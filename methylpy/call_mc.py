@@ -17,17 +17,21 @@ except Exception,e:
     exc_type, exc_obj, exc_tb = exc_info()
     print(exc_type, exc_tb.tb_lineno)
     print e
-    exit("methylpy.DMRfind requires ArgumentParser from the argparse module")
+    exit("methylpy.call_mc requires ArgumentParser from the argparse module")
     
-def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_reference,reference_fasta,unmethylated_control,
-                             quality_version="1.8",path_to_samtools="",path_to_bowtie="",
-                             bowtie_options=["-S","-k 1","-m 1","--chunkmbs 3072","--best","--strata","-o 4","-e 80","-l 20","-n 0"],
-                             num_procs=1,trim_reads=True,
-                             path_to_cutadapt="",adapter_seq = "AGATCGGAAGAGCACACGTCTG",max_adapter_removal=None,
-                             overlap_length=None,zero_cap=None,error_rate=None,min_qual_score=10,
-                             min_read_len=30,sig_cutoff=.01,min_cov=0,binom_test=True,bh=True,keep_temp_files=False,num_reads=-1,save_space=True,
-                             bowtie2=False,sort_mem="500M",path_to_output="",in_mem=False,min_base_quality=1,
-                             path_to_MarkDuplicates=False):
+def run_methylation_pipeline(files, libraries, sample,
+                             forward_reference, reverse_reference, reference_fasta, unmethylated_control,
+                             quality_version="1.8", remove_clonal=True, path_to_picard="",
+                             path_to_samtools="", path_to_bowtie="",
+                             bowtie_options=["-S","-k 1","-m 1","--chunkmbs 3072",
+                                             "--best","--strata","-o 4","-e 80","-l 20","-n 0"],
+                             num_procs=1, trim_reads=True,
+                             path_to_cutadapt="", adapter_seq = "AGATCGGAAGAGCACACGTCTG", max_adapter_removal=None,
+                             overlap_length=None, zero_cap=None, error_rate=None, min_qual_score=10, min_read_len=30,
+                             sig_cutoff=.01, min_cov=0, binom_test=True, bh=False,
+                             keep_temp_files=False, num_reads=-1, save_space=True,
+                             bowtie2=False, sort_mem="500M", path_to_output="", in_mem=False, min_base_quality=1):
+
     """
     files is a list of all the fastq files you'd like to run through the pipeline. 
         Note that globbing is supported here (i.e., you can use * in your paths)
@@ -57,11 +61,17 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
         
     quality_version is either an integer indicating the base offset for the quality scores or a float indicating
         which version of casava was used to generate the fastq files.
+
+    remove_clonal is a boolean indicating that you want to remove clonal reads (PCR duplicates). If true,
+        picard.jar should be available in folder specified in path_to_picard.
+    
+    path_to_picard is a string of the path to "picard.jar". "picard.jar" is assumed to be 
+        in your path if this option isn't used
             
     path_to_samtools is a string indicating the path to the directory containing your 
         installation of samtools. Samtools is assumed to be in your path if this is not
         provided    
-    
+
     path_to_bowtie is a string indicating the path to the folder in which bowtie resides. Bowtie
         is assumed to be in your path if this option isn't used
             
@@ -111,10 +121,11 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
     num_reads is an integer indicating how many reads you'd like to process at a time. Breaking up the processing this
         way can reduce the size of some of the intermediate files that are created. Use this if you're strapped for space.
         
-    save_space indicates whether or not you'd like to perform read collapsing right after mapping or once all the libraries have
-        been mapped. If you wait until after everything has been mapped, the collapsing can be parallelized. Otherwise the collapsing
-        will have to be done serially. The trade-off is that you must keep all the mapped files around, rather than deleting them as they
-        are processed, which can take up a considerable amount of space. It's safest to set this to True.
+    save_space indicates whether or not you'd like to perform read collapsing right after mapping or once all the 
+        libraries have been mapped. If you wait until after everything has been mapped, the collapsing can be 
+        parallelized. Otherwise the collapsing will have to be done serially. The trade-off is that you must keep
+        all the mapped files around, rather than deleting them as they are processed, which can take up a 
+        considerable amount of space. It's safest to set this to True.
     
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
     
@@ -124,11 +135,9 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
     
     path_to_output is the path to a directory where you would like the output to be stored. The default is the
         same directory as the input fastqs.
+
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
-        mpileup file (and subsequently to be considered for methylation calling)    
-    
-    path_to_MarkDuplicates is the path to MarkDuplicates jar from picard. Default is false indicating that you
-        don't want to use this jar for duplication removal
+        mpileup file (and subsequently to be considered for methylation calling)        
     """
     #Figure out all the correct quality options based on the offset or CASAVA version given
     try:
@@ -215,15 +224,8 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
                                         path_to_output=path_to_output,save_space=save_space)            
         if save_space == True:
             pool = multiprocessing.Pool(num_procs)
-            #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up 
-            #the sorting. I had to add some special logic in the processing though
             processed_library_files = glob.glob(path_to_output+sample+"_"+str(current_library)+"_*_no_multimap_*")
-            for filen in processed_library_files:
-                cmd = shlex.split("sort" + sort_mem + " -t '\t' -k 4n -o "+filen+" "+filen)
-                pool.apply_async(subprocess.check_call,(cmd,))
-            pool.close()
-            pool.join()
-            total_clonal += collapse_clonal_reads(reference_fasta,path_to_samtools,num_procs,sample,current_library,path_to_files=path_to_output,sort_mem=sort_mem)
+            total_clonal += collapse_clonal_reads(reference_fasta,path_to_samtools,num_procs,sample,current_library,path_to_files=path_to_output,sort_mem=sort_mem,remove_clonal=remove_clonal,path_to_picard=path_to_picard)
     if save_space == True:
         print_checkpoint("There are " + str(total_unique) + " uniquely mapping reads, " + str(float(total_unique) / total_reads*100) + " percent remaining")
     else:
@@ -243,7 +245,6 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
                 result.get()
             #Need to add the _1 for a bogus chunk ID
             merge_results.append(pool.apply_async(merge_sorted_multimap,(sorted_files,sample+"_"+str(library)+"_1")))
-            #total_unique += merge_sorted_multimap(sorted_files,sample+"_"+library,num_procs)
         pool.close()
         pool.join()
         subprocess.check_call(shlex.split("rm "+" ".join(sorted_files)))
@@ -256,47 +257,40 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
         #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up 
         #the sorting. I had to add some special logic in the processing though
         processed_library_files = glob.glob(path_to_output+sample+"_"+str(current_library)+"_*_no_multimap_*")
-        for filen in processed_library_files:
-            cmd = shlex.split("sort" + sort_mem + " -t '\t' -k 4n -o "+filen+" "+filen)
-            pool.apply_async(subprocess.check_call,(cmd,))
-        pool.close()
-        pool.join()
         
         clonal_results = []
         pool = multiprocessing.Pool(num_procs)
 
         for library in set(libraries):
-            clonal_results.append(pool.apply_async(collapse_clonal_reads,(reference_fasta,path_to_samtools,num_procs,sample,library), {"sort_mem":sort_mem,"path_to_files":path_to_output}))
+            clonal_results.append(pool.apply_async(collapse_clonal_reads,(reference_fasta,path_to_samtools,num_procs,sample,library), {"sort_mem":sort_mem,"path_to_files":path_to_output,"remove_clonal":remove_clonal,"path_to_picard":path_to_picard}))
         pool.close()
         pool.join()
-        
-        for result in clonal_results:
-            total_clonal += result.get()
-    
-    print_checkpoint("There are " + str(total_clonal) + " non-clonal reads, " + str(float(total_clonal) / total_reads*100) + " percent remaining") 
-    library_files = [path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam" for library in set(libraries)]
-    if len(library_files) > 1:
-        merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
-        subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
-    else:
-        subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads_no_clonal.bam"))
 
-    #Remove clonal reads
-    if path_to_MarkDuplicates != False:
-        subprocess.check_call(shlex.split(" ".join(["java","-Xmx20g","-jar",
-                                                    path_to_MarkDuplicates+"/picard.jar MarkDuplicates",
-                                                    "INPUT="+sample+"_processed_reads_no_clonal.bam",
-                                                    "OUTPUT="+sample+"_processed_reads_no_clonal_final.bam",
-                                                    "ASSUME_SORTED=true",
-                                                    "REMOVE_DUPLICATES=true",
-                                                    "METRICS_FILE=/dev/null",
-                                                    "VALIDATION_STRINGENCY=LENIENT"])))
-        subprocess.check_call(shlex.split(" ".join(["mv",
-                                                    sample+"_processed_reads_no_clonal_final.bam",
-                                                    sample+"_processed_reads_no_clonal.bam"])))
+        if remove_clonal==True:        
+            for result in clonal_results:
+                total_clonal += result.get()
+
+    if remove_clonal==True:
+        print_checkpoint("There are " + str(total_clonal) + " non-clonal reads, " + str(float(total_clonal) / total_reads*100) + " percent remaining")
+        library_files = [path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam" for library in set(libraries)]
+        if len(library_files) > 1:
+            merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
+            subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
+        else:
+            subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads_no_clonal.bam"))
+    else:
+        library_files = [path_to_output+sample+"_processed_reads_"+str(library)+".bam" for library in set(libraries)]
+        if len(library_files) > 1:
+            merge_bam_files(library_files,path_to_output+sample+"_processed_reads.bam",path_to_samtools)
+            subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
+        else:
+            subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads.bam"))
 
     print_checkpoint("Begin calling mCs")
-    call_methylated_sites(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
+    if remove_clonal==True:
+        call_methylated_sites(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
+    else:
+        call_methylated_sites(sample+"_processed_reads.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
     print_checkpoint("Done")
     
 def run_mapping(current_library,library_files,sample,forward_reference,reverse_reference,reference_fasta,
@@ -822,7 +816,9 @@ def merge_unknown_bam(old_file, new_file, output, path_to_samtools=""):
     
     print_checkpoint("Finished merging BAM files")
 
-def collapse_clonal_reads(reference_fasta,path_to_samtools,num_procs,sample,current_library, sort_mem="500M",path_to_files=""):
+def collapse_clonal_reads(reference_fasta,path_to_samtools,num_procs,sample,
+                          current_library, sort_mem="500M",path_to_files="",
+                          remove_clonal=True,path_to_picard=""):
     """
     This function is a wrapper for collapsing clonal reads
     
@@ -846,21 +842,55 @@ def collapse_clonal_reads(reference_fasta,path_to_samtools,num_procs,sample,curr
     
     path_to_files is a string indicating the path for the output files and input sam for clonal
         collapsing.
+
+    remove_clonal is a boolean indicating that you want to remove clonal reads (PCR duplicates). If true,
+        picard.jar should be available in folder specified in path_to_picard.
+    
+    path_to_picard is a string of the path to "picard.jar". "picard.jar" is assumed to be 
+        in your path if this option isn't used
     """
-    print_checkpoint("Collapsing clonal reads for library "+str(current_library))
+    if remove_clonal == True:
+        print_checkpoint("Collapsing clonal reads for library "+str(current_library))
+    else:
+        print_checkpoint("Processing uniquely mapped reads for library "+str(current_library))
+
     #Include the * between the library and _no_multimap to account for different chunks
     #Reads in each of these files are sorted by the position
     processed_library_files = glob.glob(path_to_files+sample+"_"+str(current_library)+"_*_no_multimap_*")
-    #processed_library_files = glob.glob(path_to_files+sample+"_"+str(current_library)+"_no_multimap_*")
-    total_clonal = find_clonal_reads(processed_library_files,path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal",reference_fasta,path_to_samtools=path_to_samtools,num_procs=num_procs,sort_mem=sort_mem)
+    merge_no_multimap(processed_library_files,
+                      path_to_files+sample+"_processed_reads_"+str(current_library)+"",
+                      reference_fasta,path_to_samtools=path_to_samtools,num_procs=num_procs,sort_mem=sort_mem)
+    
     print_checkpoint("Converting to BAM")
-    f = open(path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam",'w')
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"),stdout=f)
+    f = open(path_to_files+sample+"_processed_reads_"+str(current_library)+".bam",'w')
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+path_to_files+sample+"_processed_reads_"+str(current_library)),stdout=f)
+    subprocess.check_call(shlex.split(" ".join(["rm",
+                                                path_to_files+sample+"_processed_reads_"+str(current_library)])))
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+".bam "+path_to_files+sample+"_processed_reads_"+str(current_library)))
+    
     f.close()
-    subprocess.check_call(shlex.split("rm "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"))
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam -o "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam"))
-    #subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"))
-    return total_clonal
+
+    total_clonal = 0
+    #Remove clonal reads
+    if remove_clonal == True:
+        print_checkpoint("Remove clonal reads for library "+str(current_library))
+        subprocess.check_call(shlex.split(" ".join(["java","-Xmx2g","-jar",
+                                                    path_to_picard+"/picard.jar MarkDuplicates",
+                                                    "INPUT="+path_to_files+sample+"_processed_reads_"+str(current_library)+".bam",
+                                                    "OUTPUT="+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam",
+                                                    "ASSUME_SORTED=true",
+                                                    "REMOVE_DUPLICATES=true",
+                                                    "METRICS_FILE=/dev/null",
+                                                    "VALIDATION_STRINGENCY=LENIENT"])))
+        subprocess.check_call(shlex.split(" ".join(["rm",
+                                                    path_to_files+sample+"_processed_reads_"+str(current_library)+".bam"])))
+        total_clonal = subprocess.check_output(
+            shlex.split(" ".join([path_to_samtools,
+                                  "samtools view -c",
+                                  path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam"])
+            ))
+    
+    return int(total_clonal)
 
 def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bowtie2=False):
     """
@@ -1264,13 +1294,14 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
         file_handles[file_num].close()
 def merge_sorted_multimap(files, output):
     """
-    This function takes the files from find_multi_mappers and outputs the uniquely mapping reads
+    This function takes the files from find_multi_mappers and outputs the uniquely mapping reads.
     
     files is a list of filenames containing the output of find_multi_mappers
     
-    output is a prefix you'd like prepended to the file containing the uniquely mapping reads
+    output is a prefix you'd like prepended to the bam file containing the uniquely mapping reads
         This file will be named as <output>+"_no_multimap_"+<index_num>
-        """
+    """
+    
     lines = {}
     fields = {}
     output_handles = {}
@@ -1281,7 +1312,7 @@ def merge_sorted_multimap(files, output):
     cycle = itertools.cycle(range(0,len(files)))
     
     for index,filen in enumerate(files):
-        output_handles[index] = open(output+"_no_multimap_"+str(index),'a')
+        output_handles[index] = open(output+"_no_multimap_"+str(index),'a')               
         file_handles[filen]=open(filen,'r')
         lines[filen]=file_handles[filen].readline()
         fields[filen] = lines[filen].split("\t")[0]
@@ -1306,33 +1337,14 @@ def merge_sorted_multimap(files, output):
             total_unique += 1
             
     for index,filen in enumerate(files):
-        output_handles[index].close()
+        output_handles[index].close()                
         file_handles[filen].close()
-    
+
     return total_unique
         
-def merge_sorted_clonal(files, output,reference_fasta,path_to_samtools=""):
+def merge_no_multimap(files,output,reference_fasta,num_procs=1,path_to_samtools="",sort_mem="500M"):
     """
-    This function takes the output of find_clonal_reads and drops all but one read
-    mapping to the same strand, position, and chromosome.
-    
-    files is a list of files containing the output from find_clonal_reads
-    
-    output is the name of the file you'd like the non-clonal reads output to
-    
-    reference_fasta is a string indciating the path to a fasta file containing the sequences
-        you used for mapping
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
-        installation of samtools. Samtools is assumed to be in your path if this is not
-        provided
-    """
-
-        
-def find_clonal_reads(files,output,reference_fasta,num_procs=1,path_to_samtools="",sort_mem="500M"):
-    """
-    This function takes a list of files, sorts them by position, and hands them off to
-    merge_sorted_clonal to have clonal reads removed
+    This function takes a list of *_no_multimap files and merge them into a sam file
     
     files is a list of files that you wish to have clonal reads removed from and reads in each of these files are sorted by position
     
@@ -1351,8 +1363,6 @@ def find_clonal_reads(files,output,reference_fasta,num_procs=1,path_to_samtools=
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
 
-    
-    total_clonal = 0 #number of non-clonal reads
     g = open(output,'w')
     try:
         f = open(reference_fasta+".fai",'r')
@@ -1369,60 +1379,28 @@ def find_clonal_reads(files,output,reference_fasta,num_procs=1,path_to_samtools=
         fields = line.split("\t")
         g.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
     f.close()
-    #Start to remove clonal reads(?)
-    lines = {}
-    positions = {}
-    chroms_strands = {}
-    file_handles = {}
     #Intialization
     for filen in files:
-        file_handles[filen]=open(filen,'r')
-        lines[filen]=file_handles[filen].readline()
-        fields = lines[filen].split("\t")
-        positions[filen] = int(fields[3])
-        chroms_strands[filen] = (fields[2],fields[1])
-    #Start to remove clonal reads
-    while True:
-        all_fields = [field for field in positions.values() if field != ""]
-        if len(all_fields) == 0:
-            break
-        min_field = min(all_fields)
-        chrom_seen = []
-        for key in positions:
-            while positions[key] == min_field:
-                if chroms_strands[key] not in chrom_seen:
-                    chrom_seen.append(chroms_strands[key])
-                    g.write(lines[key])
-                    total_clonal += 1
-                lines[key]=file_handles[key].readline()
-                try:
-                    fields = lines[key].split("\t")
-                    positions[key]=int(fields[3])
-                    chroms_strands[key] = (fields[2],fields[1])
-                except:
-                    positions[key]=""
-                    chroms_strands[key]=""
-                
-    g.close()          
-    for filen in files:
-        file_handles[filen].close()
+        file_handle=open(filen,'r')
+        for line in file_handle:
+            g.write(line)
+        file_handle.close()
+    g.close()
     subprocess.check_call(shlex.split("rm "+" ".join(files)))
-    return total_clonal
-            
 
 def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                                 forward_reference,reverse_reference,reference_fasta,unmethylated_control,
-                                quality_version="1.8",path_to_samtools="",path_to_bowtie="",
+                                quality_version="1.8",remove_clonal=True,path_to_picard="",
+                                path_to_samtools="",path_to_bowtie="",
                                 bowtie_options=[],
                                 num_procs=1,trim_reads=True,path_to_cutadapt="",
                                 adapter_seq_R1 = "AGATCGGAAGAGCACACGTCTGAAC",
                                 adapter_seq_R2 = "AGATCGGAAGAGCGTCGTGTAGGGA",
                                 max_adapter_removal=None,
                                 overlap_length=None,zero_cap=None,error_rate=None,min_qual_score=10,
-                                min_read_len=30,sig_cutoff=.01,min_cov=0,binom_test=True,bh=True,
+                                min_read_len=30,sig_cutoff=.001,min_cov=0,binom_test=True,bh=False,
                                 keep_temp_files=False,num_reads=-1,save_space=True,
-                                bowtie2=True,sort_mem="500M",path_to_output="",in_mem=False,min_base_quality=1,
-                                path_to_MarkDuplicates=False):
+                                bowtie2=True,sort_mem="500M",path_to_output="",in_mem=False,min_base_quality=1):
     """
     This function 
 
@@ -1459,6 +1437,12 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         
     quality_version is either an integer indicating the base offset for the quality scores or a float indicating
         which version of casava was used to generate the fastq files.
+
+    remove_clonal is a boolean indicating that you want to remove clonal reads (PCR duplicates). If true,
+        executable picard should be available in folder specified in path_to_picard.
+    
+    path_to_picard is a string of the path to "picard.jar". "picard.jar" is assumed to be 
+        in your path if this option isn't used
             
     path_to_samtools is a string indicating the path to the directory containing your 
         installation of samtools. Samtools is assumed to be in your path if this is not
@@ -1536,7 +1520,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
         mpileup file (and subsequently to be considered for methylation calling)    
 
-    path_to_MarkDuplicates is the path to MarkDuplicates jar from picard. Default is false indicating that you
+    path_to_picard is the path to MarkDuplicates jar from picard. Default is false indicating that you
         don't want to use this jar for duplication removal
     """
 
@@ -1665,13 +1649,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
             #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up 
             #the sorting. I had to add some special logic in the processing though
             processed_library_files = glob.glob(path_to_output+sample+"_"+str(current_library)+"_*_no_multimap_*")
-            for filen in processed_library_files:
-                #Sort by the start positions of both reads in a pair
-                cmd = shlex.split("sort" + sort_mem + " -t '\t' -k 4n -k 8n -o "+filen+" "+filen)
-                pool.apply_async(subprocess.check_call,(cmd,))
-            pool.close()
-            pool.join()
-            total_clonal += collapse_clonal_reads_pe(reference_fasta,path_to_samtools,num_procs,sample,current_library,path_to_files=path_to_output,sort_mem=sort_mem)
+            total_clonal += collapse_clonal_reads(reference_fasta,path_to_samtools,num_procs,sample,current_library,path_to_files=path_to_output,sort_mem=sort_mem,remove_clonal=remove_clonal,path_to_picard=path_to_picard)
     if save_space == True:
         print_checkpoint("There are " + str(total_unique) + " uniquely mapping reads, " + str(float(total_unique) / total_reads*100) + " percent remaining")
     else:
@@ -1697,6 +1675,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         subprocess.check_call(shlex.split("rm "+" ".join(sorted_files)))
         for result in merge_results:
             total_unique+=result.get()
+            
         print_checkpoint("There are " + str(total_unique) + " uniquely mapping reads, " + str(float(total_unique) / total_reads*100) + " percent remaining")
         
         
@@ -1714,38 +1693,35 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         pool = multiprocessing.Pool(num_procs)
 
         for library in set(libraries):
-            clonal_results.append(pool.apply_async(collapse_clonal_reads_pe,(reference_fasta,path_to_samtools,num_procs,sample,library), {"sort_mem":sort_mem,"path_to_files":path_to_output}))
+            clonal_results.append(pool.apply_async(collapse_clonal_reads,(reference_fasta,path_to_samtools,num_procs,sample,library), {"sort_mem":sort_mem,"path_to_files":path_to_output,"remove_clonal":remove_clonal,"path_to_picard":path_to_picard}))
         pool.close()
         pool.join()
         
         for result in clonal_results:
             total_clonal += result.get()
-    
-    print_checkpoint("There are " + str(total_clonal) + " non-clonal reads, " + str(float(total_clonal) / total_reads*100) + " percent remaining") 
-    library_files = [path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam" for library in set(libraries)]
-    if len(library_files) > 1:
-        merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
-        subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
+            
+    if remove_clonal == True:
+        print_checkpoint("There are " + str(total_clonal/2) + " non-clonal reads, " + str(float(total_clonal/2) / total_reads*100) + " percent remaining") 
+        library_files = [path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam" for library in set(libraries)]
+        if len(library_files) > 1:
+            merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
+            subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
+        else:
+            subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads_no_clonal.bam"))
     else:
-        subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads_no_clonal.bam"))
+        library_files = [path_to_output+sample+"_processed_reads_"+str(library)+".bam" for library in set(libraries)]
+        if len(library_files) > 1:
+            merge_bam_files(library_files,path_to_output+sample+"_processed_reads.bam",path_to_samtools)
+            subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
+        else:
+            subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads.bam"))
 
-    #Remove clonal reads
-    if path_to_MarkDuplicates != False:
-        subprocess.check_call(shlex.split(" ".join(["java","-Xmx20g","-jar",
-                                                    path_to_MarkDuplicates+"/picard.jar MarkDuplicates",
-                                                    "INPUT="+sample+"_processed_reads_no_clonal.bam",
-                                                    "OUTPUT="+sample+"_processed_reads_no_clonal_final.bam",
-                                                    "ASSUME_SORTED=true",
-                                                    "REMOVE_DUPLICATES=true",
-                                                    "METRICS_FILE=/dev/null",
-                                                    "VALIDATION_STRINGENCY=LENIENT"])))
-        subprocess.check_call(shlex.split(" ".join(["mv",
-                                                    sample+"_processed_reads_no_clonal_final.bam",
-                                                    sample+"_processed_reads_no_clonal.bam"])))
-        
     #Calling methylated sites
     print_checkpoint("Begin calling mCs")
-    call_methylated_sites_pe(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
+    if remove_clonal == True:
+        call_methylated_sites_pe(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
+    else:
+        call_methylated_sites_pe(sample+"_processed_reads.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
     print_checkpoint("Done")
 
 
@@ -1890,13 +1866,12 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                 pool.apply_async(convert_reads_pe,(inputf,output,True))
             pool.close()
             pool.join()
-            if keep_temp_files==False:
-                subprocess.check_call(
-                    shlex.split("rm "+" ".join([file_path+"_R1_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
-                )
-                subprocess.check_call(
-                    shlex.split("rm "+" ".join([file_path+"_R2_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
-                )        
+            subprocess.check_call(
+                shlex.split("rm "+" ".join([file_path+"_R1_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
+            )
+            subprocess.check_call(
+                shlex.split("rm "+" ".join([file_path+"_R2_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
+            )        
             #Run bowtie
             print_checkpoint("Begin Running Bowtie for "+file_name)
             total_unique += run_bowtie_pe([file_path+"_R1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)],
@@ -1928,9 +1903,8 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                                           save_space=save_space)
         chunk+=1
 
-    if keep_temp_files==False:
-        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_R1_split_"+str(i) for i in xrange(0,num_procs)])))
-        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_R2_split_"+str(i) for i in xrange(0,num_procs)])))
+    subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_R1_split_"+str(i) for i in xrange(0,num_procs)])))
+    subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_R2_split_"+str(i) for i in xrange(0,num_procs)])))
     
     return total_unique
 
@@ -2100,7 +2074,7 @@ def merge_sorted_multimap_pe(files, output):
     
     output is a prefix you'd like prepended to the file containing the uniquely mapping reads
         This file will be named as <output>+"_no_multimap_"+<index_num>
-        """
+    """
     lines = {}
     fields = {}
     output_handles = {}
@@ -2200,129 +2174,6 @@ def convert_reads_pe(inputf,output,is_R2=False):
             encoding = encode_converted_positions(seq,is_R2=is_R2)
     f.close()
     g.close()
-
-def collapse_clonal_reads_pe(reference_fasta,path_to_samtools,num_procs,sample,current_library, sort_mem="500M",path_to_files=""):
-    """
-    This function is a wrapper for collapsing clonal reads
-    
-    reference_fasta is a string indicating the path to a fasta file containing the sequences
-        you used for mapping
-        input is the path to a bam file that contains mapped bisulfite sequencing reads
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
-        installation of samtools. Samtools is assumed to be in your path if this is not
-        provided    
-
-    num_procs is an integer indicating how many num_procs you'd like to run this function over
-
-    sample is a string indicating the name of the sample you're processing. It will be included
-        in the output files.
-    
-    current_library is the library from which clonal reads should be removed. The expected file
-        name is <sample>_processed_reads_<current_library>_no_clonal
-        
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
-    path_to_files is a string indicating the path for the output files and input sam for clonal
-        collapsing.
-    """
-    print_checkpoint("Collapsing clonal reads for library "+str(current_library))
-    #Include the * between the library and _no_multimap to account for different chunks
-    #Reads in each of these files are sorted by the position
-    processed_library_files = glob.glob(path_to_files+sample+"_"+str(current_library)+"_*_no_multimap_*")
-    #processed_library_files = glob.glob(path_to_files+sample+"_"+str(current_library)+"_no_multimap_*")
-    total_clonal = find_clonal_reads_pe(processed_library_files,path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal",reference_fasta,path_to_samtools=path_to_samtools,num_procs=num_procs,sort_mem=sort_mem)
-    print_checkpoint("Converting to BAM")
-    f = open(path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam",'w')
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"),stdout=f)
-    f.close()
-    subprocess.check_call(shlex.split("rm "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"))
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam -o "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam"))
-    #subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"))
-    return total_clonal
-
-
-def find_clonal_reads_pe(files,output,reference_fasta,num_procs=1,path_to_samtools="",sort_mem="500M"):
-    """
-    This function takes a list of files, sorts them by position, and hands them off to
-    merge_sorted_clonal to have clonal reads removed
-    
-    files is a list of files that you wish to have clonal reads removed from and reads in each of these files are sorted by position
-    
-    output is a string indicating the prefix you'd like prepended to the file containing the
-        non-clonal output
-    
-    reference_fasta is a string indicating the path to a fasta file containing the sequences
-        you used for mapping
-    
-    num_procs is an integer indicating the number of files you'd like to split the input into
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
-        installation of samtools. Samtools is assumed to be in your path if this is not
-        provided
-        
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-
-    
-    total_clonal = 0 #number of non-clonal reads
-    g = open(output,'w')
-    try:
-        f = open(reference_fasta+".fai",'r')
-    except:
-        print "Reference fasta not indexed. Indexing."
-        try:
-            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
-            f = open(reference_fasta+".fai",'r')
-        except:
-            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
-    #Create sam header based on reference genome
-    g.write("@HD\tVN:1.0\tSO:unsorted\n")
-    for line in f:
-        fields = line.split("\t")
-        g.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
-    f.close()
-    
-    #Start to remove clonal reads(?)
-    ##Intialization
-    lines = {}
-    positions = {}
-    chroms_strands = {}
-    file_handles = {}
-    for filen in files:
-        file_handles[filen]=open(filen,'r')
-        lines[filen]=file_handles[filen].readline()
-        fields = lines[filen].split("\t")
-        positions[filen] = (int(fields[3]),int(fields[7]))
-        chroms_strands[filen] = (fields[2],fields[1])
-    ##Start to remove clonal reads
-    while True:
-        all_fields = [field for field in positions.values() if field != ""]
-        if len(all_fields) == 0:
-            break
-        min_field = min(all_fields)
-        chrom_seen = []
-        for key in positions:
-            while positions[key] == min_field:
-                if chroms_strands[key] not in chrom_seen:
-                    chrom_seen.append(chroms_strands[key])
-                    g.write(lines[key])
-                    total_clonal += 1
-                lines[key]=file_handles[key].readline()
-                #Update
-                try:
-                    fields = lines[key].split("\t")
-                    positions[key]=(int(fields[3]),int(fields[7]))
-                    chroms_strands[key] = (fields[2],fields[1])
-                except:
-                    positions[key]=""
-                    chroms_strands[key]=""
-                
-    g.close()          
-    for filen in files:
-        file_handles[filen].close()
-    subprocess.check_call(shlex.split("rm "+" ".join(files)))
-    return total_clonal/2
 
 def quality_trim(inputf, output = None, quality_base = None, min_qual_score = None, min_read_len = None, 
                  adapter_seq = "AGATCGGAAGAGCACACGTCTG", num_procs = 1, format = None, error_rate = None, 
@@ -2426,8 +2277,8 @@ def quality_trim(inputf, output = None, quality_base = None, min_qual_score = No
     #adapter trimming
     for current_input,current_output in zip(inputf,output):
         if output:
-            run_options = options + " -o " + current_output + " "
-        pool.apply_async(subprocess.check_call,(base_cmd + run_options + current_input,),{"shell":True})
+            options += " -o " + current_output + " "
+        pool.apply_async(subprocess.check_call,(base_cmd + options + current_input,),{"shell":True})
     pool.close()
     pool.join()
 
@@ -2554,13 +2405,68 @@ def quality_trim_pe(inputf_R1, outputf_R1,inputf_R2, outputf_R2,quality_base = N
     pool = multiprocessing.Pool(num_procs)
     #adapter trimming
     for current_input_R1,current_output_R1,current_input_R2,current_output_R2 in zip(inputf_R1,outputf_R1,inputf_R2,outputf_R2):
-        run_options = options + " -o " + current_output_R1 + " " + " -p " + current_output_R2 + " "
-        pool.apply_async(subprocess.check_call,(base_cmd + run_options + current_input_R1 + " " + current_input_R2,),{"shell":True})
+        options += " -o " + current_output_R1 + " " + " -p " + current_output_R2 + " "
+        pool.apply_async(subprocess.check_call,(base_cmd + options + current_input_R1 + " " + current_input_R2,),{"shell":True})
     pool.close()
     pool.join()
+
+
+def flip_R2_strand(input_file,output_file,path_to_samtools=""):
+    """
+    This function flips the strand of all read2s (R2s) of mapped paired-end
+        reads in input bam file
+    
+    input_file:
+        Input bam file storing the mapped paired-end reads
+
+    output_file:
+        Output bam file storing the paired-end reads with strand of read 2 flipped
+
+    path_to_samtools:
+        A string of the directory where samtools executive is available. By default,
+        samtools is assumed to be included in your path (PATH environmental vairable).
+    """
+        
+    if len(path_to_samtools) > 0:
+        path_to_samtools += "/"
+    # Input initialization
+    input_pipe = subprocess.Popen(
+        shlex.split(path_to_samtools+"samtools view -h "+input_file),
+        stdout=subprocess.PIPE)
+    # Output initialization
+    output_handle = open(output_file,'w')
+    output_pipe = subprocess.Popen(
+        shlex.split(path_to_samtools+"samtools view -S -b -"),
+        stdin=subprocess.PIPE,stdout=output_handle)
+
+    for line in input_pipe.stdout:
+        # header
+        if line[0] == "@":
+            output_pipe.stdin.write(line)
+            continue
+
+        fields = line.split("\t")
+        flag = int(fields[1])
+        # Check if it is read 2
+        if( (flag & 128) == 0 ): #Not read 2
+            output_pipe.stdin.write(line)
+            continue
+        # flip the strand of read 2
+        if( (flag & 16) == 0):
+            flag += 16
+        else:
+            flag -= 16
+        fields[1] = str(flag)
+        # Write
+        output_pipe.stdin.write("\t".join(fields))
+        
+    # End
+    output_handle.close()
+    output_pipe.stdin.close()
+
     
 def call_methylated_sites_pe(inputf, sample, reference, control,quality_version,sig_cutoff=.01,num_procs = 1,
-                             min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=True,
+                             min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=False,
                              path_to_files="",min_base_quality=1):
 
     """
@@ -2597,12 +2503,14 @@ def call_methylated_sites_pe(inputf, sample, reference, control,quality_version,
         mpileup file (and subsequently to be considered for methylation calling)
     """
 
-    #Flip the strand of R2 and create a new bam file
+    #Flip the strand of read 2 (R2) and create a new bam file
     ##input: sample+"_processed_reads_no_clonal.bam"
     ##output: sample+"_processed_reads_no_clonal_flipped.bam"
     print_checkpoint("Begin flipping the strand of R2 reads")
-    pl_exe_path = __file__[:__file__.rfind("/")]+"/flip_R2.pl"
-    subprocess.check_call(shlex.split(" ".join(["env perl",pl_exe_path,inputf,inputf+".R2flipped.bam",path_to_samtools])))
+    flip_R2_strand(input_file = inputf,
+                   output_file = inputf+".R2flipped.bam",
+                   path_to_samtools=path_to_samtools)
+
         
     #Call methylated sites
     call_methylated_sites(inputf+".R2flipped.bam", sample, reference, control,quality_version,sig_cutoff,num_procs,
@@ -2617,9 +2525,8 @@ def call_methylated_sites_pe(inputf, sample, reference, control,quality_version,
         pass
 
     
-    
 def call_methylated_sites(inputf, sample, reference, control,quality_version,sig_cutoff=.01,num_procs = 1,
-                          min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
+                          min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=False,path_to_files="",min_base_quality=1):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads
@@ -3659,7 +3566,8 @@ def parse_args():
      parser_pipeline.add_argument('--path_to_output', type=str, default="", help="Path to a directory where you would like the output to be stored. \
         The default is the same directory as the input fastqs.")
      parser_pipeline.add_argument('--in_mem', type=bool, default=False, help="Does not write files as part of run_mapping, keeps all input/output in memory")
-     parser_pipeline.add_argument('--path_to_MarkDuplicates', type=str, default=False, help="The path to MarkDuplicates jar from picard. Default is false indicating that you don't want to use this jar for duplication removal")
+     parser_pipeline.add_argument('--path_to_picard', type=str, default=False, help="The path to MarkDuplicates jar from picard. Default is false indicating that you don't want to use this jar for duplication removal")
+     parser_pipeline.add_argument('--remove_clonal', type=bool, default=True, help="Remove clonal reads or not")
 
      
      #create the parser for the "call_methylated_sites" command
