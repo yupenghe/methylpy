@@ -18,7 +18,7 @@ except Exception,e:
     print(exc_type, exc_tb.tb_lineno)
     print e
     exit("methylpy.DMRfind requires ArgumentParser from the argparse module")
-    
+
 def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_reference,reference_fasta,unmethylated_control,
                              quality_version="1.8",path_to_samtools="",path_to_bowtie="",
                              bowtie_options=["-S","-k 1","-m 1","--chunkmbs 3072","--best","--strata","-o 4","-e 80","-l 20","-n 0"],
@@ -29,74 +29,74 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
                              bowtie2=False,sort_mem="500M",path_to_output="",in_mem=False,min_base_quality=1,
                              path_to_MarkDuplicates=False):
     """
-    files is a list of all the fastq files you'd like to run through the pipeline. 
+    files is a list of all the fastq files you'd like to run through the pipeline.
         Note that globbing is supported here (i.e., you can use * in your paths)
-    
+
     libraries is a list of library IDs (in the same order as the files list) indiciating which
         libraries each set of fastq files belong to. If you use a glob, you only need to indicate
         the library ID for those fastqs once (i.e., the length of files and libraries should be
         the same)
-    
+
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-        
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-        
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-        
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
         input is the path to a bam file that contains mapped bisulfite sequencing reads
 
-    unmethylated_control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your 
+    unmethylated_control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your
         sample, or the non-conversion rate you'd like to use. Consequently, control is either a string, or a decimal
-        If control is a string then it should be in the following format: "chrom:start-end". 
+        If control is a string then it should be in the following format: "chrom:start-end".
         If you'd like to specify an entire chromosome simply use "chrom:"
-        
+
     quality_version is either an integer indicating the base offset for the quality scores or a float indicating
         which version of casava was used to generate the fastq files.
-            
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided    
-    
+        provided
+
     path_to_bowtie is a string indicating the path to the folder in which bowtie resides. Bowtie
         is assumed to be in your path if this option isn't used
-            
-    bowtie_options is a list of strings indicating options you'd like passed to bowtie 
+
+    bowtie_options is a list of strings indicating options you'd like passed to bowtie
         (e.g., ["-k 1","-l 2"]
-    
+
     num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
+
     trim_reads is a boolean indicating that you want to have reads trimmed by cutadapt. This option is currently
         not compatible with "in_mem" mode.
 
     path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in your
         path.
 
-    adapter_seq is the sequence of an adapter that was ligated to the 3' end. The adapter itself and 
+    adapter_seq is the sequence of an adapter that was ligated to the 3' end. The adapter itself and
         anything that follows is trimmed.
 
-    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter 
+    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter
         gets appended multiple times.
-        
-    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than 
+
+    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than
         LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.
 
     zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation faults in BWA).
-        
-    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region) 
+
+    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region)
         (default: 0.1)
-    
-    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the 
+
+    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the
         one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
         sequence; cut sequence at the index at which the sum is minimal).
-        
+
     min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even before adapter removal
         are also discarded. In colorspace, an initial primer is not counted.
-        
+
     sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining whether or not
         a site is methylated
 
@@ -107,26 +107,26 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
 
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-        
+
     num_reads is an integer indicating how many reads you'd like to process at a time. Breaking up the processing this
         way can reduce the size of some of the intermediate files that are created. Use this if you're strapped for space.
-        
+
     save_space indicates whether or not you'd like to perform read collapsing right after mapping or once all the libraries have
         been mapped. If you wait until after everything has been mapped, the collapsing can be parallelized. Otherwise the collapsing
         will have to be done serially. The trade-off is that you must keep all the mapped files around, rather than deleting them as they
         are processed, which can take up a considerable amount of space. It's safest to set this to True.
-    
+
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
+
     in_mem: does not write files as part of run_mapping, keeps all input/output in memory
-    
+
     path_to_output is the path to a directory where you would like the output to be stored. The default is the
         same directory as the input fastqs.
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
-        mpileup file (and subsequently to be considered for methylation calling)    
-    
+        mpileup file (and subsequently to be considered for methylation calling)
+
     path_to_MarkDuplicates is the path to MarkDuplicates jar from picard. Default is false indicating that you
         don't want to use this jar for duplication removal
     """
@@ -164,16 +164,16 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
         path_to_bowtie+="/"
     if len(path_to_output) !=0:
         path_to_output+="/"
-        
+
     if sort_mem:
         if sort_mem.find("-S") == -1:
             sort_mem = " -S " + sort_mem
     else:
         sort_mem = ""
-        
+
     expanded_file_list = []
     expanded_library_list = []
-    
+
     total_reads = 0
     total_unique = 0
     total_clonal = 0
@@ -212,10 +212,10 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
                                         min_qual_score=min_qual_score,min_read_len=min_read_len,
                                         keep_temp_files=keep_temp_files,
                                         num_reads=num_reads, bowtie2=bowtie2, sort_mem=sort_mem,
-                                        path_to_output=path_to_output,save_space=save_space)            
+                                        path_to_output=path_to_output,save_space=save_space)
         if save_space == True:
             pool = multiprocessing.Pool(num_procs)
-            #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up 
+            #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up
             #the sorting. I had to add some special logic in the processing though
             processed_library_files = glob.glob(path_to_output+sample+"_"+str(current_library)+"_*_no_multimap_*")
             for filen in processed_library_files:
@@ -250,10 +250,10 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
         for result in merge_results:
             total_unique+=result.get()
         print_checkpoint("There are " + str(total_unique) + " uniquely mapping reads, " + str(float(total_unique) / total_reads*100) + " percent remaining")
-        
-        
+
+
         pool = multiprocessing.Pool(num_procs)
-        #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up 
+        #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up
         #the sorting. I had to add some special logic in the processing though
         processed_library_files = glob.glob(path_to_output+sample+"_"+str(current_library)+"_*_no_multimap_*")
         for filen in processed_library_files:
@@ -261,7 +261,7 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
             pool.apply_async(subprocess.check_call,(cmd,))
         pool.close()
         pool.join()
-        
+
         clonal_results = []
         pool = multiprocessing.Pool(num_procs)
 
@@ -269,11 +269,11 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
             clonal_results.append(pool.apply_async(collapse_clonal_reads,(reference_fasta,path_to_samtools,num_procs,sample,library), {"sort_mem":sort_mem,"path_to_files":path_to_output}))
         pool.close()
         pool.join()
-        
+
         for result in clonal_results:
             total_clonal += result.get()
-    
-    print_checkpoint("There are " + str(total_clonal) + " non-clonal reads, " + str(float(total_clonal) / total_reads*100) + " percent remaining") 
+
+    print_checkpoint("There are " + str(total_clonal) + " non-clonal reads, " + str(float(total_clonal) / total_reads*100) + " percent remaining")
     library_files = [path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam" for library in set(libraries)]
     if len(library_files) > 1:
         merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
@@ -298,7 +298,7 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
     print_checkpoint("Begin calling mCs")
     call_methylated_sites(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
     print_checkpoint("Done")
-    
+
 def run_mapping(current_library,library_files,sample,forward_reference,reverse_reference,reference_fasta,
                 path_to_samtools="",path_to_bowtie="",
                 bowtie_options=["-S","-k 1","-m 1","--chunkmbs 3072","--best","--strata","-o 4","-e 80","-l 20","-n 0"],
@@ -308,76 +308,76 @@ def run_mapping(current_library,library_files,sample,forward_reference,reverse_r
                 path_to_output="",save_space=True):
     """
     This function runs the mapping portion of the methylation calling pipeline.
-    
+
     current_library is the ID that you'd like to run mapping on.
-    
+
     libraries is a list of library IDs (in the same order as the files list) indiciating which
         libraries each set of fastq files belong to. If you use a glob, you only need to indicate
         the library ID for those fastqs once (i.e., the length of files and libraries should be
         the same)
-    
+
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-        
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-        
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-        
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
 
-    path_to_samtools is a string indicating the path to the directory containing your 
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided.    
-    
+        provided.
+
     path_to_bowtie is a string indicating the path to the folder in which bowtie resides. Bowtie
         is assumed to be in your path if this option isn't used
-            
-    bowtie_options is a list of strings indicating options you'd like passed to bowtie 
+
+    bowtie_options is a list of strings indicating options you'd like passed to bowtie
         (e.g., ["-k 1","-l 2"]
-    
+
     num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
+
     trim_reads is a boolean indicating that you want to have reads trimmed by cutadapt
 
     path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in your
         path.
 
-    adapter_seq is the sequence of an adapter that was ligated to the 3' end. The adapter itself and 
+    adapter_seq is the sequence of an adapter that was ligated to the 3' end. The adapter itself and
         anything that follows is trimmed.
 
-    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter 
+    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter
         gets appended multiple times.
-        
-    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than 
+
+    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than
         LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.
 
     zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation faults in BWA).
 
-    quality_base is the offset for quality scores. In other words, assume that quality values are encoded as ascii(quality + QUALITY_BASE). 
+    quality_base is the offset for quality scores. In other words, assume that quality values are encoded as ascii(quality + QUALITY_BASE).
         The default (33) is usually correct, except for reads produced by some versions of the Illumina pipeline, where this should
         be set to 64.
-        
-    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region) 
+
+    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region)
         (default: 0.1)
-    
-    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the 
+
+    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the
         one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
         sequence; cut sequence at the index at which the sum is minimal).
-        
+
     min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even before adapter removal
         are also discarded. In colorspace, an initial primer is not counted.
 
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-        
+
     num_reads is an integer indicating how many reads you'd like to process at a time. Breaking up the processing this
         way can reduce the size of some of the intermediate files that are created. Use this if you're strapped for space.
-    
+
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
     total_unique = 0
@@ -424,7 +424,7 @@ def run_mapping(current_library,library_files,sample,forward_reference,reverse_r
             total_unique += run_bowtie([file_path+"_split_converted_"+str(i) for i in xrange(0,num_procs)],
                                        forward_reference,reverse_reference,file_path,options=bowtie_options,
                                        path_to_bowtie=path_to_bowtie,num_procs=num_procs,keep_temp_files=keep_temp_files,
-                                       bowtie2=bowtie2, sort_mem=sort_mem,save_space=save_space)                
+                                       bowtie2=bowtie2, sort_mem=sort_mem,save_space=save_space)
         chunk+=1
 
     return total_unique
@@ -467,7 +467,7 @@ def Msplit_fastq_file(num_chunks, input_files, num_reads = -1,current_file=False
         input_files = input_files[input_files.index(current_file):]
     file_handles = {}
     for index in xrange(0,num_chunks):
-        file_handles[index]=cStr.StringIO()    
+        file_handles[index]=cStr.StringIO()
     cycle = itertools.cycle(range(0,num_chunks))
     for inputf in input_files:
         try:
@@ -489,7 +489,7 @@ def Msplit_fastq_file(num_chunks, input_files, num_reads = -1,current_file=False
                 line = f.readline()
                 file_handles[current_file].write(line)
             count += 1
-            if num_reads != -1 and count >= num_reads:                
+            if num_reads != -1 and count >= num_reads:
                 save_point = ((inputf,f.tell()), file_handles)
                 f.close()
                 return save_point
@@ -497,9 +497,9 @@ def Msplit_fastq_file(num_chunks, input_files, num_reads = -1,current_file=False
         current_pointer=0
 
     return (False, file_handles)
- 
-def Mquality_trim(file_handles, output = None, quality_base = None, min_qual_score = None, min_read_len = None, 
-                 adapter_seq = "AGATCGGAAGAGCACACGTCTG", num_procs = 1, format = None, error_rate = None, 
+
+def Mquality_trim(file_handles, output = None, quality_base = None, min_qual_score = None, min_read_len = None,
+                 adapter_seq = "AGATCGGAAGAGCACACGTCTG", num_procs = 1, format = None, error_rate = None,
                  max_adapter_removal = None, overlap_length = None, zero_cap = False, path_to_cutadapt = ""):
     if path_to_cutadapt:  #see if cutadapt is installed
         if path_to_cutadapt[-1]!="/":
@@ -511,15 +511,15 @@ def Mquality_trim(file_handles, output = None, quality_base = None, min_qual_sco
     except OSError:
         sys.exit("Cutadapt must be installed to run quality_trim")
     except:
-        devnull.close()            
-            
+        devnull.close()
+
     base_cmd = path_to_cutadapt
     options = ""
     if zero_cap:
         zero = "-z "
     else:
-        zero = ""  
-    
+        zero = ""
+
     if format:
         options += " -f " + format
     if error_rate:
@@ -548,9 +548,9 @@ def Mquality_trim(file_handles, output = None, quality_base = None, min_qual_sco
     trimmed = {}
     for key in file_handles:
         trimmed[key] = results[int(key)].get()
-    
+
     return trimmed
-        
+
 def open_cmd(cmd, fstring):
     """
     Helper function for Mquality_trim
@@ -570,7 +570,7 @@ def Mconvert_reads(file_handles, num_procs):
     converted = {}
     for key in file_handles:
         converted[key] = results[int(key)].get()
-    
+
     return converted
 
 def Mconvert_reads_helper(readstr):
@@ -582,14 +582,14 @@ def Mconvert_reads_helper(readstr):
     header2 = f.readline()
     qual = f.readline()
     encoding = encode_c_positions(seq)
-    
+
     while header:
         g.write(header+"!"+encoding+"\n")
         converted_seq = seq.replace("C","T")
         g.write(converted_seq)
         g.write(header2)
         g.write(qual)
-        
+
 
         header = f.readline().rstrip()
         header = header.replace(" ","!")
@@ -598,7 +598,7 @@ def Mconvert_reads_helper(readstr):
         qual = f.readline()
         encoding = encode_c_positions(seq)
     f.close()
-    
+
     return g.getvalue()
 
 def Mrun_bowtie(converted,forward_reference,reverse_reference,prefix,options="",path_to_bowtie="",
@@ -607,7 +607,7 @@ def Mrun_bowtie(converted,forward_reference,reverse_reference,prefix,options="",
     for key in converted:
         inreads.append(converted[key])
     inreads = "".join(inreads)
-    
+
     if sort_mem:
         if sort_mem.find("-S") == -1:
             sort_mem = " -S " + sort_mem
@@ -651,7 +651,7 @@ def Mrun_bowtie(converted,forward_reference,reverse_reference,prefix,options="",
         args.append(prefix+"_reverse_strand_hits.sam")
     proc = subprocess.Popen(shlex.split(" ".join(args)), stdin=subprocess.PIPE)
     proc.communicate(input=inreads)
-        
+
     print_checkpoint("Processing reverse strand hits")
     sam_header = find_multi_mappers(prefix+"_reverse_strand_hits.sam",prefix,num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
     pool = multiprocessing.Pool(num_procs)
@@ -668,16 +668,16 @@ def Mrun_bowtie(converted,forward_reference,reverse_reference,prefix,options="",
 def merge_bam_files(input_files,output,path_to_samtools=""):
     """
     This function will merge several bam files and create the correct header.
-    
+
     input_files is a list of files produced by collapse_clonal reads. In other words, they're assumed
         to be named like <sample>_<processed_reads>_<lib_id>_no_clonal.bam
-    
+
     output is the name of the merged bam file
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
         provided.
-    """ 
+    """
     f=open("header.sam",'w')
     subprocess.check_call(shlex.split(path_to_samtools+"samtools view -H "+input_files[0]),stdout=f)
     for filen in input_files:
@@ -693,30 +693,30 @@ def merge_unknown_bam(old_file, new_file, output, path_to_samtools=""):
     merging.
     """
     #find out if these come from the same library or not
-    
+
     #find all libary names present in the old file
     old_header = subprocess.check_output(shlex.split(path_to_samtools+"samtools view -H "+old_file))
     rg1_index = [] #indices of '@RG' substrings in header for old_file
     lib1 = [] #list of (library name, id name) found in old_file
     start = 0
     #find all instances of "@RG" in the header of old_file
-    while True: 
+    while True:
         start = old_header.find("@RG", start)
         if start==-1:
             break
         rg1_index.append(start)
         start += 3
-    
+
     #get the ID and LB from each @RG value in the header
     for index in rg1_index:
         rg1_start = old_header.find("LB:", index) + 3
-        rg1_end = old_header.find("\n", rg1_start) # (!) assumption that LB: is the last field on the @RG line    
+        rg1_end = old_header.find("\n", rg1_start) # (!) assumption that LB: is the last field on the @RG line
         id1_start = old_header.find("ID:", index) + 3
         id1_end = old_header.find("\t", id1_start)
         lib1.append((old_header[rg1_start:rg1_end], old_header[id1_start:id1_end]))
-    
+
     #find library name for this file, (!) assumption that there is only one library in new_file
-    new_header = subprocess.check_output(shlex.split(path_to_samtools+"samtools view -H "+new_file)) 
+    new_header = subprocess.check_output(shlex.split(path_to_samtools+"samtools view -H "+new_file))
     rg2_index = new_header.find("@RG")
 
     #If no @RG can be found in the file, try to use the library found in the filename
@@ -734,10 +734,10 @@ def merge_unknown_bam(old_file, new_file, output, path_to_samtools=""):
         if rg2_end == -1 or (rg2_end!=-1 and rg2_tab!=-1 and rg2_tab < rg2_end):
             rg2_end = rg2_tab
         lib2 = new_header[rg2_start:rg2_end]
-    
+
     #print "Library 2: " + lib2
     #print "Library 1: " + ", ".join([x[0] for x in lib1]) + "\n"
-    
+
     if lib2 not in [x[0] for x in lib1]:
         print_checkpoint("New library not found in existing file, merging")
         #merge the two files together without worrying about duplicates
@@ -754,35 +754,35 @@ def merge_unknown_bam(old_file, new_file, output, path_to_samtools=""):
             g.close()
         except:
             subprocess.check_call(shlex.split(path_to_samtools + "samtools index " + old_file))
-        
+
         #Get the id of the matching library in old_file
         lib2_id = ""
         for lb, id in lib1:
             if lb==lib2:
                 lib2_id = id
                 break
-        
+
         #check if the old file has the same filename as the new file that we are trying to create
         if old_file == lib2_id + ".bam":
             sys.exit("Error when merging bam files: the old bam file must not be the same filename as the one that it is merging with\n")
-        
+
         #create the header from old_file because the @RG is the same in the new file
         g = open("header.sam", 'w')
         subprocess.check_call(shlex.split(path_to_samtools+"samtools view -H "+old_file),stdout=g)
         g.close()
-        
+
         lines = subprocess.check_output(shlex.split(path_to_samtools+"samtools view "+new_file))
-        
+
         if id_filename: #prevent overwriting the input file if the filename is going to be the same as the new merge file
             subprocess.check_call(["mv", new_file, new_file+"tmp"])
-            
+
         f = open(lib2_id + ".sam",'w')
         #header is required in sam file, so put it in the new file to merge
         if id_filename:
             subprocess.check_call(shlex.split(path_to_samtools+"samtools view -H "+new_file+"tmp"),stdout=f)
         else:
             subprocess.check_call(shlex.split(path_to_samtools+"samtools view -H "+new_file),stdout=f)
-        
+
         lines = lines.split('\n')
         written = False #flag used to indicate if any new reads were found (if not, the merge command will fail if attempted)
         for line in lines:
@@ -802,13 +802,13 @@ def merge_unknown_bam(old_file, new_file, output, path_to_samtools=""):
                 read = read.split("\t")
                 if read[2]==chr and read[3]==start and read[1]==strand and read[-1]=="RG:Z:"+lib2_id:
                    valid = False #this read already exists in the old_file
-                   break 
+                   break
             if valid:
                 f.write('\t'.join(line) + '\n')
                 written = True
         f.close()
-        
-        if written:       
+
+        if written:
             with open(lib2_id + ".bam", 'w') as outfile:
                 subprocess.check_call(shlex.split(path_to_samtools+"samtools view -bS " + lib2_id + ".sam"), stdout=outfile)
             subprocess.check_call(shlex.split(path_to_samtools+"samtools merge -r -h header.sam "+ output +" "+old_file+" "+lib2_id + ".bam"))
@@ -816,34 +816,34 @@ def merge_unknown_bam(old_file, new_file, output, path_to_samtools=""):
         else:
             print_checkpoint("No new reads were found")
             subprocess.check_call(["rm", "header.sam", lib2_id + ".sam"])
-        
+
         if id_filename:
             subprocess.check_call(["mv", new_file+"tmp", new_file])
-    
+
     print_checkpoint("Finished merging BAM files")
 
 def collapse_clonal_reads(reference_fasta,path_to_samtools,num_procs,sample,current_library, sort_mem="500M",path_to_files=""):
     """
     This function is a wrapper for collapsing clonal reads
-    
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
         input is the path to a bam file that contains mapped bisulfite sequencing reads
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided    
+        provided
 
     num_procs is an integer indicating how many num_procs you'd like to run this function over
 
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-    
+
     current_library is the library from which clonal reads should be removed. The expected file
         name is <sample>_processed_reads_<current_library>_no_clonal
-        
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
+
     path_to_files is a string indicating the path for the output files and input sam for clonal
         collapsing.
     """
@@ -865,13 +865,13 @@ def collapse_clonal_reads(reference_fasta,path_to_samtools,num_procs,sample,curr
 def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bowtie2=False):
     """
     Creates 2 reference files: one with all C's converted to T's, and one with all G's converted to A's
-    
+
     input_files is a list of files to build a reference from
-    
+
     output is the prefix of the two output reference files that will be created
-    
+
     buffsize is the number of bytes that will be read in from the reference at once
-    
+
     offrate refers to the Bowtie parameter, reference the bowtie manual to see more detail
     """
     if not isinstance(input_files, list):
@@ -880,7 +880,7 @@ def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bo
         else:
             sys.exit("input_files must be a list of strings")
     print input_files
-    #outf = Convert all C to T. outr = convert all G to A  
+    #outf = Convert all C to T. outr = convert all G to A
     with open(output+"_f.fasta", 'w') as outf, open(output+"_r.fasta", 'w') as outr:
         for filen in input_files:
             f = open(filen, 'r')
@@ -921,7 +921,7 @@ def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bo
         base_cmd = "bowtie-build -f "
     if offrate:
         base_cmd += "-o " + str(offrate) + " "
-    
+
     if parallel == True:
         pool = multiprocessing.Pool(2)
         pool.apply_async(subprocess.check_call,(shlex.split(base_cmd + output + "_f.fasta " + output +"_f"),))
@@ -931,15 +931,15 @@ def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bo
     else:
         subprocess.check_call(shlex.split(base_cmd + output + "_f.fasta " + output +"_f"))
         subprocess.check_call(shlex.split(base_cmd + output + "_r.fasta " + output+ "_r"))
-    
+
 def convert_reads(inputf,output):
     """
     This function takes a fastq file as input and converts all the cytosines in reads to thymines for
     mapping to bisulfite converted genomes. This function also stores an encoding of where the cytosines
     were located in the header of each fastq read. See encode_c_positions for more detail.
-    
+
     input is a fastq file for conversion
-    
+
     output is the name of the file you'd like to put the converted reads in
     """
     f = open(inputf,'r')
@@ -950,14 +950,14 @@ def convert_reads(inputf,output):
     header2 = f.readline()
     qual = f.readline()
     encoding = encode_c_positions(seq)
-    
+
     while header:
         g.write(header+"!"+encoding+"\n")
         converted_seq = seq.replace("C","T")
         g.write(converted_seq)
         g.write(header2)
         g.write(qual)
-        
+
 
         header = f.readline().rstrip()
         header = header.replace(" ","!")
@@ -970,12 +970,12 @@ def convert_reads(inputf,output):
 def encode_c_positions(seq):
     """
     This function creates an encoding of where cytosine nucleotides are located in a converted read.
-    The encoding uses ascii characters (minus an offset) to indicate an offset into the read. 
-    For example, the ascii character # has an integer value of 36 and indicates that a C is located 
+    The encoding uses ascii characters (minus an offset) to indicate an offset into the read.
+    For example, the ascii character # has an integer value of 36 and indicates that a C is located
     2 bases from the previous position (36 - 34). The offsets build off of one another so if the first
     offset is 2 and the second offset is 5 the second C is located in the 9th position (since python indexing
     starts at 0). In other words, next_c_index = prev_c_index + offset + 1.
-    
+
     seq is a string of nucleotides you'd like to encode.
     """
     indexes = ""
@@ -989,7 +989,7 @@ def encode_c_positions(seq):
             indexes += chr(255)
             offset -= 255
         indexes += chr(offset)
-        
+
         prev_index = index + 1
         index = seq.find("C",prev_index)
         offset = index - prev_index + 34
@@ -998,15 +998,15 @@ def decode_c_positions(seq,indexes,strand):
     """
     This function takes the encodings generated by encode_c_position and replaces the appropriate
     positions with C nucleotides.
-    
+
     seq is a string of nucleotides to have Cs replaced.
-    
+
     indexes is a string of characters indicating the offsets for the positions of the Cs.
-    
+
     strand is the DNA strand (+ or -) that seq mapped to. This is important because
         sequences in sam files are always represented on the forward strand
     """
-    
+
     prev_index = 0
     new_seq=""
     index = 0
@@ -1032,17 +1032,17 @@ def decode_c_positions(seq,indexes,strand):
 def encode_converted_positions(seq,is_R2=False):
     """
     This function creates an encoding of where cytosine nucleotides are located in a converted read.
-    The encoding uses ascii characters (minus an offset) to indicate an offset into the read. 
-    For example, the ascii character # has an integer value of 36 and indicates that a C is located 
+    The encoding uses ascii characters (minus an offset) to indicate an offset into the read.
+    For example, the ascii character # has an integer value of 36 and indicates that a C is located
     2 bases from the previous position (36 - 34). The offsets build off of one another so if the first
     offset is 2 and the second offset is 5 the second C is located in the 9th position (since python indexing
     starts at 0). In other words, next_c_index = prev_c_index + offset + 1.
-    
+
     seq is a string of nucleotides you'd like to encode.
     """
     indexes = ""
     prev_index = 0
-    if is_R2==False:        
+    if is_R2==False:
         index = seq.find("C",prev_index)
         offset = index + 34
         while True:
@@ -1064,7 +1064,7 @@ def encode_converted_positions(seq,is_R2=False):
             while offset > 255:
                 indexes += chr(255)
                 offset -= 255
-            indexes += chr(offset)                
+            indexes += chr(offset)
             prev_index = index + 1
             index = seq.find("G",prev_index)
             offset = index - prev_index + 34
@@ -1074,11 +1074,11 @@ def decode_converted_positions(seq,indexes,strand,is_R2=False):
     """
     This function takes the encodings generated by encode_c_position and replaces the appropriate
     positions with C nucleotides.
-    
+
     seq is a string of nucleotides to have Cs or Gs replaced.
-    
+
     indexes is a string of characters indicating the offsets for the positions of the Cs or Gs.
-    
+
     strand is the DNA strand (+ or -) that seq mapped to. This is important because
         sequences in sam files are always represented on the forward strand
     """
@@ -1124,34 +1124,34 @@ def decode_converted_positions(seq,indexes,strand,is_R2=False):
 def run_bowtie(files,forward_reference,reverse_reference,prefix,options="",path_to_bowtie="",
                num_procs=1,keep_temp_files=False, bowtie2=False, sort_mem="500M",save_space=True):
     """
-    This function runs bowtie on the forward and reverse converted bisulfite references 
+    This function runs bowtie on the forward and reverse converted bisulfite references
     (generated by build_ref). It removes any read that maps to both the forward and reverse
     strands.
-    
+
     files is a list of file paths to be mapped
-    
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-    
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-    
+
     prefix is a string that you would like prepended to the output files (e.g., the sample name)
-    
-    options is a list of strings indicating options you'd like passed to bowtie 
+
+    options is a list of strings indicating options you'd like passed to bowtie
         (e.g., ["-k 1","-l 2"]
-    
+
     path_to_bowtie is a string indicating the path to the folder in which bowtie resides. Bowtie
         is assumed to be in your path if this option isn't used
-    
+
     num_procs is an integer indicating the number of processors you'd like used for removing multi
         mapping reads and for bowtie mapping
-    
+
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-    
+
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
     if sort_mem:
@@ -1194,7 +1194,7 @@ def run_bowtie(files,forward_reference,reverse_reference,prefix,options="",path_
         args.append(",".join(files))
         args.append(prefix+"_reverse_strand_hits.sam")
     subprocess.check_call(shlex.split(" ".join(args)))
-    
+
     print_checkpoint("Processing reverse strand hits")
     sam_header = find_multi_mappers(prefix+"_reverse_strand_hits.sam",prefix,num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
     if save_space == True:
@@ -1210,23 +1210,23 @@ def run_bowtie(files,forward_reference,reverse_reference,prefix,options="",path_
         return total_unique
     else:
         return 0
- 
+
 def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=False):
     """
     This function takes a sam file generated by bowtie and pulls out any mapped reads.
     It splits these mapped reads into num_procs number of files.
-    
+
     inputf is a string of the path to a sam file from bowtie
-    
+
     output is a string of the prefix you'd like prepended to the output files
         The output files will be named as <output>_sorted_<index num>
-    
+
     num_procs is an integer indicating how many files the bowtie sam file should be split
         into
-    
+
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-    
+
     append is a boolean that should be False for the first bowtie sam file you process (i.e., for the forward
         mapped reads) and True for the second. This option is mainly for safety. It ensures that files from
         previous runs are erased.
@@ -1265,9 +1265,9 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
 def merge_sorted_multimap(files, output):
     """
     This function takes the files from find_multi_mappers and outputs the uniquely mapping reads
-    
+
     files is a list of filenames containing the output of find_multi_mappers
-    
+
     output is a prefix you'd like prepended to the file containing the uniquely mapping reads
         This file will be named as <output>+"_no_multimap_"+<index_num>
         """
@@ -1275,11 +1275,11 @@ def merge_sorted_multimap(files, output):
     fields = {}
     output_handles = {}
     file_handles = {}
-    
+
     total_unique = 0
     count= 0
     cycle = itertools.cycle(range(0,len(files)))
-    
+
     for index,filen in enumerate(files):
         output_handles[index] = open(output+"_no_multimap_"+str(index),'a')
         file_handles[filen]=open(filen,'r')
@@ -1304,54 +1304,54 @@ def merge_sorted_multimap(files, output):
             output_handles[index].write(current_line)
             output_handles[index].flush()
             total_unique += 1
-            
+
     for index,filen in enumerate(files):
         output_handles[index].close()
         file_handles[filen].close()
-    
+
     return total_unique
-        
+
 def merge_sorted_clonal(files, output,reference_fasta,path_to_samtools=""):
     """
     This function takes the output of find_clonal_reads and drops all but one read
     mapping to the same strand, position, and chromosome.
-    
+
     files is a list of files containing the output from find_clonal_reads
-    
+
     output is the name of the file you'd like the non-clonal reads output to
-    
+
     reference_fasta is a string indciating the path to a fasta file containing the sequences
         you used for mapping
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
         provided
     """
 
-        
+
 def find_clonal_reads(files,output,reference_fasta,num_procs=1,path_to_samtools="",sort_mem="500M"):
     """
     This function takes a list of files, sorts them by position, and hands them off to
     merge_sorted_clonal to have clonal reads removed
-    
+
     files is a list of files that you wish to have clonal reads removed from and reads in each of these files are sorted by position
-    
+
     output is a string indicating the prefix you'd like prepended to the file containing the
         non-clonal output
-    
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
-    
+
     num_procs is an integer indicating the number of files you'd like to split the input into
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
         provided
-        
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
 
-    
+
     total_clonal = 0 #number of non-clonal reads
     g = open(output,'w')
     try:
@@ -1402,13 +1402,13 @@ def find_clonal_reads(files,output,reference_fasta,num_procs=1,path_to_samtools=
                 except:
                     positions[key]=""
                     chroms_strands[key]=""
-                
-    g.close()          
+
+    g.close()
     for filen in files:
         file_handles[filen].close()
     subprocess.check_call(shlex.split("rm "+" ".join(files)))
     return total_clonal
-            
+
 
 def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                                 forward_reference,reverse_reference,reference_fasta,unmethylated_control,
@@ -1424,56 +1424,56 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                                 bowtie2=True,sort_mem="500M",path_to_output="",in_mem=False,min_base_quality=1,
                                 path_to_MarkDuplicates=False):
     """
-    This function 
+    This function
 
     read1_files and read2_files are lists of fastq files of the forward and reverse reads
         from paired-end bisulfite sequencing data, which you'd like to run through the pipeline.
-        The length of read1_files and read2_files should be the same. Also, Files in there two 
+        The length of read1_files and read2_files should be the same. Also, Files in there two
         lists should be ordered such that the forward reads for a particular read set are in the
         same position of read1_files as the reverse reads are in the read2_files.
         (i.e. the elements in each of these lists are paired)
         Note that globbing is supported here (i.e., you can use * in your paths)
-    
+
     libraries is a list of library IDs (in the same order as the files list) indiciating which
         libraries each set of fastq files belong to. If you use a glob, you only need to indicate
         the library ID for those fastqs once (i.e., the length of files and libraries should be
         the same)
-    
+
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-        
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-        
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-        
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
         input is the path to a bam file that contains mapped bisulfite sequencing reads
 
-    unmethylated_control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your 
+    unmethylated_control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your
         sample, or the non-conversion rate you'd like to use. Consequently, control is either a string, or a decimal
-        If control is a string then it should be in the following format: "chrom:start-end". 
+        If control is a string then it should be in the following format: "chrom:start-end".
         If you'd like to specify an entire chromosome simply use "chrom:"
-        
+
     quality_version is either an integer indicating the base offset for the quality scores or a float indicating
         which version of casava was used to generate the fastq files.
-            
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided    
-    
+        provided
+
     path_to_bowtie is a string indicating the path to the folder in which bowtie resides. Bowtie
         is assumed to be in your path if this option isn't used
-            
+
     bowtie_options is a list of strings indicating options you'd like passed to bowtie2 (or bowtie)
     (default for bowtie2: "-X 1000 -k 2 --no-mixed --no-discordant")
     (default for bowtie: "-X 1000 -S -k 1 -m 1 --best --strata --chunkmbs 64 -n 1")
 
-    
+
     num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
+
     trim_reads is a boolean indicating that you want to have reads trimmed by cutadapt. This option is currently
         not compatible with "in_mem" mode.
 
@@ -1488,24 +1488,24 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         Sequence of an adapter that was ligated to the 3' end of read 2. The adapter itself and anything that follows is
         trimmed.
 
-    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter 
+    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter
         gets appended multiple times.
-        
-    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than 
+
+    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than
         LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.
 
     zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation faults in BWA).
-        
-    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region) 
+
+    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region)
         (default: 0.1)
-    
-    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the 
+
+    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the
         one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
         sequence; cut sequence at the index at which the sum is minimal).
-        
+
     min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even before adapter removal
         are also discarded. In colorspace, an initial primer is not counted. It is not recommended to change this value in paired-end processing because it may results in the situation that one of the two reads in a pair is discarded. And this will lead to error.
-        
+
     sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining whether or not
         a site is methylated
 
@@ -1516,25 +1516,25 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
 
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-        
+
     num_reads is an integer indicating how many reads you'd like to process at a time. Breaking up the processing this
         way can reduce the size of some of the intermediate files that are created. Use this if you're strapped for space.
-        
+
     save_space indicates whether or not you'd like to perform read collapsing right after mapping or once all the libraries have
         been mapped. If you wait until after everything has been mapped, the collapsing can be parallelized. Otherwise the collapsing
         will have to be done serially. The trade-off is that you must keep all the mapped files around, rather than deleting them as they
         are processed, which can take up a considerable amount of space. It's safest to set this to True.
-    
+
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
+
     in_mem: does not write files as part of run_mapping, keeps all input/output in memory (This mode is unavailable now)
-    
+
     path_to_output is the path to a directory where you would like the output to be stored. The default is the
         same directory as the input fastqs.
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
-        mpileup file (and subsequently to be considered for methylation calling)    
+        mpileup file (and subsequently to be considered for methylation calling)
 
     path_to_MarkDuplicates is the path to MarkDuplicates jar from picard. Default is false indicating that you
         don't want to use this jar for duplication removal
@@ -1585,17 +1585,17 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         path_to_bowtie+="/"
     if len(path_to_output) !=0:
         path_to_output+="/"
-        
+
     if sort_mem:
         if sort_mem.find("-S") == -1:
             sort_mem = " -S " + sort_mem
     else:
         sort_mem = ""
-        
+
     expanded_file_list_R1 = []
     expanded_file_list_R2 = []
     expanded_library_list = []
-    
+
     total_reads = 0
     total_unique = 0
     total_clonal = 0
@@ -1605,7 +1605,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
     #R1
     for path,library in zip(read1_files,libraries):
         glob_list = glob.glob(path)
-        for filen in glob_list:            
+        for filen in glob_list:
             expanded_file_list_R1.append(filen)
             expanded_library_list.append(library)
             total_reads_R1 += int(subprocess.check_output(['wc', '-l', filen]).split(' ')[0]) / 4
@@ -1644,7 +1644,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                 max_adapter_removal=max_adapter_removal,
                 overlap_length=overlap_length,zero_cap=zero_cap,quality_base=quality_base,
                 error_rate=error_rate,min_qual_score=min_qual_score,min_read_len=min_read_len,
-                keep_temp_files=keep_temp_files,num_reads=num_reads, bowtie2=bowtie2, 
+                keep_temp_files=keep_temp_files,num_reads=num_reads, bowtie2=bowtie2,
                 sort_mem=sort_mem, path_to_output=path_to_output)
         else:
             total_unique += run_mapping_pe(
@@ -1657,12 +1657,12 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                 max_adapter_removal=max_adapter_removal,overlap_length=overlap_length,
                 zero_cap=zero_cap,quality_base=quality_base,error_rate=error_rate,
                 min_qual_score=min_qual_score,min_read_len=min_read_len,
-                keep_temp_files=keep_temp_files,num_reads=num_reads, bowtie2=bowtie2, 
+                keep_temp_files=keep_temp_files,num_reads=num_reads, bowtie2=bowtie2,
                 sort_mem=sort_mem, path_to_output=path_to_output,save_space=save_space)
 
         if save_space == True:
             pool = multiprocessing.Pool(num_procs)
-            #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up 
+            #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up
             #the sorting. I had to add some special logic in the processing though
             processed_library_files = glob.glob(path_to_output+sample+"_"+str(current_library)+"_*_no_multimap_*")
             for filen in processed_library_files:
@@ -1698,10 +1698,10 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         for result in merge_results:
             total_unique+=result.get()
         print_checkpoint("There are " + str(total_unique) + " uniquely mapping reads, " + str(float(total_unique) / total_reads*100) + " percent remaining")
-        
-        
+
+
         pool = multiprocessing.Pool(num_procs)
-        #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up 
+        #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up
         #the sorting. I had to add some special logic in the processing though
         processed_library_files = glob.glob(path_to_output+sample+"_"+str(current_library)+"_*_no_multimap_*")
         for filen in processed_library_files:
@@ -1709,7 +1709,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
             pool.apply_async(subprocess.check_call,(cmd,))
         pool.close()
         pool.join()
-        
+
         clonal_results = []
         pool = multiprocessing.Pool(num_procs)
 
@@ -1717,11 +1717,11 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
             clonal_results.append(pool.apply_async(collapse_clonal_reads_pe,(reference_fasta,path_to_samtools,num_procs,sample,library), {"sort_mem":sort_mem,"path_to_files":path_to_output}))
         pool.close()
         pool.join()
-        
+
         for result in clonal_results:
             total_clonal += result.get()
-    
-    print_checkpoint("There are " + str(total_clonal) + " non-clonal reads, " + str(float(total_clonal) / total_reads*100) + " percent remaining") 
+
+    print_checkpoint("There are " + str(total_clonal) + " non-clonal reads, " + str(float(total_clonal) / total_reads*100) + " percent remaining")
     library_files = [path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam" for library in set(libraries)]
     if len(library_files) > 1:
         merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
@@ -1742,7 +1742,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         subprocess.check_call(shlex.split(" ".join(["mv",
                                                     sample+"_processed_reads_no_clonal_final.bam",
                                                     sample+"_processed_reads_no_clonal.bam"])))
-        
+
     #Calling methylated sites
     print_checkpoint("Begin calling mCs")
     call_methylated_sites_pe(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
@@ -1758,48 +1758,48 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                    adapter_seq_R2 = "AGATCGGAAGAGCGTCGTGTAGGGA",
                    max_adapter_removal=None,overlap_length=None,zero_cap=None,
                    quality_base=None,error_rate=None,min_qual_score=10,
-                   min_read_len=30,keep_temp_files=False,num_reads=-1, 
+                   min_read_len=30,keep_temp_files=False,num_reads=-1,
                    bowtie2=True, sort_mem="500M",path_to_output="",
                    save_space=True):
     """
     This function runs the mapping portion of the methylation calling pipeline.
     For Paired-end data processing.
-    
+
     current_library is the ID that you'd like to run mapping on.
-    
+
     library_read1_files is a list of library IDs (in the same order as the files list) indiciating
-    which libraries each set of fastq files belong to. If you use a glob, you only need to 
-    indicate the library ID for those fastqs once (i.e., the length of files and libraries 
+    which libraries each set of fastq files belong to. If you use a glob, you only need to
+    indicate the library ID for those fastqs once (i.e., the length of files and libraries
     should be the same)
 
     library_read2_files is a list of library IDs (in the same order as the files list) indiciating
-    which libraries each set of fastq files belong to. If you use a glob, you only need to 
-    indicate the library ID for those fastqs once (i.e., the length of files and libraries 
+    which libraries each set of fastq files belong to. If you use a glob, you only need to
+    indicate the library ID for those fastqs once (i.e., the length of files and libraries
     should be the same)
-    
+
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-        
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-        
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-        
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
 
-    path_to_samtools is a string indicating the path to the directory containing your 
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided.    
-    
+        provided.
+
     path_to_bowtie is a string indicating the path to the folder in which bowtie resides. Bowtie
         is assumed to be in your path if this option isn't used
-            
+
     bowtie_options is a list of strings indicating options you'd like passed to bowtie2 (or bowtie)
-    
+
     num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
+
     trim_reads is a boolean indicating that you want to have reads trimmed by cutadapt
 
     path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in your
@@ -1813,36 +1813,36 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
         Sequence of an adapter that was ligated to the 3' end of read 2. The adapter itself and anything that follows is
         trimmed.
 
-    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter 
+    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter
         gets appended multiple times.
-        
-    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than 
+
+    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than
         LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.
 
     zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation faults in BWA).
 
-    quality_base is the offset for quality scores. In other words, assume that quality values are encoded as ascii(quality + QUALITY_BASE). 
+    quality_base is the offset for quality scores. In other words, assume that quality values are encoded as ascii(quality + QUALITY_BASE).
         The default (33) is usually correct, except for reads produced by some versions of the Illumina pipeline, where this should
         be set to 64.
-        
-    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region) 
+
+    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region)
         (default: 0.1)
-    
-    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the 
+
+    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the
         one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
         sequence; cut sequence at the index at which the sum is minimal).
-        
+
     min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even before adapter removal
         are also discarded. In colorspace, an initial primer is not counted.
 
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-        
+
     num_reads is an integer indicating how many reads you'd like to process at a time. Breaking up the processing this
         way can reduce the size of some of the intermediate files that are created. Use this if you're strapped for space.
-    
+
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
     total_unique = 0
@@ -1861,7 +1861,7 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                                          num_reads=num_reads,current_file=save_point_r2[0],current_pointer=save_point_r2[1])
         if trim_reads:
             #Trimming
-            print_checkpoint("Begin trimming reads for "+file_name)  
+            print_checkpoint("Begin trimming reads for "+file_name)
             quality_trim_pe(
                 inputf_R1=[file_path+"_R1_split_"+str(i) for i in xrange(0,num_procs)],
                 outputf_R1=[file_path+"_R1_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
@@ -1878,7 +1878,7 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                 max_adapter_removal=max_adapter_removal,
                 overlap_length=overlap_length,
                 zero_cap=zero_cap,
-                path_to_cutadapt=path_to_cutadapt)        
+                path_to_cutadapt=path_to_cutadapt)
             #Conversion
             print_checkpoint("Begin converting reads for "+file_name)
             pool = multiprocessing.Pool(num_procs)#R1
@@ -1896,7 +1896,7 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                 )
                 subprocess.check_call(
                     shlex.split("rm "+" ".join([file_path+"_R2_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
-                )        
+                )
             #Run bowtie
             print_checkpoint("Begin Running Bowtie for "+file_name)
             total_unique += run_bowtie_pe([file_path+"_R1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)],
@@ -1906,7 +1906,7 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                                           keep_temp_files=keep_temp_files, bowtie2=bowtie2, sort_mem=sort_mem,
                                           save_space=save_space)
         else:
-            print_checkpoint("No trimming applied on reads")  
+            print_checkpoint("No trimming applied on reads")
             #Conversion
             print_checkpoint("Begin converting reads for "+file_name)
             pool = multiprocessing.Pool(num_procs)#R1
@@ -1931,42 +1931,42 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
     if keep_temp_files==False:
         subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_R1_split_"+str(i) for i in xrange(0,num_procs)])))
         subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_R2_split_"+str(i) for i in xrange(0,num_procs)])))
-    
+
     return total_unique
 
 def run_bowtie_pe(library_read1_files,library_read2_files,forward_reference,reverse_reference,prefix,options="",
                   path_to_bowtie="",num_procs=1,keep_temp_files=False, bowtie2=True, sort_mem="500M",save_space=True):
     """
-    This function runs bowtie on the forward and reverse converted bisulfite references 
-    (generated by build_ref). The function is for processing paired-end data. It removes 
-    any read that maps to both the forward and reverse strands. In addition, any inproperly 
-    paired reads are removed. 
-    
+    This function runs bowtie on the forward and reverse converted bisulfite references
+    (generated by build_ref). The function is for processing paired-end data. It removes
+    any read that maps to both the forward and reverse strands. In addition, any inproperly
+    paired reads are removed.
+
     library_read1_files is a list of fastq file paths of the first reads to be mapped
 
     library_read2_files is a list of fastq file paths of the second reads to be mapped
-    
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-    
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-    
+
     prefix is a string that you would like prepended to the output files (e.g., the sample name)
-    
+
     options is a list of strings indicating options you'd like passed to bowtie2 (or bowtie)
-    
+
     path_to_bowtie is a string indicating the path to the folder in which bowtie resides. Bowtie
         is assumed to be in your path if this option isn't used
-    
+
     num_procs is an integer indicating the number of processors you'd like used for removing multi
         mapping reads and for bowtie mapping
-    
+
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-    
+
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
     if sort_mem:
@@ -2012,7 +2012,7 @@ def run_bowtie_pe(library_read1_files,library_read2_files,forward_reference,reve
         args.append("-2 "+",".join(library_read2_files))
         args.append(prefix+"_reverse_strand_hits.sam")
     subprocess.check_call(shlex.split(" ".join(args)))
-    
+
     print_checkpoint("Processing reverse strand hits")
     sam_header = find_multi_mappers_pe(prefix+"_reverse_strand_hits.sam",prefix,num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
     if keep_temp_files==False:
@@ -2036,18 +2036,18 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
     """
     This function takes a sam file generated by bowtie and pulls out any mapped reads.
     It splits these mapped reads into num_procs number of files.
-    
+
     inputf is a string of the path to a sam file from bowtie
-    
+
     output is a string of the prefix you'd like prepended to the output files
         The output files will be named as <output>_sorted_<index num>
-    
+
     num_procs is an integer indicating how many files the bowtie sam file should be split
         into
-    
+
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-    
+
     append is a boolean that should be False for the first bowtie sam file you process (i.e., for the forward
         mapped reads) and True for the second. This option is mainly for safety. It ensures that files from
         previous runs are erased.
@@ -2064,7 +2064,7 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
     for line in f:
         if line[0] == "@":
             continue
-        
+
         fields = line.split("\t")
 
         #To deal with the way chromosomes were named in some of our older references
@@ -2095,9 +2095,9 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
 def merge_sorted_multimap_pe(files, output):
     """
     This function takes the files from find_multi_mappers and outputs the uniquely mapping reads
-    
+
     files is a list of filenames containing the output of find_multi_mappers
-    
+
     output is a prefix you'd like prepended to the file containing the uniquely mapping reads
         This file will be named as <output>+"_no_multimap_"+<index_num>
         """
@@ -2105,11 +2105,11 @@ def merge_sorted_multimap_pe(files, output):
     fields = {}
     output_handles = {}
     file_handles = {}
-    
+
     total_unique = 0
     count= 0
     cycle = itertools.cycle(range(0,len(files)))
-    
+
     for index,filen in enumerate(files):
         output_handles[index] = open(output+"_no_multimap_"+str(index),'a')
         file_handles[filen]=open(filen,'r')
@@ -2143,14 +2143,14 @@ def merge_sorted_multimap_pe(files, output):
             output_handles[index].write(current_line_2)
             output_handles[index].flush()
             total_unique += 1
-            
+
     for index,filen in enumerate(files):
         output_handles[index].close()
         file_handles[filen].close()
 
     ##Yupeng debug
 #    exit()
-    
+
     return total_unique
 
 def convert_reads_pe(inputf,output,is_R2=False):
@@ -2158,9 +2158,9 @@ def convert_reads_pe(inputf,output,is_R2=False):
     This function takes a fastq file as input and converts all the cytosines in reads to thymines for
     mapping to bisulfite converted genomes. This function also stores an encoding of where the cytosines
     were located in the header of each fastq read. See encode_c_positions for more detail.
-    
+
     input is a fastq file for conversion
-    
+
     output is the name of the file you'd like to put the converted reads in
     """
     f = open(inputf,'r')
@@ -2171,14 +2171,14 @@ def convert_reads_pe(inputf,output,is_R2=False):
     header2 = f.readline()
     qual = f.readline()
     encoding = encode_converted_positions(seq,is_R2=is_R2)
-    
+
     if is_R2 == False:
         while header:
             g.write(header+"!"+encoding+"\n")
             converted_seq = seq.replace("C","T")
             g.write(converted_seq)
             g.write(header2)
-            g.write(qual)            
+            g.write(qual)
             header = f.readline().rstrip()
             header = header.replace(" ","!")
             seq = f.readline()
@@ -2191,7 +2191,7 @@ def convert_reads_pe(inputf,output,is_R2=False):
             converted_seq = seq.replace("G","A")
             g.write(converted_seq)
             g.write(header2)
-            g.write(qual)                    
+            g.write(qual)
             header = f.readline().rstrip()
             header = header.replace(" ","!")
             seq = f.readline()
@@ -2204,25 +2204,25 @@ def convert_reads_pe(inputf,output,is_R2=False):
 def collapse_clonal_reads_pe(reference_fasta,path_to_samtools,num_procs,sample,current_library, sort_mem="500M",path_to_files=""):
     """
     This function is a wrapper for collapsing clonal reads
-    
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
         input is the path to a bam file that contains mapped bisulfite sequencing reads
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided    
+        provided
 
     num_procs is an integer indicating how many num_procs you'd like to run this function over
 
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-    
+
     current_library is the library from which clonal reads should be removed. The expected file
         name is <sample>_processed_reads_<current_library>_no_clonal
-        
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
+
     path_to_files is a string indicating the path for the output files and input sam for clonal
         collapsing.
     """
@@ -2246,25 +2246,25 @@ def find_clonal_reads_pe(files,output,reference_fasta,num_procs=1,path_to_samtoo
     """
     This function takes a list of files, sorts them by position, and hands them off to
     merge_sorted_clonal to have clonal reads removed
-    
+
     files is a list of files that you wish to have clonal reads removed from and reads in each of these files are sorted by position
-    
+
     output is a string indicating the prefix you'd like prepended to the file containing the
         non-clonal output
-    
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
-    
+
     num_procs is an integer indicating the number of files you'd like to split the input into
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
         provided
-        
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
 
-    
+
     total_clonal = 0 #number of non-clonal reads
     g = open(output,'w')
     try:
@@ -2282,7 +2282,7 @@ def find_clonal_reads_pe(files,output,reference_fasta,num_procs=1,path_to_samtoo
         fields = line.split("\t")
         g.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
     f.close()
-    
+
     #Start to remove clonal reads(?)
     ##Intialization
     lines = {}
@@ -2317,15 +2317,15 @@ def find_clonal_reads_pe(files,output,reference_fasta,num_procs=1,path_to_samtoo
                 except:
                     positions[key]=""
                     chroms_strands[key]=""
-                
-    g.close()          
+
+    g.close()
     for filen in files:
         file_handles[filen].close()
     subprocess.check_call(shlex.split("rm "+" ".join(files)))
     return total_clonal/2
 
-def quality_trim(inputf, output = None, quality_base = None, min_qual_score = None, min_read_len = None, 
-                 adapter_seq = "AGATCGGAAGAGCACACGTCTG", num_procs = 1, format = None, error_rate = None, 
+def quality_trim(inputf, output = None, quality_base = None, min_qual_score = None, min_read_len = None,
+                 adapter_seq = "AGATCGGAAGAGCACACGTCTG", num_procs = 1, format = None, error_rate = None,
                  max_adapter_removal = None, overlap_length = None, zero_cap = False, path_to_cutadapt = ""):
     """
     Information from cutadapt documentation:
@@ -2336,13 +2336,13 @@ def quality_trim(inputf, output = None, quality_base = None, min_qual_score = No
     adapter_seq:
         Sequence of an adapter that was ligated to the 3' end. The adapter itself and anything that follows is
         trimmed.
-    
+
     error_rate:
         Maximum allowed error rate (no. of errors divided by the length of the matching region) (default: 0.1)
 
     max_adapter_removal:
         Try to remove adapters at most COUNT times. Useful when an adapter gets appended multiple times.
-        
+
     overlap_length:
         Minimum overlap length. If the overlap between the read and the adapter is shorter than LENGTH, the read
         is not modified.This reduces the no. of bases trimmed purely due to short random adapter matches.
@@ -2359,18 +2359,18 @@ def quality_trim(inputf, output = None, quality_base = None, min_qual_score = No
         Trim low-quality ends from reads before adapter removal. The algorithm is the same as the one used by
         BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
         sequence; cut sequence at the index at which the sum is minimal).
-        
+
     quality_base:
         Assume that quality values are encoded as ascii(quality + QUALITY_BASE). The default (33) is
         usually correct, except for reads produced by some versions of the Illumina pipeline, where this should
         be set to 64.
-    
+
     zero_cap:
         Change negative quality values to zero (workaround to avoid segmentation faults in BWA).
-    
+
     path_to_cutadapt:
         Path to the folder where cutadapt executable exists. If none, assumes it can be run from current directory
-        
+
     input:
         list of filenames
     """
@@ -2385,7 +2385,7 @@ def quality_trim(inputf, output = None, quality_base = None, min_qual_score = No
         sys.exit("Cutadapt must be installed to run quality_trim")
     except:
         devnull.close()
-                 
+
     if not isinstance(inputf, list):
         if isinstance(inputf, basestring):
             inputf = [inputf]
@@ -2396,7 +2396,7 @@ def quality_trim(inputf, output = None, quality_base = None, min_qual_score = No
             output = [output]
         else:
             sys.exit("output must be a list of strings")
-            
+
     if len(output) != len(inputf):
         sys.exit("Must provide an equal number of input and output files")
     base_cmd = path_to_cutadapt
@@ -2404,8 +2404,8 @@ def quality_trim(inputf, output = None, quality_base = None, min_qual_score = No
     if zero_cap:
         zero = "-z "
     else:
-        zero = ""  
-    
+        zero = ""
+
     if format:
         options += " -f " + format
     if error_rate:
@@ -2457,13 +2457,13 @@ def quality_trim_pe(inputf_R1, outputf_R1,inputf_R2, outputf_R2,quality_base = N
     adapter_seq_R2:
         Sequence of an adapter that was ligated to the 3' end of read 2. The adapter itself and anything that follows is
         trimmed.
-    
+
     error_rate:
         Maximum allowed error rate (no. of errors divided by the length of the matching region) (default: 0.1)
 
     max_adapter_removal:
         Try to remove adapters at most COUNT times. Useful when an adapter gets appended multiple times.
-        
+
     overlap_length:
         Minimum overlap length. If the overlap between the read and the adapter is shorter than LENGTH, the read
         is not modified.This reduces the no. of bases trimmed purely due to short random adapter matches.
@@ -2477,18 +2477,18 @@ def quality_trim_pe(inputf_R1, outputf_R1,inputf_R2, outputf_R2,quality_base = N
         Trim low-quality ends from reads before adapter removal. The algorithm is the same as the one used by
         BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
         sequence; cut sequence at the index at which the sum is minimal).
-        
+
     quality_base:
         Assume that quality values are encoded as ascii(quality + QUALITY_BASE). The default (33) is
         usually correct, except for reads produced by some versions of the Illumina pipeline, where this should
         be set to 64.
-    
+
     zero_cap:
         Change negative quality values to zero (workaround to avoid segmentation faults in BWA).
-    
+
     path_to_cutadapt:
         Path to the folder where cutadapt executable exists. If none, assumes it can be run from current directory
-        
+
     """
     if path_to_cutadapt:  #see if cutadapt is installed
         if path_to_cutadapt[-1]!="/":
@@ -2501,7 +2501,7 @@ def quality_trim_pe(inputf_R1, outputf_R1,inputf_R2, outputf_R2,quality_base = N
         sys.exit("Cutadapt must be installed to run quality_trim")
     except:
         devnull.close()
-                 
+
     if not isinstance(inputf_R1, list):
         if isinstance(inputf_R1, basestring):
             inputf = [inputf_R1]
@@ -2522,8 +2522,8 @@ def quality_trim_pe(inputf_R1, outputf_R1,inputf_R2, outputf_R2,quality_base = N
         if isinstance(outputf_R2, basestring):
             output = [outputf_R2]
         else:
-            sys.exit("outputf_R2 must be a list of strings")            
-            
+            sys.exit("outputf_R2 must be a list of strings")
+
     if len(outputf_R1) != len(inputf_R2) or len(outputf_R1) != len(outputf_R1) or len(outputf_R1) != len(outputf_R2):
         sys.exit("Must provide an equal number of input and output files")
 
@@ -2532,8 +2532,8 @@ def quality_trim_pe(inputf_R1, outputf_R1,inputf_R2, outputf_R2,quality_base = N
     if zero_cap:
         zero = "-z "
     else:
-        zero = ""  
-    
+        zero = ""
+
     if format:
         options += " -f " + format
     if error_rate:
@@ -2558,39 +2558,39 @@ def quality_trim_pe(inputf_R1, outputf_R1,inputf_R2, outputf_R2,quality_base = N
         pool.apply_async(subprocess.check_call,(base_cmd + run_options + current_input_R1 + " " + current_input_R2,),{"shell":True})
     pool.close()
     pool.join()
-    
+
 def call_methylated_sites_pe(inputf, sample, reference, control,quality_version,sig_cutoff=.01,num_procs = 1,
                              min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=True,
                              path_to_files="",min_base_quality=1):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads
-    
+
     sample is the name you'd like for the allc files. The files will be named like so:
         allc_<sample>_<chrom>.tsv
-    
+
     reference is the path to a samtools indexed fasta file
-    
-    control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your 
+
+    control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your
         sample, or the non-conversion rate you'd like to use. Consequently, control is either a string, or a decimal
-        If control is a string then it should be in the following format: "chrom:start-end". 
+        If control is a string then it should be in the following format: "chrom:start-end".
         If you'd like to specify an entire chromosome simply use "chrom:"
-    
+
     quality_version is either an integer indicating the base offset for the quality scores or a float indicating
         which version of casava was used to generate the fastq files.
-    
+
     sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining whether or not
         a site is methylated
-    
+
     num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
+
     min_cov is an integer indicating the minimum number of reads for a site to be tested.
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
+
     bh is a True/False flag indicating whether or not you'd like to use the benjamini-hochberg FDR
         instead of an FDR calculated from the control reference
-    
+
     path_to_files is a string indicating the path for the output and the input bam, mpileup, or allc files
         for methylation calling.
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
@@ -2602,13 +2602,13 @@ def call_methylated_sites_pe(inputf, sample, reference, control,quality_version,
     ##output: sample+"_processed_reads_no_clonal_flipped.bam"
     print_checkpoint("Begin flipping the strand of R2 reads")
     pl_exe_path = __file__[:__file__.rfind("/")]+"/flip_R2.pl"
-    subprocess.check_call(shlex.split(" ".join(["env perl",pl_exe_path,inputf,inputf+".R2flipped.bam",path_to_samtools])))
-        
+    subprocess.check_call(shlex.split(" ".join(["env perl",pl_exe_path,path_to_files+inputf,path_to_files+inputf+".R2flipped.bam",path_to_samtools])))
+
     #Call methylated sites
     call_methylated_sites(inputf+".R2flipped.bam", sample, reference, control,quality_version,sig_cutoff,num_procs,
                           min_cov,binom_test,min_mc,path_to_samtools,sort_mem,bh,
                           path_to_files,min_base_quality)
-    
+
     #Remove intermediate bam file
     try:
         subprocess.check_call(shlex.split("rm -f "+inputf+".R2flipped.bam"+
@@ -2616,39 +2616,39 @@ def call_methylated_sites_pe(inputf, sample, reference, control,quality_version,
     except:
         pass
 
-    
-    
+
+
 def call_methylated_sites(inputf, sample, reference, control,quality_version,sig_cutoff=.01,num_procs = 1,
                           min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads
-    
+
     sample is the name you'd like for the allc files. The files will be named like so:
         allc_<sample>_<chrom>.tsv
-    
+
     reference is the path to a samtools indexed fasta file
-    
-    control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your 
+
+    control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your
         sample, or the non-conversion rate you'd like to use. Consequently, control is either a string, or a decimal
-        If control is a string then it should be in the following format: "chrom:start-end". 
+        If control is a string then it should be in the following format: "chrom:start-end".
         If you'd like to specify an entire chromosome simply use "chrom:"
-    
+
     quality_version is either an integer indicating the base offset for the quality scores or a float indicating
         which version of casava was used to generate the fastq files.
-    
+
     sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining whether or not
         a site is methylated
-    
+
     num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
+
     min_cov is an integer indicating the minimum number of reads for a site to be tested.
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
+
     bh is a True/False flag indicating whether or not you'd like to use the benjamini-hochberg FDR
         instead of an FDR calculated from the control reference
-    
+
     path_to_files is a string indicating the path for the output and the input bam, mpileup, or allc files
         for methylation calling.
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
@@ -2723,9 +2723,9 @@ def call_methylated_sites(inputf, sample, reference, control,quality_version,sig
             line = line.rstrip()
             fields = line.split("\t")
             if fields[3] != "0":
-                total_phred += sum([ord(i)-quality_base for i in fields[5]]) 
+                total_phred += sum([ord(i)-quality_base for i in fields[5]])
                 total_bases += len(fields[5])
-                
+
                 if fields[2] == "C":
                     unconverted_c = fields[4].count(".")
                     converted_c = fields[4].count("T")
@@ -2766,7 +2766,7 @@ def call_methylated_sites(inputf, sample, reference, control,quality_version,sig
                 coverage = unconverted_c+converted_c
                 if (fields[2] == "C" or fields[2] == "G") and coverage > 0:
                     if coverage not in pvalue_lookup:
-                        pvalue_lookup[coverage] = get_pvalue_dist(coverage,control_sites) 
+                        pvalue_lookup[coverage] = get_pvalue_dist(coverage,control_sites)
                     if pvalue_lookup[coverage][unconverted_c] < min_pvalue:
                         min_pvalue=pvalue_lookup[coverage][unconverted_c]
         if binom_test==False and min_mc==0:
@@ -2798,12 +2798,12 @@ def call_methylated_sites(inputf, sample, reference, control,quality_version,sig
                     print "Must use benjamini-hochberg correction if no control genome is provided"
                 best_pvalues = benjamini_hochberg_correction_call_methylated_sites([path_to_files+filename+"_binom_results.tsv" for filename in allc_files],mc_class_counts,sig_cutoff)
             pool=multiprocessing.Pool(num_procs)
-            #Normally I can't do this because all the chromosomes are mixed together, but in this case it's fine.       
+            #Normally I can't do this because all the chromosomes are mixed together, but in this case it's fine.
             for allc_file in [path_to_files+filename+"_binom_results.tsv" for filename in allc_files]:
                 pool.apply_async(filter_files_by_pvalue,([allc_file],path_to_files+sample,best_pvalues,1),{"remove_file":True, "sort_mem":sort_mem})
             pool.close()
             pool.join()
-        
+
         else:
             for allc_file in allc_files:
                 mc_class_counts = allc_run_binom_tests(allc_file,non_conversion,min_cov,sort_mem=sort_mem)
@@ -2873,7 +2873,7 @@ def call_methylated_sites(inputf, sample, reference, control,quality_version,sig
         else:
             run_pvalue_lookup_filter(path_to_files+sample+"_mpileup_output.tsv",pvalue_lookup,min_pvalue,control_sites,min_cov=min_cov,output=sample)
     print_checkpoint("Done")
-    
+
 def filter_files_by_pvalue(files,output,best_pvalues,num_procs,remove_file=True, sort_mem="500M"):
     """
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
@@ -2898,7 +2898,7 @@ def filter_files_by_pvalue(files,output,best_pvalues,num_procs,remove_file=True,
                 output_files[fields[0]].write("\t".join(fields[:6])+"\t0\n")
         f.close()
         if remove_file == True:
-            subprocess.check_call(shlex.split("rm "+filen))    
+            subprocess.check_call(shlex.split("rm "+filen))
     print_checkpoint("Begin sorting files by position")
     if num_procs > 1:
         pool=multiprocessing.Pool(num_procs)
@@ -2925,7 +2925,7 @@ def calculate_control_fdr(files,control_pvalues,fdr_target,mc_class_counts):
         except:
             pvalues[filen]= 2.0
 
-    
+
     control_index = 0
     control_count = 0
     pvalue_count = {}
@@ -2934,7 +2934,7 @@ def calculate_control_fdr(files,control_pvalues,fdr_target,mc_class_counts):
     control_pvalues = sorted(control_pvalues)
     control_quantiles = mquantiles(control_pvalues,prob = [i / 1000000.0 for i in range(0,1000000)],alphap=1,betap=1)
     #I need this because I carry out way more actual tests than control tests
-    #the number of control pvalues I see at a certain pvalue is based on the 
+    #the number of control pvalues I see at a certain pvalue is based on the
     #size of the control region, so the number I'd expect in the real dataset
     #needs to be scaled up.
     scale_factor = {}
@@ -2967,7 +2967,7 @@ def calculate_control_fdr(files,control_pvalues,fdr_target,mc_class_counts):
                 try:
                     pvalues[filen] = float(fields[filen][6])
                 except:
-                    pvalues[filen]= 2.0            
+                    pvalues[filen]= 2.0
     for mc_class in best_pvalue:
         if mc_class_counts[mc_class] > 0:
             print "The closest p-value cutoff for "+mc_class+" at your desired FDR is "+str(best_pvalue[mc_class])+" which corresponds to an FDR of "+str(best_fdr[mc_class])
@@ -2977,9 +2977,9 @@ def calculate_control_fdr(files,control_pvalues,fdr_target,mc_class_counts):
 def get_pvalue_dist(coverage,control_sites):
     """
     This function will calculate the p-values for a given coverage based on an input control genome
-    
+
     coverage is an integer specifying a particular coverage
-    
+
     control_sites is a list of sites from the control genomes. Each site consists of two integers
         the number of methylated reads at the at site and the total number of reads. Consequently,
         this argument is a list of lists like so: [[1,3],[2,5],...]
@@ -2995,9 +2995,9 @@ def get_pvalue_dist(coverage,control_sites):
             combinations[mc_count] = choose(coverage,mc_count)
     for site in control_sites:
         mc_level = site[0] / float(site[1])
-        for mc_count in range(0,coverage+1):   
+        for mc_count in range(0,coverage+1):
             dist[mc_count]+=(combinations[mc_count])*(mc_level**mc_count)*((1-mc_level)**(coverage-mc_count))
-    dist[coverage]=dist[coverage]/total_control_sites 
+    dist[coverage]=dist[coverage]/total_control_sites
     for mc_count in range(0,coverage)[::-1]:
         dist[mc_count]=dist[mc_count]/total_control_sites
         dist[mc_count]+=dist[mc_count+1]
@@ -3007,7 +3007,7 @@ def choose(n, k):
     """
     Taken from:
     http://stackoverflow.com/questions/3025162/statistics-combinations-in-python
-    
+
     A fast way to calculate binomial coefficients by Andrew Dalke (contrib).
     """
     if 0 <= k <= n:
@@ -3030,11 +3030,11 @@ def benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,si
     This link:
     http://brainder.org/2011/09/05/fdr-corrected-fdr-adjusted-p-values/
     was also helpful as the monotonicity correction from stats.stackexchange is not correct.
-    
+
     file is a string indicating the path to an allc file (generated by run_binom_tests).
-    
+
     mc_class_counts is a dictionary indicating the total number of statistical tests performed for each mc context
-    
+
     sig_cutoff is the FDR cutoff you'd like to use to indicate if a site is significant.
     """
     #A dict of file_names to file handles for the benjamini hochberg correction step
@@ -3075,7 +3075,7 @@ def benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,si
         if bh_value <= sig_cutoff:
             best_fdr[fields[3]] = bh_value
             best_pvalue[fields[3]] = float(fields[6])
-        
+
         test_num[fields[3]] += 1
         input_lines[min_pvalue]=input_files[min_pvalue].readline().rstrip()
         input_fields[min_pvalue]=input_lines[min_pvalue].split("\t")
@@ -3088,7 +3088,7 @@ def benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,si
     for mc_class in best_pvalue:
         print "The closest p-value cutoff for "+mc_class+" at your desired FDR is "+str(best_pvalue[mc_class])+" which corresponds to an FDR of "+str(best_fdr[mc_class])
     for filen in files:
-        input_files[filen].close() 
+        input_files[filen].close()
     return best_pvalue
 def run_mc_filter(filen,min_cov=1,output="temp",min_mc=0):
     """
@@ -3097,7 +3097,7 @@ def run_mc_filter(filen,min_cov=1,output="temp",min_mc=0):
     min_cov is the minimum number of reads a site must have to be tested
     output is a string indicating the name of the output file like so:
         allc_<output>_<chr>.tsv
-    min_mc is the minimum number of mCs that must be observed to 
+    min_mc is the minimum number of mCs that must be observed to
     """
     output_files={}
     reverse_complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
@@ -3113,13 +3113,13 @@ def run_mc_filter(filen,min_cov=1,output="temp",min_mc=0):
         fields3 = line3.split("\t")
         fields4 = line4.split("\t")
         fields5 = line5.split("\t")
-        
+
         fields1[2] = fields1[2].upper()
         fields2[2] = fields2[2].upper()
         fields3[2] = fields3[2].upper()
         fields4[2] = fields4[2].upper()
         fields5[2] = fields5[2].upper()
-        
+
         if fields3[2] == "C":
             #make sure bases are contiguous
             if fields4[0] == fields3[0] and int(fields4[1]) == int(fields3[1]) + 1:
@@ -3140,7 +3140,7 @@ def run_mc_filter(filen,min_cov=1,output="temp",min_mc=0):
             unconverted_c = fields3[4].count(".")
             converted_c = fields3[4].count("T")
             total = unconverted_c+ converted_c
-            
+
             if chrom not in output_files:
                 output_files[chrom] = open("allc_"+output+"_"+chrom+".tsv",'w')
                 output_files[chrom].write("\t".join(["chr","pos","strand","mc_class","mc_count","total","methylated"])+"\n")
@@ -3150,7 +3150,7 @@ def run_mc_filter(filen,min_cov=1,output="temp",min_mc=0):
             elif total!=0:
                 output_files[chrom].write("\t".join(map(str,[chrom,fields3[1],"+",mc_class,unconverted_c,total,"0"]))+"\n")
 
-                
+
         elif fields3[2] == "G":
             #make sure bases are contiguous
             if fields2[0] == fields3[0] and int(fields2[1]) == int(fields3[1]) - 1:
@@ -3169,9 +3169,9 @@ def run_mc_filter(filen,min_cov=1,output="temp",min_mc=0):
                 mc_class += "N"
             chrom = fields3[0].replace("chr","")
             unconverted_c = fields3[4].count(",")
-            converted_c = fields3[4].count("a") 
+            converted_c = fields3[4].count("a")
             total = unconverted_c + converted_c
-        
+
             if chrom not in output_files:
                 output_files[chrom] = open("allc_"+output+"_"+chrom+".tsv",'w')
                 output_files[chrom].write("\t".join(["chr","pos","strand","mc_class","mc_count","total","methylated"])+"\n")
@@ -3201,20 +3201,20 @@ def run_pvalue_lookup_filter(filen,pvalue_lookup,min_pvalue,control_sites,output
     line3 = f.readline().rstrip()
     line4 = f.readline().rstrip()
     line5 = f.readline().rstrip()
-    
+
     fields1 = line1.split("\t")
     fields2 = line2.split("\t")
     fields3 = line3.split("\t")
     fields4 = line4.split("\t")
     fields5 = line5.split("\t")
-    
+
     fields1[2] = fields1[2].upper()
     fields2[2] = fields2[2].upper()
     fields3[2] = fields3[2].upper()
     fields4[2] = fields4[2].upper()
     while line5:
         fields5[2] = fields5[2].upper()
-        
+
         if fields3[2] == "C":
             #make sure bases are contiguous
             if fields4[0] == fields3[0] and int(fields4[1]) == int(fields3[1]) + 1:
@@ -3267,7 +3267,7 @@ def run_pvalue_lookup_filter(filen,pvalue_lookup,min_pvalue,control_sites,output
                 mc_class += "N"
             chrom = fields3[0].replace("chr","")
             unconverted_c = fields3[4].count(",")
-            converted_c = fields3[4].count("a") 
+            converted_c = fields3[4].count("a")
             total = unconverted_c + converted_c
             if total >= min_cov:
                 if total not in pvalue_lookup:
@@ -3287,13 +3287,13 @@ def run_pvalue_lookup_filter(filen,pvalue_lookup,min_pvalue,control_sites,output
         line3 = line4
         line4 = line5
         line5 = f.readline().rstrip()
-        
+
         fields1 = fields2
         fields2 = fields3
         fields3 = fields4
         fields4 = fields5
         fields5 = line5.split("\t")
-        
+
     for chrom in output_files:
         output_files[chrom].close()
 def allc_run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
@@ -3301,12 +3301,12 @@ def allc_run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
     This function is used to recall methylated sites. This is faster than
     going through the original mpileup files.
     file is a string containing the path to an mpileup file
-    
+
     non_conversion is a float indicating the estimated non-conversion rate and sequencing
         error
-        
+
     min_cov is the minimum number of reads a site must have to be tested
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
     if sort_mem:
@@ -3324,9 +3324,9 @@ def allc_run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
     g = open(filen+"_binom_results.tsv",'w')
     for line in f:
         line = line.rstrip()
-        
+
         fields = line.split("\t")
-        
+
         mc_class = fields[3]
         try:
             unconverted_c = int(fields[4])
@@ -3347,7 +3347,7 @@ def allc_run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
             #a unmethylated site
             p_value = 2.0
             g.write("\t".join(fields[:6])+"\t"+str(p_value)+"\n")
-        
+
     g.close()
     subprocess.check_call(shlex.split("sort" + sort_mem + " -k 7g,7g -o "+filen+"_binom_results.tsv "+filen+"_binom_results.tsv"))
     return mc_class_counts
@@ -3355,11 +3355,11 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
     """
     This function is used by call_methylated_sites to parallelize the binomial test.
     file is a string containing the path to an mpileup file
-    
+
     non_conversion is a float indicating the estimated non-conversion rate and sequencing error
-        
+
     min_cov is the minimum number of reads a site must have to be tested
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
     if sort_mem:
@@ -3380,7 +3380,7 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
     line4 = f.readline().rstrip('\n')
     line5 = f.readline().rstrip('\n')
     g = open(filen+"_binom_results.tsv",'w')
-    
+
     #Deal with edge case of the first two positions
     fields1 = line1.split("\t")
     fields2 = line2.split("\t")
@@ -3404,7 +3404,7 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
                 mc_class += fields3[2]
         else:
             mc_class += "N"
-        chrom = fields1[0].replace("chr","")    
+        chrom = fields1[0].replace("chr","")
         unconverted_c = fields1[4].count(".")
         converted_c = fields1[4].count("T")
         total = unconverted_c+ converted_c
@@ -3426,7 +3426,7 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
         mc_class = "CNN"
         chrom = fields1[0].replace("chr","")
         unconverted_c = fields1[4].count(",")
-        converted_c = fields1[4].count("a") 
+        converted_c = fields1[4].count("a")
         total = unconverted_c + converted_c
         if total >= min_cov and unconverted_c != 0:
             try:
@@ -3440,7 +3440,7 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
             #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
             #a unmethylated site
             p_value = 2.0
-            g.write("\t".join(map(str,[chrom,fields1[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")        
+            g.write("\t".join(map(str,[chrom,fields1[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")
     #FOR THE SECOND POSITION
     if fields2[2] == "C" and fields2[3]!="0":
         #make sure bases are contiguous
@@ -3458,7 +3458,7 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
                 mc_class += fields4[2]
         else:
             mc_class += "N"
-        chrom = fields2[0].replace("chr","")    
+        chrom = fields2[0].replace("chr","")
         unconverted_c = fields2[4].count(".")
         converted_c = fields2[4].count("T")
         total = unconverted_c+ converted_c
@@ -3488,7 +3488,7 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
         mc_class += "N"
         chrom = fields2[0].replace("chr","")
         unconverted_c = fields2[4].count(",")
-        converted_c = fields2[4].count("a") 
+        converted_c = fields2[4].count("a")
         total = unconverted_c + converted_c
         if total >= min_cov and unconverted_c != 0:
             try:
@@ -3503,20 +3503,20 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
             #a unmethylated site
             p_value = 2.0
             g.write("\t".join(map(str,[chrom,fields2[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")
-    
+
     while line5:
         fields1 = line1.split("\t")
         fields2 = line2.split("\t")
         fields3 = line3.split("\t")
         fields4 = line4.split("\t")
         fields5 = line5.split("\t")
-        
+
         fields1[2] = fields1[2].upper()
         fields2[2] = fields2[2].upper()
         fields3[2] = fields3[2].upper()
         fields4[2] = fields4[2].upper()
         fields5[2] = fields5[2].upper()
-        
+
         if fields3[2] == "C" and fields3[3]!="0":
             #make sure bases are contiguous
             if fields4[0] == fields3[0] and int(fields4[1]) == int(fields3[1]) + 1:
@@ -3533,7 +3533,7 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
                     mc_class += fields5[2]
             else:
                 mc_class += "N"
-            chrom = fields3[0].replace("chr","")    
+            chrom = fields3[0].replace("chr","")
             unconverted_c = fields3[4].count(".")
             converted_c = fields3[4].count("T")
             total = unconverted_c+ converted_c
@@ -3568,7 +3568,7 @@ def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
                 mc_class += "N"
             chrom = fields3[0].replace("chr","")
             unconverted_c = fields3[4].count(",")
-            converted_c = fields3[4].count("a") 
+            converted_c = fields3[4].count("a")
             total = unconverted_c + converted_c
             if total >= min_cov and unconverted_c != 0:
                 try:
@@ -3618,7 +3618,7 @@ def parse_args():
         If you'd like to specify an entire chromosome simply use 'chrom:'")
      parser_pipeline.add_argument('--quality_version', type=str, default="1.8", help="either an integer indicating the base offset for \
         the quality scores or a float indicating which version of casava was used to generate the fastq files.")
-     parser_pipeline.add_argument('--path_to_samtools', type=str, default="", help='Path to samtools installation (default is current dir)')     
+     parser_pipeline.add_argument('--path_to_samtools', type=str, default="", help='Path to samtools installation (default is current dir)')
      parser_pipeline.add_argument('--path_to_bowtie', type=str, default="", help='Path to bowtie installation (default is current dir)')
      parser_pipeline.add_argument('--bowtie_options', type=str, nargs='+', help="list of strings indicating options you'd like passed to bowtie \
         (e.g., ['-k 1','-l 2']")
@@ -3661,7 +3661,7 @@ def parse_args():
      parser_pipeline.add_argument('--in_mem', type=bool, default=False, help="Does not write files as part of run_mapping, keeps all input/output in memory")
      parser_pipeline.add_argument('--path_to_MarkDuplicates', type=str, default=False, help="The path to MarkDuplicates jar from picard. Default is false indicating that you don't want to use this jar for duplication removal")
 
-     
+
      #create the parser for the "call_methylated_sites" command
      parser_call = subparsers.add_parser('call_methylated_sites', help='Use to run the call_methylated_sites function')
      parser_call.add_argument('inputf', type=str, help='inputf is the path to a bam file that contains mapped bisulfite sequencing reads')
@@ -3674,7 +3674,7 @@ def parse_args():
      parser_call.add_argument('casava_version', type=float, help="casava_version is a float indicating which version of casava was used to generate the fastq files.")
      parser_call.add_argument('--sig_cutoff', type=float, default=0.01, help="sig_cutoff is a float indicating the adjusted \
         p-value cutoff you wish to use for determining whether or not a site is methylated")
-     parser_call.add_argument('--num_procs', type=int, default=1, help="processers is an integer indicating how many processors you'd like to run this function over") 
+     parser_call.add_argument('--num_procs', type=int, default=1, help="processers is an integer indicating how many processors you'd like to run this function over")
      parser_call.add_argument('--min_cov', type=int, default=1, help="min_cov is an integer indicating the minimum number of reads for a site to be tested")
      parser_call.add_argument('--binom_test', type=bool, default=False, help="Boolean indicating if you want to run binomial tests")
      parser_call.add_argument('--min_mc', type=int, default=0, help="Minimum number of mCs that must be observed")
@@ -3683,14 +3683,14 @@ def parse_args():
      parser_call.add_argument('--bh', type=bool, default=False, help="Boolean flag indicating whether or not you'd like to use the benjamini-hochberg FDR \
         instead of an FDR calculated from the control reference")
      parser_call.add_argument('--path_to_files', type=str, default="", help="string indicating the path for the output and the input bam, mpileup, or allc files \
-        for methylation calling.")                                                                                                                                                   
-     
+        for methylation calling.")
+
      args = parser.parse_args()
 
      if args.command == "run_methylation_pipeline":
          if not args.bowtie_options:
              args.bowtie_options = ["-S","-k 1","-m 1","--chunkmbs 3072","--best","--strata","-o 4","-e 80","-l 20","-n 0"]
-        
+
          run_methylation_pipeline(args.files,args.libraries,args.sample,args.forward_ref,args.reverse_ref,args.ref_fasta,
                                   args.unmethylated_control,args.quality_version,args.path_to_samtools,args.path_to_bowtie,
                                   args.bowtie_options,args.num_procs,args.trim_reads,
@@ -3699,11 +3699,11 @@ def parse_args():
                                   args.sig_cutoff,args.min_cov,args.binom_test,args.keep_temp_files,args.num_reads,
                                   args.save_space,
                                   args.bowtie2,args.sort_mem,args.path_to_output,args.in_mem)
-                                  
+
      elif args.command == "call_methylated_sites":
          call_methylated_sites(args.inputf, args.sample, args.reference, args.control, args.casava_version, args.sig_cutoff,
                               args.num_procs, args.min_cov, args.binom_test, args.min_mc, args.path_to_samtools, args.sort_mem,
                               args.bh, args.path_to_files)
-    
+
 if __name__ == '__main__':
     parse_args()
