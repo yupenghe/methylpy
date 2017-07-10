@@ -3679,7 +3679,7 @@ def parse_args():
      parser_call.add_argument('--binom_test', type=bool, default=False, help="Boolean indicating if you want to run binomial tests")
      parser_call.add_argument('--min_mc', type=int, default=0, help="Minimum number of mCs that must be observed")
      parser_call.add_argument('--path_to_samtools', type=str, default="", help='Path to samtools installation (default is current dir)')
-     parser_call.add_argument('--sort_mem', type=bool, default=False, help="Parameter to pass to unix sort with -S/--buffer-size command")
+     parser_call.add_argument('--sort_mem', type=str, default=False, help="Parameter to pass to unix sort with -S/--buffer-size command")
      parser_call.add_argument('--bh', type=bool, default=False, help="Boolean flag indicating whether or not you'd like to use the benjamini-hochberg FDR \
         instead of an FDR calculated from the control reference")
      parser_call.add_argument('--path_to_files', type=str, default="", help="string indicating the path for the output and the input bam, mpileup, or allc files \
