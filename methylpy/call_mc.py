@@ -1621,7 +1621,7 @@ def call_methylated_sites(inputf, sample, reference, control,quality_version,sig
         f.close()
         #compute pvalues for control genome. Have to read through it completely twice to do this
         min_pvalue = 1
-        avg_qual = total_phred / total_bases
+        avg_qual = total_phred / float(total_bases)
         seq_error = 10 ** (avg_qual / -10)
         if seq_error > 1.0 or seq_error < 0.0:
             sys.exit("One of your quality values corresponds to a sequence error rate of "+str(seq_error)+". These error rates have to be between 0 and 1. Are you sure you chose the correct CASAVA version?")
