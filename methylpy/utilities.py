@@ -240,7 +240,6 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
     """
     This function mimics the unix split utility.
     """
-    count = 0
     if not isinstance(input_files, list):
         if isinstance(input_files, basestring):
             input_files = [input_files]
@@ -253,21 +252,22 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
     for inputf in input_files:
         try:
             f = gzip.open(inputf,'r')
-            f.readline()
         except:
             try:
                 f = bz2.BZ2File(inputf,'r')
-                f.readline()
             except:
                 f = open(inputf,'r')
-
+                
         line = True
         while line:
             current_file = cycle.next()
-            for index in xrange(0,4):
+            # processing read id
+            # remove any string after the first space character
+            line = f.readline()
+            file_handles[current_file].write(line.split(" ")[0]+"\n")
+            for index in xrange(0,3):
                 line = f.readline()
                 file_handles[current_file].write(line)
-            count += 1
         f.close()
         current_pointer=0
 
