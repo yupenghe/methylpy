@@ -236,7 +236,7 @@ def split_allc_file(num_chunks, inputf, output_prefix, window=False):
     g.close()
     f.close()
 
-def split_fastq_file(num_chunks, input_files, output_prefix,num_reads = -1,current_file=False,current_pointer=0):
+def split_fastq_file(num_chunks, input_files, output_prefix):
     """
     This function mimics the unix split utility.
     """
@@ -246,8 +246,6 @@ def split_fastq_file(num_chunks, input_files, output_prefix,num_reads = -1,curre
             input_files = [input_files]
         else:
             sys.exit("input_files must be a list of strings")
-    if current_file != False:
-        input_files = input_files[input_files.index(current_file):]
     file_handles = {}
     for index in xrange(0,num_chunks):
         file_handles[index]=open(output_prefix+str(index),'w')
@@ -262,8 +260,6 @@ def split_fastq_file(num_chunks, input_files, output_prefix,num_reads = -1,curre
                 f.readline()
             except:
                 f = open(inputf,'r')
-        finally:
-            f.seek(current_pointer)
 
         line = True
         while line:
@@ -272,19 +268,11 @@ def split_fastq_file(num_chunks, input_files, output_prefix,num_reads = -1,curre
                 line = f.readline()
                 file_handles[current_file].write(line)
             count += 1
-            if num_reads != -1 and count >= num_reads:
-                for index in xrange(0,num_chunks):
-                    file_handles[index].close()
-                
-                save_point = (inputf,f.tell())
-                f.close()
-                return save_point
         f.close()
         current_pointer=0
 
     for index in xrange(0,num_chunks):
         file_handles[index].close()
-    return False
 
 def split_mpileup_file(num_chunks,inputf,output_prefix):
     """
@@ -616,6 +604,11 @@ def print_checkpoint(message):
     tabs = message.count("\t")
     print ("\t" * tabs) + time.asctime(time.localtime(time.time()))
     sys.stdout.flush()
-  
+
+
+def print_error(error_message=""):
+    sys.stderr.write("Error:\n" + error_message)
+    sys.exit(1)
+
 if __name__ == '__main__':
     pass
