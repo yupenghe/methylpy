@@ -247,19 +247,12 @@ int run_rms_tests(vector<string> files, string output, vector<string> samples, i
 
                     string methylated = fields[sample_index][6];
                     vector<int> current_counts(2);
-                    if(methylated == "1"){
-                        mc = atoi(fields[sample_index][4].c_str());
-                        h = atoi(fields[sample_index][5].c_str());
-                    	current_counts[0] = mc;
-                    	current_counts[1] = h-mc;
-                        frac = mc / static_cast<float>(h);
-                    } else {
-                    	mc = 0;
-                        h = atoi(fields[sample_index][5].c_str());
-                    	current_counts[0] = 0;
-                    	current_counts[1] = h;
-                    	frac = 0.0;
-                    }
+                    
+		    mc = atoi(fields[sample_index][4].c_str());
+		    h = atoi(fields[sample_index][5].c_str());
+		    current_counts[0] = mc;
+		    current_counts[1] = h-mc;
+		    frac = mc / static_cast<float>(h);
 
                     if(frac > max_frac){
                     	max_frac = frac;
