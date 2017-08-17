@@ -250,26 +250,25 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
         file_handles[index]=open(output_prefix+str(index),'w')
     cycle = itertools.cycle(range(0,num_chunks))
     for inputf in input_files:
-        try:
+        if inputf[-3:] == ".gz":
             f = gzip.open(inputf,'r')
-        except:
-            try:
-                f = bz2.BZ2File(inputf,'r')
-            except:
-                f = open(inputf,'r')
+        elif inputf[-4:] == ".bz2":
+            f = bz2.BZ2File(inputf,'r')
+        else:
+            f = open(inputf,'r')
                 
-        line = True
-        while line:
+        while True:
             current_file = cycle.next()
             # processing read id
             # remove any string after the first space character
             line = f.readline()
+            if not line:
+                break
             file_handles[current_file].write(line.split(" ")[0]+"\n")
             for index in xrange(0,3):
                 line = f.readline()
                 file_handles[current_file].write(line)
         f.close()
-        current_pointer=0
 
     for index in xrange(0,num_chunks):
         file_handles[index].close()
