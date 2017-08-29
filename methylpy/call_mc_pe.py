@@ -1140,44 +1140,12 @@ def call_methylated_sites(inputf, sample, reference, control,sig_cutoff=.01,num_
 
         print_checkpoint("Begin calling methylated cytosines")
         if binom_test == True:
-            if num_procs > 1:
-                results = []
-                try:
-                    subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output_chunk_[0-9]"))
-                except:
-                    pass
-                try:
-                    subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output_chunk_[0-9][0-9]"))
-                except:
-                    pass
-                try:
-                    subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output_chunk_[0-9][0-9][0-9]"))
-                except:
-                    pass
-                split_mpileup_file(num_procs,path_to_files+sample+"_mpileup_output.tsv",path_to_files+sample+"_mpileup_output_chunk_")
-                print_checkpoint("Begin binomial tests")
-                pool=multiprocessing.Pool(num_procs)
-                chunks = glob.glob(path_to_files+sample+"_mpileup_output_chunk_*")
-                for chunk in chunks:
-                    results.append(pool.apply_async(run_binom_tests,(chunk,non_conversion,min_cov),{"sort_mem":sort_mem}))
-                pool.close()
-                pool.join()
-                pvalues = []
-                for result in results:
-                    result_mc_class_counts = result.get()
-                    for mc_class in result_mc_class_counts:
-                        mc_class_counts[mc_class]+=result_mc_class_counts[mc_class]
-                #files = [path_to_files+i+"_binom_results.tsv" for i in chunks]
-                files = [i+"_binom_results.tsv" for i in chunks]
-                subprocess.check_call(shlex.split("rm "+" ".join(chunks)))
-            else: # single core
-                print_checkpoint("Begin binomial tests")
-                mc_class_counts = run_binom_tests(path_to_files+sample+"_mpileup_output.tsv",non_conversion,min_cov=min_cov,sort_mem=sort_mem)
-                files = [path_to_files+sample+"_mpileup_output.tsv_binom_results.tsv"]
+            print_checkpoint("Begin binomial tests")
+            mc_class_counts = run_binom_tests(path_to_files+sample+"_mpileup_output.tsv",non_conversion,min_cov=min_cov,sort_mem=sort_mem)
+            files = [path_to_files+sample+"_mpileup_output.tsv_binom_results.tsv"]
             print_checkpoint("Begin adjusting p-values")
             best_pvalues = benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,sig_cutoff)
             filter_files_by_pvalue(files,path_to_files+sample,best_pvalues,num_procs,remove_file=True,sort_mem=sort_mem)
-
         else:
             run_mc_filter(path_to_files+sample+"_mpileup_output.tsv",min_cov=min_cov,output=sample,min_mc=min_mc)
     print_checkpoint("Done")
