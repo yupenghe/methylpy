@@ -228,6 +228,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         total_unique += run_mapping_pe(
             current_library,library_read1_files,library_read2_files,sample,
             forward_reference,reverse_reference,reference_fasta,
+            path_to_output=path_to_output,
             path_to_samtools=path_to_samtools,path_to_aligner=path_to_aligner,
             aligner_options=aligner_options,num_procs=num_procs,
             trim_reads=trim_reads,path_to_cutadapt=path_to_cutadapt,
@@ -237,28 +238,29 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
             min_qual_score=min_qual_score,min_read_len=min_read_len,
             keep_temp_files=keep_temp_files,
             bowtie2=bowtie2, 
-            sort_mem=sort_mem, path_to_output=path_to_output)
-
-        pool = multiprocessing.Pool(num_procs)
-        #I avoid sorting by chromosome or strand because it's not strictly necessary and this speeds up 
-        #the sorting. I had to add some special logic in the processing though
-        processed_library_files = glob.glob(path_to_output+sample+"_"+str(current_library)+"_no_multimap_*")
-        for filen in processed_library_files:
-            #Sort by the start positions of both reads in a pair
-            cmd = shlex.split("sort" + sort_mem + " -t '\t' -k 4n -k 8n -o "+filen+" "+filen)
-            pool.apply_async(subprocess.check_call,(cmd,))
-        pool.close()
-        pool.join()
-        total_clonal += collapse_clonal_reads_pe(reference_fasta,path_to_samtools,
-                                                 num_procs,sample,current_library,
-                                                 path_to_picard=path_to_picard,remove_clonal=remove_clonal,
-                                                 path_to_files=path_to_output,sort_mem=sort_mem)
+            sort_mem=sort_mem)
         
-    print_checkpoint("There are " + str(total_unique) + " uniquely mapping read pairs, " +
-                     str(float(total_unique) / total_reads*100) + " percent remaining")                          
+    #print_checkpoint("There are " + str(total_unique) + " uniquely mapping read pairs, " +
+    #                 str(float(total_unique) / total_reads*100) + " percent remaining")
+
+    ## Remove clonal reads
     if remove_clonal == True:
         print_checkpoint("There are " + str(total_clonal/2) + " non-clonal reads, " +
-                         str(float(total_clonal/2) / total_reads*100) + " percent remaining") 
+                         str(float(total_clonal/2) / total_reads*100) + " percent remaining")
+            #Remove clonal reads
+        for library in set(libraries):
+            subprocess.check_call(
+                shlex.split(" ".join(["java","-Xmx20g","-jar",
+                                      path_to_picard+"/picard.jar MarkDuplicates",
+                                      "INPUT="+path_to_output+sample+"_"+str(library)+"_processed_reads.bam",
+                                      "OUTPUT="+path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam",
+                                      "ASSUME_SORTED=true",
+                                      "REMOVE_DUPLICATES=true",
+                                      "METRICS_FILE=/dev/null",
+                                      "VALIDATION_STRINGENCY=LENIENT"])
+                )
+            )
+            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+str(library)+"_processed_reads.bam"))
         library_files = [path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam" for library in set(libraries)]
         if len(library_files) > 1:
             merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
@@ -283,6 +285,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
  
 def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                    sample,forward_reference,reverse_reference,reference_fasta,
+                   path_to_output="",
                    path_to_samtools="",path_to_aligner="",
                    aligner_options=[],
                    num_procs=1,trim_reads=True,path_to_cutadapt="",
@@ -291,7 +294,7 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                    max_adapter_removal=None,overlap_length=None,zero_cap=None,
                    quality_base=None,error_rate=None,min_qual_score=10,
                    min_read_len=30,keep_temp_files=False,
-                   bowtie2=True, sort_mem="500M",path_to_output=""):
+                   bowtie2=True, sort_mem="500M"):
     """
     This function runs the mapping portion of the methylation calling pipeline.
     For Paired-end data processing.
@@ -373,6 +376,9 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
     
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
+    if len(path_to_output) !=0:
+        path_to_output+="/"
+        
     total_unique = 0
     file_name = sample+"_"+str(current_library)
     file_path = path_to_output+file_name
@@ -425,9 +431,13 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
         )        
         #Run bowtie
         print_checkpoint("Begin Running Bowtie for "+file_name)
-        total_unique += run_bowtie_pe([file_path+"_R1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)],
+        total_unique += run_bowtie_pe(current_library,
+                                      [file_path+"_R1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)],
                                       [file_path+"_R2_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)],
-                                      forward_reference,reverse_reference,file_path,aligner_options=aligner_options,
+                                      sample,
+                                      forward_reference,reverse_reference,reference_fasta,
+                                      path_to_output=path_to_output,
+                                      aligner_options=aligner_options,
                                       path_to_aligner=path_to_aligner,num_procs=num_procs,
                                       keep_temp_files=keep_temp_files, bowtie2=bowtie2, sort_mem=sort_mem)
     else:
@@ -447,16 +457,24 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
         subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_R2_split_"+str(i) for i in xrange(0,num_procs)])))
         #Run bowtie
         print_checkpoint("Begin Running Bowtie for "+file_name)
-        total_unique += run_bowtie_pe([file_path+"_R1_split_converted_"+str(i) for i in xrange(0,num_procs)],
+        total_unique += run_bowtie_pe(current_library,
+                                      [file_path+"_R1_split_converted_"+str(i) for i in xrange(0,num_procs)],
                                       [file_path+"_R2_split_converted_"+str(i) for i in xrange(0,num_procs)],
-                                      forward_reference,reverse_reference,file_path,aligner_options=aligner_options,
+                                      sample,
+                                      forward_reference,reverse_reference,reference_fasta,
+                                      path_to_output=path_to_output,
+                                      path_to_samtools=path_to_samtools,
+                                      aligner_options=aligner_options,
                                       path_to_aligner=path_to_aligner,num_procs=num_procs,
                                       keep_temp_files=keep_temp_files, bowtie2=bowtie2, sort_mem=sort_mem)
     
     return total_unique
 
-def run_bowtie_pe(library_read1_files,library_read2_files,
-                  forward_reference,reverse_reference,prefix,
+def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
+                  sample,
+                  forward_reference,reverse_reference,reference_fasta,
+                  path_to_output="",                  
+                  path_to_samtools="",
                   aligner_options="",path_to_aligner="",
                   num_procs=1,keep_temp_files=False, bowtie2=True, sort_mem="500M"):
     """
@@ -496,6 +514,11 @@ def run_bowtie_pe(library_read1_files,library_read2_files,
     options = aligner_options
     if " ".join(options).find(" -p ") == -1:
         options.append("-p "+str(num_procs))
+
+    if len(path_to_output) !=0:
+        path_to_output+="/"
+        
+    prefix = path_to_output+sample+"_"+str(current_library)
         
     ## Forward
     if bowtie2:
@@ -535,7 +558,7 @@ def run_bowtie_pe(library_read1_files,library_read2_files,
         args.append("-1 "+",".join(library_read1_files))
         args.append("-2 "+",".join(library_read2_files))
         args.append(prefix+"_reverse_strand_hits.sam")
-    subprocess.check_call(shlex.split(" ".join(args)))    
+    subprocess.check_call(shlex.split(" ".join(args)))
     print_checkpoint("Processing reverse strand hits")
     sam_header = find_multi_mappers_pe(prefix+"_reverse_strand_hits.sam",prefix,num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
     ## Clear temporary files
@@ -549,7 +572,11 @@ def run_bowtie_pe(library_read1_files,library_read2_files,
     pool.join()
     print_checkpoint("Finding multimappers")
 
-    total_unique = merge_sorted_multimap_pe([prefix+"_sorted_"+str(file_num) for file_num in xrange(0,num_procs)],prefix)
+    total_unique = merge_sorted_multimap_pe(current_library,
+                                            [prefix+"_sorted_"+str(file_num) for file_num in xrange(0,num_procs)],
+                                            prefix,
+                                            reference_fasta,
+                                            path_to_samtools="")
     subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num) for file_num in xrange(0,num_procs)])))
     return total_unique
 
@@ -610,7 +637,7 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
     for file_num in xrange(0,num_procs):
         file_handles[file_num].close()
 
-def merge_sorted_multimap_pe(files, output):
+def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_to_samtools=""):
     """
     This function takes the files from find_multi_mappers and outputs the uniquely mapping reads
     
@@ -619,17 +646,37 @@ def merge_sorted_multimap_pe(files, output):
     output is a prefix you'd like prepended to the file containing the uniquely mapping reads
         This file will be named as <output>+"_no_multimap_"+<index_num>
     """
+    ## SAM header
+    output_bam_file = prefix+"_processed_reads.bam"
+    output_handle = open(output_bam_file,'w')
+
+    output_pipe = subprocess.Popen(
+        shlex.split(path_to_samtools+"samtools view -S -b -"),
+        stdin=subprocess.PIPE,stdout=output_handle)
+
+    try:
+        f = open(reference_fasta+".fai",'r')
+    except:
+        print "Reference fasta not indexed. Indexing."
+        try:
+            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
+            f = open(reference_fasta+".fai",'r')
+        except:
+            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
+    #Create sam header based on reference genome
+    output_pipe.stdin.write("@HD\tVN:1.0\tSO:unsorted\n")
+    for line in f:
+        fields = line.split("\t")
+        output_pipe.stdin.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
+    f.close()
+
+    ## Merging alignment results of both strands
     lines = {}
     fields = {}
-    output_handles = {}
-    file_handles = {}
-    
+    file_handles = {}    
     total_unique = 0
     count= 0
-    cycle = itertools.cycle(range(0,len(files)))
-    
     for index,filen in enumerate(files):
-        output_handles[index] = open(output+"_no_multimap_"+str(index),'a')
         file_handles[filen]=open(filen,'r')
         lines[filen]=file_handles[filen].readline()
         fields[filen] = lines[filen].split("\t")[0]#Read ID
@@ -654,16 +701,17 @@ def merge_sorted_multimap_pe(files, output):
                 fields[key]=lines[key].split("\t")[0]
         #Check if there is only one valid alignment
         if count_1 == 1:
-            index = cycle.next()
-            #Output
-            output_handles[index].write(current_line_1)
-            output_handles[index].write(current_line_2)
-            output_handles[index].flush()
+            output_pipe.stdin.write(current_line_1)
+            output_pipe.stdin.write(current_line_2)
             total_unique += 1
-            
+
+    output_handle.close()
+    output_pipe.stdin.close()
     for index,filen in enumerate(files):
-        output_handles[index].close()
         file_handles[filen].close()
+
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
+                                      " -o "+output_bam_file))
 
     return total_unique
 
@@ -943,9 +991,21 @@ def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,n
 
         
     #Call methylated sites
-    call_methylated_sites(inputf+".R2flipped.bam", sample, reference, control,sig_cutoff,num_procs,
-                          min_cov,binom_test,min_mc,path_to_samtools,sort_mem,bh,
-                          path_to_files,min_base_quality)
+    call_methylated_sites(inputf = inputf+".R2flipped.bam",
+                          sample = sample,
+                          reference_fasta = reference,
+                          control = control,
+                          sig_cutoff = sig_cutoff,
+                          num_procs = num_procs,
+                          num_upstr_bases=0,num_downstr_bases=2,
+                          min_cov = min_cov,
+                          binom_test = binom_test,
+                          min_mc = min_mc,
+                          path_to_samtools = path_to_samtools,
+                          sort_mem = sort_mem,
+                          bh = bh,
+                          path_to_files = path_to_files,
+                          min_base_quality = min_base_quality)
     
     #Remove intermediate bam file
     try:
@@ -954,9 +1014,29 @@ def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,n
     except:
         pass
 
-    
-def call_methylated_sites(inputf, sample, reference, control,sig_cutoff=.01,num_procs = 1,
-                          min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
+def fasta_iter(fasta_name,query_chrom):
+    """
+    given a fasta file. yield tuples of header, sequence
+    """
+    fh = open(fasta_name)
+    # ditch the boolean (x[0]) and just keep the header or sequence since
+    # we know they alternate.
+    from itertools import groupby
+    faiter = (x[1] for x in groupby(fh, lambda line: line[0] == ">"))
+    seq = None
+    for header in faiter:
+        # drop the ">"
+        header = header.next()[1:].strip().replace("chr","")
+        if header != query_chrom:
+            continue
+        # join all sequence lines to one.
+        seq = "".join(s.strip() for s in faiter.next())
+        return seq
+
+def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
+                          num_upstr_bases=0,num_downstr_bases=2,
+                          min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
+                          sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads
@@ -991,164 +1071,61 @@ def call_methylated_sites(inputf, sample, reference, control,sig_cutoff=.01,num_
     #Figure out all the correct quality options based on the offset or CASAVA version given
     # quality_version >= 1.8:
     quality_base = 33
-    mpileup_quality = ""
+    if len(path_to_files)!=0:
+        path_to_files+="/"
+    if len(path_to_samtools)!=0:
+        path_to_samtools+="/"
+
 
     try:
         num_procs = int(num_procs)
     except:
         sys.exit("num_procs must be an integer")
-    if len(path_to_files)!=0:
-        path_to_files+="/"
-
-    mc_class_counts = {}
-    for first in ["A","T","C","G","N"]:
-        for second in ["A","T","C","G","N"]:
-            mc_class_counts["C"+first+second]=0
-
-    #figure out non-conversion rate if it isn't given
+        
     try:
-        non_conversion = float(control)
+        #make sure bam file is indexed
+        open(path_to_files+inputf+".bai",'r')
     except:
-        if control.find(":") == -1:
-            sys.exit("control MUST have a colon in it. Either chr: or chr:start-end")
-        print_checkpoint("Begin calculating non-conversion rate for "+control)
-        try:
-            open(path_to_files+sample+"_mpileup_output_"+control+".tsv",'r')
-        except IOError:
-            try:
-                #make sure bam file is indexed
-                open(path_to_files+inputf+".bai",'r')
-            except:
-                print_checkpoint("Input not indexed. Indexing...")
-                subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+path_to_files+inputf))
-            with open(path_to_files+sample+"_mpileup_output_"+control+".tsv",'w') as f:
-                subprocess.check_call(shlex.split(path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B "+mpileup_quality+" -r "+control+" -f "+reference+" "+path_to_files+inputf),stdout=f)
-        else:
-            print(sample+"_mpileup_output_"+control+".tsv already exists, using it for calculations.")
-        f = open(path_to_files+sample+"_mpileup_output_"+control+".tsv" ,'r')
+        print_checkpoint("Input not indexed. Indexing...")
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+path_to_files+inputf))
 
-        unconverted_c = 0
-        converted_c = 0
-        total_phred = 0
-        total_bases = 0
-        total_control_sites = 0
-        total_unconverted_c =0
-        total_converted_c = 0
-        pvalue_lookup={}
-        control_sites = []
-        for line in f:
-            line = line.rstrip()
-            fields = line.split("\t")
-            if fields[3] != "0":
-                total_phred += sum([ord(i)-quality_base for i in fields[5]]) 
-                total_bases += len(fields[5])
-                
-                if fields[2] == "C":
-                    unconverted_c = fields[4].count(".")
-                    converted_c = fields[4].count("T")
-                elif fields[2] == "G":
-                    unconverted_c = fields[4].count(",")
-                    converted_c = fields[4].count("a")
-                else:
-                    continue
-                total_unconverted_c += unconverted_c
-                total_converted_c += converted_c
-                if binom_test==False and min_mc==0:
-                    if unconverted_c+converted_c > 0:
-                        total_control_sites += 1
-                        control_sites.append((unconverted_c,unconverted_c+converted_c))
-        f.close()
-        
-        #compute pvalues for control genome. Have to read through it completely twice to do this
-        min_pvalue = 1
-        avg_qual = total_phred / float(total_bases)
-        seq_error = 10 ** (avg_qual / -10)
-        if seq_error > 1.0 or seq_error < 0.0:
-            sys.exit("One of your quality values corresponds to a sequence error rate of "+str(seq_error)+". These error rates have to be between 0 and 1. Are you sure you chose the correct CASAVA version?")
-        non_conversion = total_unconverted_c / float(total_converted_c + total_unconverted_c)
-      
-        f = open(path_to_files+sample+"_mpileup_output_"+control+".tsv" ,'r')
-        
-        for line in f:
-            fields = line.split("\t")
-            if fields[2] != "C" and fields[2] != "G":
-                continue
-            if fields[2] == "C":
-                unconverted_c = fields[4].count(".")
-                converted_c = fields[4].count("T")
-            elif fields[2] == "G":
-                unconverted_c = fields[4].count(",")
-                converted_c = fields[4].count("a")      
-        print("\tThe non-conversion rate is "+str(non_conversion*100)+"%")
-        print("\tThe estimated sequencing error rate is: "+str(seq_error))
-        non_conversion+=seq_error
-        f.close()
-        
-    # Avoids matching similarly named files
-    # If allc files are available
-    allc_files = [filename for filename in glob.glob("allc_"+sample+"_*.tsv")
-                  if len(re.findall("^allc_"+sample+"_[0-9a-zA-Z]{1,3}.tsv$",filename))>0]
-    if len(allc_files) != 0:
-        print_checkpoint("allc files exist. Using these files for calling methylated cytosines.")
-        print_checkpoint("Begin binomial tests")
-        if num_procs > 1:
-            results = []
-            pool=multiprocessing.Pool(num_procs)
-            for chunk in allc_files:
-                results.append(pool.apply_async(allc_run_binom_tests,(chunk,non_conversion,min_cov), {"sort_mem":sort_mem}))
-            pool.close()
-            pool.join()
-            for result in results:
-                result_mc_class_counts = result.get()
-                for mc_class in result_mc_class_counts:
-                    mc_class_counts[mc_class]+=result_mc_class_counts[mc_class]
-            best_pvalues = benjamini_hochberg_correction_call_methylated_sites(
-                [path_to_files+filename+"_binom_results.tsv" for filename in allc_files],
-                mc_class_counts,
-                sig_cutoff)
-            
-            pool=multiprocessing.Pool(num_procs)
-            #Normally I can't do this because all the chromosomes are mixed together, but in this case it's fine.
-            for allc_file in [path_to_files+filename+"_binom_results.tsv" for filename in allc_files]:
-                pool.apply_async(filter_files_by_pvalue,([allc_file],path_to_files+sample,best_pvalues,1),{"remove_file":True, "sort_mem":sort_mem})
-            pool.close()
-            pool.join()
-        
-        else: # single core
-            for allc_file in allc_files:
-                mc_class_counts = allc_run_binom_tests(allc_file,non_conversion,min_cov,sort_mem=sort_mem)
-            best_pvalues = benjamini_hochberg_correction_call_methylated_sites(
-                [path_to_files+filename+"_binom_results.tsv" for filename in allc_files],
-                mc_class_counts,
-                sig_cutoff)
-            filter_files_by_pvalue(
-                [path_to_files+filename+"_binom_results.tsv" for filename in allc_files],
-                path_to_files+sample,
-                best_pvalues,
-                num_procs,
-                remove_file=True,
-                sort_mem=sort_mem)
-    else: # allc files do not exist
-        try:
-            f = open(path_to_files+sample+"_mpileup_output.tsv",'r')
-            f.close()
-            print(sample+"_mpileup_output.tsv exists. Using this file for calling methylated cytosines.")
-        except IOError:
-            print_checkpoint(sample+"_mpileup_output.tsv does not exist. Beginning mpileup.")
-            with open(path_to_files+sample+"_mpileup_output.tsv",'w') as f:
-                subprocess.check_call(shlex.split(path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B "+mpileup_quality+" -f "+reference+" "+path_to_files+inputf),stdout=f)
+    cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+path_to_files+inputf
+    pipes = subprocess.Popen(shlex.split(cmd),
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+                             universal_newlines=True)
 
-        print_checkpoint("Begin calling methylated cytosines")
-        if binom_test == True:
-            print_checkpoint("Begin binomial tests")
-            mc_class_counts = run_binom_tests(path_to_files+sample+"_mpileup_output.tsv",non_conversion,min_cov=min_cov,sort_mem=sort_mem)
-            files = [path_to_files+sample+"_mpileup_output.tsv_binom_results.tsv"]
-            print_checkpoint("Begin adjusting p-values")
-            best_pvalues = benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,sig_cutoff)
-            filter_files_by_pvalue(files,path_to_files+sample,best_pvalues,num_procs,remove_file=True,sort_mem=sort_mem)
-        else:
-            run_mc_filter(path_to_files+sample+"_mpileup_output.tsv",min_cov=min_cov,output=sample,min_mc=min_mc)
-    print_checkpoint("Done")
+    output_files = {}
+    complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
+    cur_chrom = ""
+    cur_chrom_nochr = ""
+    for line in pipes.stdout:
+        fields = line.split("\t")
+        if fields[0] != cur_chrom:
+            cur_chrom = fields[0]
+            cur_chrom_nochr = cur_chrom.replace("chr","")
+            seq = fasta_iter(reference_fasta,cur_chrom_nochr)
+            output_files[cur_chrom_nochr] = open(path_to_files+"allc_"+sample+"_"+cur_chrom_nochr+".tsv",'w')
+        if fields[2] == "C":
+            pos = int(fields[1])-1
+            context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
+            unconverted_c = fields[4].count(".")
+            converted_c = fields[4].count("T")
+            output_files[cur_chrom_nochr].write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
+                                                     str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
+        elif fields[2] == "G":
+            pos = int(fields[1])-1
+            context = "".join([complement[base]
+                               for base in reversed(
+                                       seq[(pos-num_downstr_bases):(pos+num_upstr_bases+1)]
+                               )]
+            )
+            unconverted_c = fields[4].count(",")
+            converted_c = fields[4].count("a")
+            output_files[cur_chrom_nochr].write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
+                                                     str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
+    for chrom in output_files.keys():
+        output_files[chrom].close()
 
 
 def expand_input_files(read_files,libraries):
@@ -1219,8 +1196,8 @@ def merge_bam_files(input_files,output,path_to_samtools=""):
 
 
 
-def collapse_clonal_reads_pe(reference_fasta,path_to_samtools,                            
-                             num_procs,sample,current_library,
+def collapse_clonal_reads_pe(inputf,sample,reference_fasta,path_to_samtools,                            
+                             num_procs,current_library,
                              path_to_picard="",remove_clonal=True,
                              sort_mem="500M",path_to_files=""):
     """
@@ -1240,7 +1217,7 @@ def collapse_clonal_reads_pe(reference_fasta,path_to_samtools,
         in the output files.
     
     current_library is the library from which clonal reads should be removed. The expected file
-        name is <sample>_processed_reads_<current_library>_no_clonal
+        name is <sample>_processed_reads_<current_library>.sam
         
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     
@@ -1249,130 +1226,19 @@ def collapse_clonal_reads_pe(reference_fasta,path_to_samtools,
     """
     print_checkpoint("Collapsing clonal reads for library "+str(current_library))
     
-    #Include the * between the library and _no_multimap to account for different chunks
-    #Reads in each of these files are sorted by the position
-    processed_library_files = glob.glob(path_to_files+sample+"_"+str(current_library)+"_no_multimap_*")
-    output_sam_file = path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"
+    output_sam_file = inputf
 
-    total_clonal = find_clonal_reads_pe(processed_library_files,
-                                        output_sam_file,
-                                        reference_fasta,
-                                        path_to_samtools=path_to_samtools,
-                                        num_procs=num_procs,
-                                        sort_mem=sort_mem)
+    total_clonal = 0
 
     print_checkpoint("Converting to BAM")
-    output_bam_file = output_sam_file + ".bam"
+    output_bam_file = path_to_files+sample+"_processed_reads_"+str(current_library)+".bam"
     f = open(output_bam_file,'w')
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"),stdout=f)
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
     f.close()
-    subprocess.check_call(shlex.split("rm "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"))
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam -o "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam"))
-    #subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam "+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal"))
+    #subprocess.check_call(shlex.split("rm "+output_sam_file))
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+".bam -o "+path_to_files+sample+"_processed_reads_"+str(current_library)+".bam"))
 
-    #Remove clonal reads
-    if remove_clonal is True:
-        subprocess.check_call(
-            shlex.split(" ".join(["java","-Xmx20g","-jar",
-                                  path_to_picard+"/picard.jar MarkDuplicates",
-                                  "INPUT="+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam",
-                                  "OUTPUT="+path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal_final.bam",
-                                  "ASSUME_SORTED=true",
-                                  "REMOVE_DUPLICATES=true",
-                                  "METRICS_FILE=/dev/null",
-                                  "VALIDATION_STRINGENCY=LENIENT"])
-            )
-        )
-        subprocess.check_call(
-            shlex.split(" ".join(["mv",
-                                  path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal_final.bam",
-                                  path_to_files+sample+"_processed_reads_"+str(current_library)+"_no_clonal.bam"])
-            )
-        )
-        
     return int(total_clonal)
-
-def find_clonal_reads_pe(files,output,reference_fasta,num_procs=1,path_to_samtools="",sort_mem="500M"):
-    """
-    This function takes a list of files, sorts them by position, and hands them off to
-    merge_sorted_clonal to have clonal reads removed
-    
-    files is a list of files that you wish to have clonal reads removed from and reads in each of these files are sorted by position
-    
-    output is a string indicating the prefix you'd like prepended to the file containing the
-        non-clonal output
-    
-    reference_fasta is a string indicating the path to a fasta file containing the sequences
-        you used for mapping
-    
-    num_procs is an integer indicating the number of files you'd like to split the input into
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
-        installation of samtools. Samtools is assumed to be in your path if this is not
-        provided
-        
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-
-    
-    total_clonal = 0 #number of non-clonal reads
-    g = open(output,'w')
-    try:
-        f = open(reference_fasta+".fai",'r')
-    except:
-        print "Reference fasta not indexed. Indexing."
-        try:
-            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
-            f = open(reference_fasta+".fai",'r')
-        except:
-            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
-    #Create sam header based on reference genome
-    g.write("@HD\tVN:1.0\tSO:unsorted\n")
-    for line in f:
-        fields = line.split("\t")
-        g.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
-    f.close()
-    
-    #Start to remove clonal reads(?)
-    ##Intialization
-    lines = {}
-    positions = {}
-    chroms_strands = {}
-    file_handles = {}
-    for filen in files:
-        file_handles[filen]=open(filen,'r')
-        lines[filen]=file_handles[filen].readline()
-        fields = lines[filen].split("\t")
-        positions[filen] = (int(fields[3]),int(fields[7]))
-        chroms_strands[filen] = (fields[2],fields[1])
-    ##Start to remove clonal reads
-    while True:
-        all_fields = [field for field in positions.values() if field != ""]
-        if len(all_fields) == 0:
-            break
-        min_field = min(all_fields)
-        chrom_seen = []
-        for key in positions:
-            while positions[key] == min_field:
-                if chroms_strands[key] not in chrom_seen:
-                    chrom_seen.append(chroms_strands[key])
-                    g.write(lines[key])
-                    total_clonal += 1
-                lines[key]=file_handles[key].readline()
-                #Update
-                try:
-                    fields = lines[key].split("\t")
-                    positions[key]=(int(fields[3]),int(fields[7]))
-                    chroms_strands[key] = (fields[2],fields[1])
-                except:
-                    positions[key]=""
-                    chroms_strands[key]=""
-                
-    g.close()          
-    for filen in files:
-        file_handles[filen].close()
-    subprocess.check_call(shlex.split("rm "+" ".join(files)))
-    return total_clonal/2
 
 def encode_c_positions(seq):
     """
@@ -1529,97 +1395,6 @@ def decode_converted_positions(seq,indexes,strand,is_read2=False):
     if strand == "-":
         new_seq = new_seq[::-1]
     return new_seq
-
-def run_bowtie(files,forward_reference,reverse_reference,prefix,options="",path_to_aligner="",
-               num_procs=1,keep_temp_files=False, bowtie2=False, sort_mem="500M"):
-    """
-    This function runs bowtie on the forward and reverse converted bisulfite references 
-    (generated by build_ref). It removes any read that maps to both the forward and reverse
-    strands.
-    
-    files is a list of file paths to be mapped
-    
-    forward_reference is a string indicating the path to the forward strand reference created by
-        build_ref
-    
-    reverse_reference is a string indicating the path to the reverse strand reference created by
-        build_ref
-    
-    prefix is a string that you would like prepended to the output files (e.g., the sample name)
-    
-    options is a list of strings indicating options you'd like passed to bowtie 
-        (e.g., ["-k 1","-l 2"]
-    
-    path_to_aligner is a string indicating the path to the folder in which bowtie resides. Bowtie
-        is assumed to be in your path if this option isn't used
-    
-    num_procs is an integer indicating the number of processors you'd like used for removing multi
-        mapping reads and for bowtie mapping
-    
-    keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
-        by this function. This can be useful for debugging, but in general should be left False.
-    
-    bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
-    else:
-        sort_mem = ""
-    if " ".join(options).find(" -p ") == -1:
-        options.append("-p "+str(num_procs))
-    ## forward strand
-    if bowtie2:
-        args = [path_to_aligner+"bowtie2"]
-        args.extend(options)
-        args.append("--norc")
-        args.append("-x "+forward_reference)
-        args.append("-U "+",".join(files))
-        args.append("-S "+prefix+"_forward_strand_hits.sam")
-    else:
-        args = [path_to_aligner+"bowtie"]
-        args.extend(options)
-        args.append("--norc")
-        args.append(forward_reference)
-        args.append(",".join(files))
-        args.append(prefix+"_forward_strand_hits.sam")
-    subprocess.check_call(shlex.split(" ".join(args)))
-    print_checkpoint("Processing forward strand hits")
-    find_multi_mappers(prefix+"_forward_strand_hits.sam",
-                       prefix,num_procs=num_procs,keep_temp_files=keep_temp_files)
-    ## reverse strand
-    if bowtie2:
-        args = [path_to_aligner+"bowtie2"]
-        args.extend(options)
-        args.append("--nofw")
-        args.append("-x "+reverse_reference)
-        args.append("-U "+",".join(files))
-        args.append("-S "+prefix+"_reverse_strand_hits.sam")
-    else:
-        args = [path_to_aligner+"bowtie"]
-        args.extend(options)
-        args.append("--nofw")
-        args.append(reverse_reference)
-        args.append(",".join(files))
-        args.append(prefix+"_reverse_strand_hits.sam")
-    subprocess.check_call(shlex.split(" ".join(args)))    
-    print_checkpoint("Processing reverse strand hits")
-    sam_header = find_multi_mappers(prefix+"_reverse_strand_hits.sam",
-                                    prefix,num_procs=num_procs,
-                                    append=True,keep_temp_files=keep_temp_files)
-    
-
-    pool = multiprocessing.Pool(num_procs)
-    for file_num in xrange(0,num_procs):
-        pool.apply_async(subprocess.check_call,(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)),))
-    pool.close()
-    pool.join()
-    
-    total_unique = merge_sorted_multimap([prefix+"_sorted_"+str(file_num) for file_num in xrange(0,num_procs)],prefix)
-    subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num) for file_num in xrange(0,num_procs)])))
-    return total_unique
  
 def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=False):
     """
@@ -1672,143 +1447,7 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
         subprocess.check_call(shlex.split("rm "+inputf))
     for file_num in xrange(0,num_procs):
         file_handles[file_num].close()
-
-        
-def merge_sorted_multimap(files, output):
-    """
-    This function takes the files from find_multi_mappers and outputs the uniquely mapping reads.
-    
-    files is a list of filenames containing the output of find_multi_mappers
-    
-    output is a prefix you'd like prepended to the bam file containing the uniquely mapping reads
-        This file will be named as <output>+"_no_multimap_"+<index_num>
-    """
-    
-    lines = {}
-    fields = {}
-    output_handles = {}
-    file_handles = {}
-    
-    total_unique = 0
-    count= 0
-    cycle = itertools.cycle(range(0,len(files)))
-    
-    for index,filen in enumerate(files):
-        output_handles[index] = open(output+"_no_multimap_"+str(index),'a')               
-        file_handles[filen]=open(filen,'r')
-        lines[filen]=file_handles[filen].readline()
-        fields[filen] = lines[filen].split("\t")[0]
-    while True:
-        all_fields = [field for field in fields.values() if field != ""]
-        if len(all_fields) == 0:
-            break
-        min_field = min(all_fields)
-        count = 0
-        current_line = ""
-        current_field = ""
-        for key in fields:
-            while fields[key] == min_field:
-                count += 1
-                current_line = lines[key]
-                lines[key]=file_handles[key].readline()
-                fields[key]=lines[key].split("\t")[0]
-        if count == 1:
-            index = cycle.next()
-            output_handles[index].write(current_line)
-            output_handles[index].flush()
-            total_unique += 1
-            
-    for index,filen in enumerate(files):
-        output_handles[index].close()                
-        file_handles[filen].close()
-
-    return total_unique
-        
-def merge_no_multimap(files,output,reference_fasta,num_procs=1,path_to_samtools="",sort_mem="500M"):
-    """
-    This function takes a list of *_no_multimap files and merge them into a sam file
-    
-    files is a list of files that you wish to have clonal reads removed from and reads in each of these files are sorted by position
-    
-    output is a string indicating the prefix you'd like prepended to the file containing the
-        non-clonal output
-    
-    reference_fasta is a string indicating the path to a fasta file containing the sequences
-        you used for mapping
-    
-    num_procs is an integer indicating the number of files you'd like to split the input into
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
-        installation of samtools. Samtools is assumed to be in your path if this is not
-        provided
-        
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-
-    g = open(output,'w')
-    try:
-        f = open(reference_fasta+".fai",'r')
-    except:
-        print "Reference fasta not indexed. Indexing."
-        try:
-            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
-            f = open(reference_fasta+".fai",'r')
-        except:
-            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
-    #Write header for sam file
-    g.write("@HD\tVN:1.0\tSO:unsorted\n")
-    for line in f:
-        fields = line.split("\t")
-        g.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
-    f.close()
-    #Intialization
-    for filen in files:
-        file_handle=open(filen,'r')
-        for line in file_handle:
-            g.write(line)
-        file_handle.close()
-    g.close()
-    subprocess.check_call(shlex.split("rm "+" ".join(files)))
-
-def filter_files_by_pvalue(files,output,best_pvalues,num_procs,remove_file=True, sort_mem="500M"):
-    """
-    Input files are allc files without correct 7th column
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
-    else:
-        sort_mem = ""
-    output_files = {}
-    for filen in files:
-        f = open(filen,'r')
-        for line in f:
-            line = line.rstrip()
-            fields = line.split("\t")
-            if fields[0] not in output_files:
-                output_files[fields[0]] = open(output[:output.rfind("/")+1]+"allc_"+output[output.rfind("/")+1:]+"_"+fields[0]+".tsv",'w')
-                output_files[fields[0]].write("\t".join(["chr","pos","strand","mc_class","mc_count","total","methylated"])+"\n")
-            if fields[6] != "2.0" and float(fields[6]) <= best_pvalues[fields[3]]:
-                output_files[fields[0]].write("\t".join(fields[:6])+"\t1\n")
-            else:
-                output_files[fields[0]].write("\t".join(fields[:6])+"\t0\n")
-        f.close()
-        if remove_file == True:
-            subprocess.check_call(shlex.split("rm "+filen))    
-    print_checkpoint("Begin sorting files by position")
-    if num_procs > 1:
-        pool=multiprocessing.Pool(num_procs)
-        for chrom in output_files:
-            output_files[chrom].close()
-            pool.apply_async(subprocess.check_call, (shlex.split("sort" + sort_mem + " -k 2n,2n -o "+output_files[chrom].name+" "+output_files[chrom].name),))
-        pool.close()
-        pool.join()
-    else:
-        for chrom in output_files:
-            output_files[chrom].close()
-            subprocess.check_call(shlex.split("sort" + sort_mem + " -k 2n,2n -o "+output_files[chrom].name+" "+output_files[chrom].name))
-
+               
 def benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,sig_cutoff):
     """
     This function is similar to the one defined here:
@@ -1878,103 +1517,6 @@ def benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,si
     for filen in files:
         input_files[filen].close() 
     return best_pvalue
-
-def run_mc_filter(filen,min_cov=1,output="temp",min_mc=0):
-    """
-    This function is used by call_methylated_sites to decide which sites are methylated.
-    file is a string containing the path to an mpileup file
-    min_cov is the minimum number of reads a site must have to be tested
-    output is a string indicating the name of the output file like so:
-        allc_<output>_<chr>.tsv
-    min_mc is the minimum number of mCs that must be observed to 
-    """
-    output_files={}
-    reverse_complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
-    f = open(filen,'r')
-    line1 = f.readline().rstrip()
-    line2 = f.readline().rstrip()
-    line3 = f.readline().rstrip()
-    line4 = f.readline().rstrip()
-    line5 = f.readline().rstrip()
-    while line5:
-        fields1 = line1.split("\t")
-        fields2 = line2.split("\t")
-        fields3 = line3.split("\t")
-        fields4 = line4.split("\t")
-        fields5 = line5.split("\t")
-        
-        fields1[2] = fields1[2].upper()
-        fields2[2] = fields2[2].upper()
-        fields3[2] = fields3[2].upper()
-        fields4[2] = fields4[2].upper()
-        fields5[2] = fields5[2].upper()
-        
-        if fields3[2] == "C":
-            #make sure bases are contiguous
-            if fields4[0] == fields3[0] and int(fields4[1]) == int(fields3[1]) + 1:
-                if fields4[2] not in ["A","C","G","T","N"]:
-                    mc_class = "CN"
-                else:
-                    mc_class = "C"+fields4[2]
-            else:
-                mc_class = "CN"
-            if fields5[0] == fields3[0] and int(fields5[1]) == int(fields3[1]) + 2:
-                if fields5[2] not in ["A","C","G","T","N"]:
-                    mc_class += "N"
-                else:
-                    mc_class += fields5[2]
-            else:
-                mc_class += "N"
-            chrom = fields3[0].replace("chr","")
-            unconverted_c = fields3[4].count(".")
-            converted_c = fields3[4].count("T")
-            total = unconverted_c+ converted_c
-            
-            if chrom not in output_files:
-                output_files[chrom] = open("allc_"+output+"_"+chrom+".tsv",'w')
-                output_files[chrom].write("\t".join(["chr","pos","strand","mc_class","mc_count","total","methylated"])+"\n")
-
-            if total>= min_cov and unconverted_c >=min_mc:
-                output_files[chrom].write("\t".join(map(str,[chrom,fields3[1],"+",mc_class,unconverted_c,total,"1"]))+"\n")
-            elif total!=0:
-                output_files[chrom].write("\t".join(map(str,[chrom,fields3[1],"+",mc_class,unconverted_c,total,"0"]))+"\n")
-
-                
-        elif fields3[2] == "G":
-            #make sure bases are contiguous
-            if fields2[0] == fields3[0] and int(fields2[1]) == int(fields3[1]) - 1:
-                try:
-                    mc_class = "C"+reverse_complement[fields2[2]]
-                except:
-                    mc_class = "CN"
-            else:
-                mc_class = "CN"
-            if fields1[0] == fields3[0] and int(fields1[1]) == int(fields3[1]) - 2:
-                try:
-                    mc_class += reverse_complement[fields1[2]]
-                except:
-                    mc_class += "N"
-            else:
-                mc_class += "N"
-            chrom = fields3[0].replace("chr","")
-            unconverted_c = fields3[4].count(",")
-            converted_c = fields3[4].count("a") 
-            total = unconverted_c + converted_c
-        
-            if chrom not in output_files:
-                output_files[chrom] = open("allc_"+output+"_"+chrom+".tsv",'w')
-                output_files[chrom].write("\t".join(["chr","pos","strand","mc_class","mc_count","total","methylated"])+"\n")
-
-            if total>= min_cov and unconverted_c >=min_mc:
-                output_files[chrom].write("\t".join(map(str,[chrom,fields3[1],"-",mc_class,unconverted_c,total,"1"]))+"\n")
-            elif total!=0:
-                output_files[chrom].write("\t".join(map(str,[chrom,fields3[1],"-",mc_class,unconverted_c,total,"0"]))+"\n")
-
-        line1 = line2
-        line2 = line3
-        line3 = line4
-        line4 = line5
-        line5 = f.readline().rstrip()
                 
 def allc_run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
     """
@@ -2028,247 +1570,6 @@ def allc_run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
             p_value = 2.0
             g.write("\t".join(fields[:6])+"\t"+str(p_value)+"\n")
         
-    g.close()
-    subprocess.check_call(shlex.split("sort" + sort_mem + " -k 7g,7g -o "+filen+"_binom_results.tsv "+filen+"_binom_results.tsv"))
-    return mc_class_counts
-
-def run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
-    """
-    This function is used by call_methylated_sites to parallelize the binomial test.
-    file is a string containing the path to an mpileup file
-    
-    non_conversion is a float indicating the estimated non-conversion rate and sequencing error
-        
-    min_cov is the minimum number of reads a site must have to be tested
-    
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
-    else:
-        sort_mem = ""
-    mc_class_counts = {}
-    for first in ["A","T","C","G","N"]:
-        for second in ["A","T","C","G","N"]:
-            mc_class_counts["C"+first+second]=0
-    obs_pvalues = {}
-    reverse_complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
-    f = open(filen,'r')
-    line1 = f.readline().rstrip('\n')
-    line2 = f.readline().rstrip('\n')
-    line3 = f.readline().rstrip('\n')
-    line4 = f.readline().rstrip('\n')
-    line5 = f.readline().rstrip('\n')
-    g = open(filen+"_binom_results.tsv",'w')
-    
-    #Deal with edge case of the first two positions
-    fields1 = line1.split("\t")
-    fields2 = line2.split("\t")
-    fields3 = line3.split("\t")
-    fields4 = line4.split("\t")
-    fields5 = line5.split("\t")
-    #For the first position
-    if fields1[2] == "C" and fields1[3]!="0":
-        #make sure bases are contiguous
-        if fields2[0] == fields1[0] and int(fields2[1]) == int(fields1[1]) + 1:
-            if fields2[2] not in ["A","C","G","T","N"]:
-                mc_class = "CN"
-            else:
-                mc_class = "C"+fields2[2]
-        else:
-            mc_class = "CN"
-        if fields3[0] == fields1[0] and int(fields3[1]) == int(fields1[1]) + 2:
-            if fields3[2] not in ["A","C","G","T","N"]:
-                mc_class += "N"
-            else:
-                mc_class += fields3[2]
-        else:
-            mc_class += "N"
-        chrom = fields1[0].replace("chr","")    
-        unconverted_c = fields1[4].count(".")
-        converted_c = fields1[4].count("T")
-        total = unconverted_c+ converted_c
-        if total >= min_cov and unconverted_c != 0:
-            try:
-                p_value = obs_pvalues[(unconverted_c,total)]
-            except:
-                p_value = sci.binom.sf(unconverted_c-1,total,non_conversion)
-                obs_pvalues[(unconverted_c,total)] = p_value
-            g.write("\t".join(map(str,[chrom,fields1[1],"+",mc_class,unconverted_c,total,p_value]))+"\n")
-            mc_class_counts[mc_class]+=1
-        elif total != 0:
-            #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
-            #a unmethylated site
-            p_value = 2.0
-            g.write("\t".join(map(str,[chrom,fields1[1],"+",mc_class,unconverted_c,total,p_value]))+"\n")
-    elif fields1[2] == "G" and fields1[3]!="0":
-        #position is right on the edge so has to be CNN
-        mc_class = "CNN"
-        chrom = fields1[0].replace("chr","")
-        unconverted_c = fields1[4].count(",")
-        converted_c = fields1[4].count("a") 
-        total = unconverted_c + converted_c
-        if total >= min_cov and unconverted_c != 0:
-            try:
-                p_value = obs_pvalues[(unconverted_c,total)]
-            except:
-                p_value = sci.binom.sf(unconverted_c-1,total,non_conversion)
-                obs_pvalues[(unconverted_c,total)] = p_value
-            g.write("\t".join(map(str,[chrom,fields1[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")
-            mc_class_counts[mc_class]+=1
-        elif total != 0:
-            #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
-            #a unmethylated site
-            p_value = 2.0
-            g.write("\t".join(map(str,[chrom,fields1[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")        
-    #FOR THE SECOND POSITION
-    if fields2[2] == "C" and fields2[3]!="0":
-        #make sure bases are contiguous
-        if fields3[0] == fields2[0] and int(fields3[1]) == int(fields2[1]) + 1:
-            if fields3[2] not in ["A","C","G","T","N"]:
-                mc_class = "CN"
-            else:
-                mc_class = "C"+fields3[2]
-        else:
-            mc_class = "CN"
-        if fields4[0] == fields2[0] and int(fields4[1]) == int(fields2[1]) + 2:
-            if fields4[2] not in ["A","C","G","T","N"]:
-                mc_class += "N"
-            else:
-                mc_class += fields4[2]
-        else:
-            mc_class += "N"
-        chrom = fields2[0].replace("chr","")    
-        unconverted_c = fields2[4].count(".")
-        converted_c = fields2[4].count("T")
-        total = unconverted_c+ converted_c
-        if total >= min_cov and unconverted_c != 0:
-            try:
-                p_value = obs_pvalues[(unconverted_c,total)]
-            except:
-                p_value = sci.binom.sf(unconverted_c-1,total,non_conversion)
-                obs_pvalues[(unconverted_c,total)] = p_value
-            g.write("\t".join(map(str,[chrom,fields2[1],"+",mc_class,unconverted_c,total,p_value]))+"\n")
-            mc_class_counts[mc_class]+=1
-        elif total != 0:
-            #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
-            #a unmethylated site
-            p_value = 2.0
-            g.write("\t".join(map(str,[chrom,fields2[1],"+",mc_class,unconverted_c,total,p_value]))+"\n")
-    elif fields2[2] == "G" and fields2[3]!="0":
-        #make sure bases are contiguous
-        if fields1[0] == fields2[0] and int(fields1[1]) == int(fields2[1]) - 1:
-            try:
-                mc_class = "C"+reverse_complement[fields1[2]]
-            except:
-                mc_class = "CN"
-        else:
-            mc_class = "CN"
-        #This position is at the edge so it'll always be C[ACTG]N
-        mc_class += "N"
-        chrom = fields2[0].replace("chr","")
-        unconverted_c = fields2[4].count(",")
-        converted_c = fields2[4].count("a") 
-        total = unconverted_c + converted_c
-        if total >= min_cov and unconverted_c != 0:
-            try:
-                p_value = obs_pvalues[(unconverted_c,total)]
-            except:
-                p_value = sci.binom.sf(unconverted_c-1,total,non_conversion)
-                obs_pvalues[(unconverted_c,total)] = p_value
-            g.write("\t".join(map(str,[chrom,fields2[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")
-            mc_class_counts[mc_class]+=1
-        elif total != 0:
-            #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
-            #a unmethylated site
-            p_value = 2.0
-            g.write("\t".join(map(str,[chrom,fields2[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")
-    
-    while line5:
-        fields1 = line1.split("\t")
-        fields2 = line2.split("\t")
-        fields3 = line3.split("\t")
-        fields4 = line4.split("\t")
-        fields5 = line5.split("\t")
-        
-        fields1[2] = fields1[2].upper()
-        fields2[2] = fields2[2].upper()
-        fields3[2] = fields3[2].upper()
-        fields4[2] = fields4[2].upper()
-        fields5[2] = fields5[2].upper()
-        
-        if fields3[2] == "C" and fields3[3]!="0":
-            #make sure bases are contiguous
-            if fields4[0] == fields3[0] and int(fields4[1]) == int(fields3[1]) + 1:
-                if fields4[2] not in ["A","C","G","T","N"]:
-                    mc_class = "CN"
-                else:
-                    mc_class = "C"+fields4[2]
-            else:
-                mc_class = "CN"
-            if fields5[0] == fields3[0] and int(fields5[1]) == int(fields3[1]) + 2:
-                if fields5[2] not in ["A","C","G","T","N"]:
-                    mc_class += "N"
-                else:
-                    mc_class += fields5[2]
-            else:
-                mc_class += "N"
-            chrom = fields3[0].replace("chr","")    
-            unconverted_c = fields3[4].count(".")
-            converted_c = fields3[4].count("T")
-            total = unconverted_c+ converted_c
-            if total >= min_cov and unconverted_c != 0:
-                try:
-                    p_value = obs_pvalues[(unconverted_c,total)]
-                except:
-                    p_value = sci.binom.sf(unconverted_c-1,total,non_conversion)
-                    obs_pvalues[(unconverted_c,total)] = p_value
-                g.write("\t".join(map(str,[chrom,fields3[1],"+",mc_class,unconverted_c,total,p_value]))+"\n")
-                mc_class_counts[mc_class]+=1
-            elif total != 0:
-                #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
-                #a unmethylated site
-                p_value = 2.0
-                g.write("\t".join(map(str,[chrom,fields3[1],"+",mc_class,unconverted_c,total,p_value]))+"\n")
-        elif fields3[2] == "G" and fields3[3]!="0":
-            #make sure bases are contiguous
-            if fields2[0] == fields3[0] and int(fields2[1]) == int(fields3[1]) - 1:
-                try:
-                    mc_class = "C"+reverse_complement[fields2[2]]
-                except:
-                    mc_class = "CN"
-            else:
-                mc_class = "CN"
-            if fields1[0] == fields3[0] and int(fields1[1]) == int(fields3[1]) - 2:
-                try:
-                    mc_class += reverse_complement[fields1[2]]
-                except:
-                    mc_class += "N"
-            else:
-                mc_class += "N"
-            chrom = fields3[0].replace("chr","")
-            unconverted_c = fields3[4].count(",")
-            converted_c = fields3[4].count("a") 
-            total = unconverted_c + converted_c
-            if total >= min_cov and unconverted_c != 0:
-                try:
-                    p_value = obs_pvalues[(unconverted_c,total)]
-                except:
-                    p_value = sci.binom.sf(unconverted_c-1,total,non_conversion)
-                    obs_pvalues[(unconverted_c,total)] = p_value
-                g.write("\t".join(map(str,[chrom,fields3[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")
-                mc_class_counts[mc_class]+=1
-            elif total != 0:
-                #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
-                #a unmethylated site
-                p_value = 2.0
-                g.write("\t".join(map(str,[chrom,fields3[1],"-",mc_class,unconverted_c,total,p_value]))+"\n")
-        line1 = line2
-        line2 = line3
-        line3 = line4
-        line4 = line5
-        line5 = f.readline().rstrip('\n')
     g.close()
     subprocess.check_call(shlex.split("sort" + sort_mem + " -k 7g,7g -o "+filen+"_binom_results.tsv "+filen+"_binom_results.tsv"))
     return mc_class_counts
