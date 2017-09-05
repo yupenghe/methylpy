@@ -1095,7 +1095,7 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
                              stderr=subprocess.PIPE,
                              universal_newlines=True)
 
-    output_files = {}
+    output_filehandler = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'w')
     complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
     cur_chrom = ""
     cur_chrom_nochr = ""
@@ -1105,13 +1105,12 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
             cur_chrom = fields[0]
             cur_chrom_nochr = cur_chrom.replace("chr","")
             seq = fasta_iter(reference_fasta,cur_chrom_nochr)
-            output_files[cur_chrom_nochr] = open(path_to_files+"allc_"+sample+"_"+cur_chrom_nochr+".tsv",'w')
         if fields[2] == "C":
             pos = int(fields[1])-1
             context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
             unconverted_c = fields[4].count(".")
             converted_c = fields[4].count("T")
-            output_files[cur_chrom_nochr].write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
+            output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
                                                      str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
         elif fields[2] == "G":
             pos = int(fields[1])-1
@@ -1122,11 +1121,9 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
             )
             unconverted_c = fields[4].count(",")
             converted_c = fields[4].count("a")
-            output_files[cur_chrom_nochr].write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
+            output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
                                                      str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
-    for chrom in output_files.keys():
-        output_files[chrom].close()
-
+    output_filehandler.close()
 
 def expand_input_files(read_files,libraries):
     expanded_read_file_list = []
