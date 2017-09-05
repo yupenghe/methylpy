@@ -1,0 +1,4 @@
+chr	start	end	number_of_dms	hypermethylated_samples	hypomethylated_samples	methylation_level_sampleA	methylation_level_sampleB
+1	481	487	5	sampleB	sampleA	0.254335260116	0.981818181818
+1	2857	2872	7	sampleB	sampleA	0.0	1.0
+1	2883	2889	3	sampleB	sampleA	0.0	1.0
