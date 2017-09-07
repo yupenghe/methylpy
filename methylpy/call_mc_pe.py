@@ -3,7 +3,7 @@ import multiprocessing
 import subprocess
 import scipy.stats as sci
 from scipy.stats.mstats import mquantiles
-from methylpy.utilities import print_checkpoint,print_error,split_mpileup_file,split_fastq_file
+from methylpy.utilities import print_checkpoint,print_error,split_fastq_file
 import pdb
 import shlex
 import itertools
@@ -202,20 +202,21 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
     # Get expanded file list
     expanded_read1_file_list,expanded_library_list = expand_input_files(read1_files,libraries)
     expanded_read2_file_list,expanded_library_list = expand_input_files(read2_files,libraries)
+
     # Get the number of total reads
-    total_reads_read1 = count_input_reads(expanded_read1_file_list)
-    total_reads_read2 = count_input_reads(expanded_read2_file_list)
+    #total_reads_read1 = count_input_reads(expanded_read1_file_list)
+    #total_reads_read2 = count_input_reads(expanded_read2_file_list)
     
     #Check if there are same number of reads in read 1 and read 2
-    if total_reads_read1 != total_reads_read2:
-        print_error("There are different numbers of read 1 and read 2. " +
-                    "Please double check your input files.\n")
-    elif len(expanded_read1_file_list) != len(expanded_read2_file_list):
-        print_error("There are different numbers of read 1 files and read 2 files. " +
-                    "Please double check your input files.\n")
-    else:
-        total_reads = total_reads_read1
-    print_checkpoint("There are " + str(total_reads) + " total input read pairs")
+    #if total_reads_read1 != total_reads_read2:
+    #    print_error("There are different numbers of read 1 and read 2. " +
+    #                "Please double check your input files.\n")
+    #elif len(expanded_read1_file_list) != len(expanded_read2_file_list):
+    #    print_error("There are different numbers of read 1 files and read 2 files. " +
+    #                "Please double check your input files.\n")
+    #else:
+    #    total_reads = total_reads_read1
+    #print_checkpoint("There are " + str(total_reads) + " total input read pairs")
     
     #Processing
     for current_library in set(libraries):
@@ -252,7 +253,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                 shlex.split(" ".join(["java","-Xmx20g","-jar",
                                       path_to_picard+"/picard.jar MarkDuplicates",
                                       "INPUT="+path_to_output+sample+"_"+str(library)+"_processed_reads.bam",
-                                      "OUTPUT="+path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam",
+                                      "OUTPUT="+path_to_output+sample+"_"+str(library)+"_processed_reads_no_clonal.bam",
                                       "ASSUME_SORTED=true",
                                       "REMOVE_DUPLICATES=true",
                                       "METRICS_FILE=/dev/null",
@@ -260,15 +261,19 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                 )
             )
             subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+str(library)+"_processed_reads.bam"))
-        library_files = [path_to_output+sample+"_processed_reads_"+str(library)+"_no_clonal.bam" for library in set(libraries)]
+        library_files = [path_to_output+sample+"_"+str(library)+"_processed_reads_no_clonal.bam"
+                         for library in set(libraries)]
         if len(library_files) > 1:
             merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
             subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
         else:
-            subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads_no_clonal.bam"))
+            subprocess.check_call(
+                shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads_no_clonal.bam")
+            )
     ## If not removing clonal reads
     else:
-        library_files = [path_to_output+sample+"_processed_reads_"+str(library)+".bam" for library in set(libraries)]
+        library_files = [path_to_output+sample+"_"+str(library)+"_processed_reads.bam"
+                         for library in set(libraries)]
         if len(library_files) > 1:
             merge_bam_files(library_files,path_to_output+sample+"_processed_reads.bam",path_to_samtools)
             subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
@@ -276,11 +281,25 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
             subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads.bam"))
 
     #Calling methylated sites
-    print_checkpoint("Begin calling mCs")
+    print_checkpoint("Begin calling mCs")    
     if remove_clonal == True:
-        call_methylated_sites_pe(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
+        output_bam_file = path_to_output+sample+"_processed_reads_no_clonal.bam"
     else:
-        call_methylated_sites_pe(sample+"_processed_reads.bam",sample,reference_fasta,unmethylated_control,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
+        output_bam_file = path_to_output+sample+"_processed_reads.bam"
+        
+    call_methylated_sites_pe(output_bam_file,sample,
+                             reference_fasta,
+                             unmethylated_control,
+                             sig_cutoff=sig_cutoff,
+                             num_procs=num_procs,
+                             min_cov=min_cov,
+                             binom_test=binom_test,
+                             bh=bh,
+                             sort_mem=sort_mem,
+                             path_to_files=path_to_output,
+                             path_to_samtools=path_to_samtools,
+                             min_base_quality=min_base_quality)
+    
     print_checkpoint("Done")
  
 def run_mapping_pe(current_library,library_read1_files,library_read2_files,
@@ -402,7 +421,7 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
             quality_base = quality_base,
             min_qual_score=min_qual_score,
             min_read_len=min_read_len,
-            format="fastq",
+            input_format="fastq",
             num_procs=num_procs,
             max_adapter_removal=max_adapter_removal,
             overlap_length=overlap_length,
@@ -466,7 +485,8 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
                                       path_to_samtools=path_to_samtools,
                                       aligner_options=aligner_options,
                                       path_to_aligner=path_to_aligner,num_procs=num_procs,
-                                      keep_temp_files=keep_temp_files, bowtie2=bowtie2, sort_mem=sort_mem)
+                                      keep_temp_files=keep_temp_files,
+                                      bowtie2=bowtie2, sort_mem=sort_mem)
     
     return total_unique
 
@@ -561,6 +581,7 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
     subprocess.check_call(shlex.split(" ".join(args)))
     print_checkpoint("Processing reverse strand hits")
     sam_header = find_multi_mappers_pe(prefix+"_reverse_strand_hits.sam",prefix,num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
+    
     ## Clear temporary files
     if keep_temp_files==False:
         subprocess.check_call(shlex.split("rm "+" ".join(library_read1_files+library_read2_files)))
@@ -616,19 +637,21 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
         
         fields = line.split("\t")
 
-        if int(fields[1]) & 2 != 0:
-            header = fields[0].split("!")
-            #BIG ASSUMPTION!! NO TABS IN FASTQ HEADER LINES EXCEPT THE ONES I ADD!
-            if (int(fields[1]) & 16) == 16:
-                strand = "-"
-            else:
-                strand = "+"
-            if (int(fields[1]) & 128) == 128:
-                is_read2 = True
-            else:
-                is_read2 = False
-            seq = decode_converted_positions(fields[9],header[-1],strand,is_read2)
-            file_handles[cycle.next()].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
+        ## Check if it is proper pair
+        if int(fields[1]) & 2 == 0:
+            continue;
+        
+        header = fields[0].split("!")
+        if (int(fields[1]) & 16) == 16:
+            strand = "-"
+        else:
+            strand = "+"
+        if (int(fields[1]) & 128) == 128:
+            is_read2 = True
+        else:
+            is_read2 = False
+        seq = decode_converted_positions(fields[9],header[-1],strand,is_read2)
+        file_handles[cycle.next()].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
             #file_handles[cycle.next()].write("\t".join(fields[0:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
     f.close()
     if keep_temp_files == False:
@@ -646,7 +669,6 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
     output is a prefix you'd like prepended to the file containing the uniquely mapping reads
         This file will be named as <output>+"_no_multimap_"+<index_num>
     """
-    ## SAM header
     output_bam_file = prefix+"_processed_reads.bam"
     output_handle = open(output_bam_file,'w')
 
@@ -765,12 +787,12 @@ def convert_reads_pe(inputf,output,is_read2=False):
 
 def quality_trim_pe(inputf_read1, outputf_read1,inputf_read2, outputf_read2,quality_base = None, min_qual_score = 10,
                     min_read_len = 30,adapter_seq_read1 = "AGATCGGAAGAGCACACGTCTGAAC",
-                    adapter_seq_read2 = "AGATCGGAAGAGCGTCGTGTAGGGA",num_procs = 1, format = None,
+                    adapter_seq_read2 = "AGATCGGAAGAGCGTCGTGTAGGGA",num_procs = 1, input_format = None,
                     error_rate = None, max_adapter_removal = None,overlap_length = None, zero_cap = False,
                     path_to_cutadapt = ""):
     """
     Information from cutadapt documentation:
-    format:
+    input_format:
         Input file format; can be either 'fasta', 'fastq' or 'sra-fastq'. Ignored when reading csfasta/qual files
         (default: auto-detect from file name extension).
 
@@ -860,14 +882,14 @@ def quality_trim_pe(inputf_read1, outputf_read1,inputf_read2, outputf_read2,qual
         sys.exit("Must provide an equal number of input and output files")
 
     base_cmd = path_to_cutadapt
-    options = ""
+    options = " --quiet "
     if zero_cap:
         zero = "-z "
     else:
         zero = ""  
     
-    if format:
-        options += " -f " + format
+    if input_format:
+        options += " -f " + input_format
     if error_rate:
         options += " -e " + str(error_rate)
     if max_adapter_removal:
@@ -1104,7 +1126,7 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
         if fields[0] != cur_chrom:
             cur_chrom = fields[0]
             cur_chrom_nochr = cur_chrom.replace("chr","")
-            seq = fasta_iter(reference_fasta,cur_chrom_nochr)
+            seq = fasta_iter(reference_fasta,cur_chrom_nochr).upper()
         if fields[2] == "C":
             pos = int(fields[1])-1
             context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
@@ -1191,51 +1213,6 @@ def merge_bam_files(input_files,output,path_to_samtools=""):
     )
     subprocess.check_call(["rm", "header.sam"])
 
-
-
-def collapse_clonal_reads_pe(inputf,sample,reference_fasta,path_to_samtools,                            
-                             num_procs,current_library,
-                             path_to_picard="",remove_clonal=True,
-                             sort_mem="500M",path_to_files=""):
-    """
-    This function is a wrapper for collapsing clonal reads
-    
-    reference_fasta is a string indicating the path to a fasta file containing the sequences
-        you used for mapping
-        input is the path to a bam file that contains mapped bisulfite sequencing reads
-    
-    path_to_samtools is a string indicating the path to the directory containing your 
-        installation of samtools. Samtools is assumed to be in your path if this is not
-        provided    
-
-    num_procs is an integer indicating how many num_procs you'd like to run this function over
-
-    sample is a string indicating the name of the sample you're processing. It will be included
-        in the output files.
-    
-    current_library is the library from which clonal reads should be removed. The expected file
-        name is <sample>_processed_reads_<current_library>.sam
-        
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
-    path_to_files is a string indicating the path for the output files and input sam for clonal
-        collapsing.
-    """
-    print_checkpoint("Collapsing clonal reads for library "+str(current_library))
-    
-    output_sam_file = inputf
-
-    total_clonal = 0
-
-    print_checkpoint("Converting to BAM")
-    output_bam_file = path_to_files+sample+"_processed_reads_"+str(current_library)+".bam"
-    f = open(output_bam_file,'w')
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
-    f.close()
-    #subprocess.check_call(shlex.split("rm "+output_sam_file))
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+path_to_files+sample+"_processed_reads_"+str(current_library)+".bam -o "+path_to_files+sample+"_processed_reads_"+str(current_library)+".bam"))
-
-    return int(total_clonal)
 
 def encode_c_positions(seq):
     """
