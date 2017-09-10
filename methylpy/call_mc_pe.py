@@ -240,20 +240,18 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                                            is_pe = True,
                                            path_to_picard=path_to_picard)
             
-            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+str(current_library)+"_processed_reads.bam"))#+
-                                              #" "+path_to_output+sample+"_"+str(current_library)+".metric"))
+            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+str(current_library)+"_processed_reads.bam"+
+                                              " "+path_to_output+sample+"_"+str(current_library)+".metric"))
             total_clonal += lib_clonal
 
     print_checkpoint("There are " + str(total_input) + " total input reads")
     print_checkpoint("There are " + str(total_unique) + " uniquely mapping read pairs, " +
                      str(float(total_unique) / total_input*100) + " percent remaining")
-    #print_checkpoint("There are " + str(total_clonal/2) + " non-clonal reads, " +
-    #                 str(float(total_clonal/2) / total_input*100) + " percent remaining")
 
     if remove_clonal == True:
         total_non_clonal = total_unique - total_clonal
         print_checkpoint("There are " + str(total_non_clonal) + " non-clonal reads, " +
-                         str(float(total_non_clonal/2) / total_input*100) + " percent remaining")
+                         str(float(total_non_clonal) / total_input*100) + " percent remaining")
         ## Merge bam files to get final bam file
         library_files = [path_to_output+sample+"_"+str(library)+"_processed_reads_no_clonal.bam"
                          for library in set(libraries)]
