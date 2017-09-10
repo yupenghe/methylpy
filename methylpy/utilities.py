@@ -249,6 +249,7 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
     for index in xrange(0,num_chunks):
         file_handles[index]=open(output_prefix+str(index),'w')
     cycle = itertools.cycle(range(0,num_chunks))
+    total_reads=0
     for inputf in input_files:
         if inputf[-3:] == ".gz":
             f = gzip.open(inputf,'r')
@@ -265,6 +266,7 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
             if not line:
                 break
             file_handles[current_file].write(line.split(" ")[0]+"\n")
+            total_reads += 1
             for index in xrange(0,3):
                 line = f.readline()
                 file_handles[current_file].write(line)
@@ -272,6 +274,8 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
 
     for index in xrange(0,num_chunks):
         file_handles[index].close()
+
+    return total_reads
 
 def split_mpileup_file(num_chunks,inputf,output_prefix):
     """

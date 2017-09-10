@@ -11,6 +11,7 @@ import re
 import glob
 import cStringIO as cStr
 import bisect
+from methylpy.call_mc_se import call_methylated_sites
 try:
     from argparse import ArgumentParser
 except Exception,e:
@@ -195,7 +196,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         
     # This code allows the user to supply paths with "*" in them rather than listing out every single
     # file    
-    total_reads = 0
+    total_input = 0
     total_unique = 0
     total_clonal = 0
     
@@ -203,21 +204,6 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
     expanded_read1_file_list,expanded_library_list = expand_input_files(read1_files,libraries)
     expanded_read2_file_list,expanded_library_list = expand_input_files(read2_files,libraries)
 
-    # Get the number of total reads
-    #total_reads_read1 = count_input_reads(expanded_read1_file_list)
-    #total_reads_read2 = count_input_reads(expanded_read2_file_list)
-    
-    #Check if there are same number of reads in read 1 and read 2
-    #if total_reads_read1 != total_reads_read2:
-    #    print_error("There are different numbers of read 1 and read 2. " +
-    #                "Please double check your input files.\n")
-    #elif len(expanded_read1_file_list) != len(expanded_read2_file_list):
-    #    print_error("There are different numbers of read 1 files and read 2 files. " +
-    #                "Please double check your input files.\n")
-    #else:
-    #    total_reads = total_reads_read1
-    #print_checkpoint("There are " + str(total_reads) + " total input read pairs")
-    
     #Processing
     for current_library in set(libraries):
         library_read1_files = [filen for filen,library in zip(expanded_read1_file_list,expanded_library_list)
@@ -226,7 +212,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                                if library == current_library]
         
         #deal with actual filename rather than path to file
-        total_unique += run_mapping_pe(
+        lib_input,lib_unique = run_mapping_pe(
             current_library,library_read1_files,library_read2_files,sample,
             forward_reference,reverse_reference,reference_fasta,
             path_to_output=path_to_output,
@@ -240,27 +226,35 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
             keep_temp_files=keep_temp_files,
             bowtie2=bowtie2, 
             sort_mem=sort_mem)
-        
-    #print_checkpoint("There are " + str(total_unique) + " uniquely mapping read pairs, " +
-    #                 str(float(total_unique) / total_reads*100) + " percent remaining")
 
-    ## Remove clonal reads
+        total_input += lib_input
+        total_unique += lib_unique
+    
+        ## Remove clonal reads
+        if remove_clonal == True:
+            lib_clonal = remove_clonal_bam(input_bam = path_to_output+sample+"_"+str(current_library)
+                                           +"_processed_reads.bam",
+                                           output_bam = path_to_output+sample+"_"+str(current_library)
+                                           +"_processed_reads_no_clonal.bam",                                           
+                                           metric = path_to_output+sample+"_"+str(current_library)+".metric",
+                                           is_pe = True,
+                                           path_to_picard=path_to_picard)
+            
+            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+str(current_library)+"_processed_reads.bam"))#+
+                                              #" "+path_to_output+sample+"_"+str(current_library)+".metric"))
+            total_clonal += lib_clonal
+
+    print_checkpoint("There are " + str(total_input) + " total input reads")
+    print_checkpoint("There are " + str(total_unique) + " uniquely mapping read pairs, " +
+                     str(float(total_unique) / total_input*100) + " percent remaining")
+    #print_checkpoint("There are " + str(total_clonal/2) + " non-clonal reads, " +
+    #                 str(float(total_clonal/2) / total_input*100) + " percent remaining")
+
     if remove_clonal == True:
-        #print_checkpoint("There are " + str(total_clonal/2) + " non-clonal reads, " +
-        #                 str(float(total_clonal/2) / total_reads*100) + " percent remaining")
-        for library in set(libraries):
-            subprocess.check_call(
-                shlex.split(" ".join(["java","-Xmx20g","-jar",
-                                      path_to_picard+"/picard.jar MarkDuplicates",
-                                      "INPUT="+path_to_output+sample+"_"+str(library)+"_processed_reads.bam",
-                                      "OUTPUT="+path_to_output+sample+"_"+str(library)+"_processed_reads_no_clonal.bam",
-                                      "ASSUME_SORTED=true",
-                                      "REMOVE_DUPLICATES=true",
-                                      "METRICS_FILE=/dev/null",
-                                      "VALIDATION_STRINGENCY=LENIENT"])
-                )
-            )
-            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+str(library)+"_processed_reads.bam"))
+        total_non_clonal = total_unique - total_clonal
+        print_checkpoint("There are " + str(total_non_clonal) + " non-clonal reads, " +
+                         str(float(total_non_clonal/2) / total_input*100) + " percent remaining")
+        ## Merge bam files to get final bam file
         library_files = [path_to_output+sample+"_"+str(library)+"_processed_reads_no_clonal.bam"
                          for library in set(libraries)]
         if len(library_files) > 1:
@@ -398,23 +392,30 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
     if len(path_to_output) !=0:
         path_to_output+="/"
         
+    total_input = 0
     total_unique = 0
-    file_name = sample+"_"+str(current_library)
-    file_path = path_to_output+file_name
+    prefix = path_to_output+sample+"_"+str(current_library)
 
     #Split files
-    print_checkpoint("Begin splitting reads for "+file_name)
-    split_fastq_file(num_procs,library_read1_files,file_path+"_read1_split_")
-    split_fastq_file(num_procs,library_read2_files,file_path+"_read2_split_")
+    print_checkpoint("Begin splitting reads for "+str(current_library))
+    total_input_read1 = split_fastq_file(num_procs,library_read1_files,prefix+"_read1_split_")
+    total_input_read2 = split_fastq_file(num_procs,library_read2_files,prefix+"_read2_split_")
+
+    #Check if there are same number of reads in read 1 and read 2
+    if total_input_read1 != total_input_read2:
+        print_error("There are different numbers of read 1 and read 2 "+
+                    "for library \"" + str(current_library) + "\" !")
+    else:
+        total_input = total_input_read1
 
     if trim_reads:
         #Trimming
-        print_checkpoint("Begin trimming reads for "+file_name)  
+        print_checkpoint("Begin trimming reads for "+str(current_library))  
         quality_trim_pe(
-            inputf_read1=[file_path+"_read1_split_"+str(i) for i in xrange(0,num_procs)],
-            outputf_read1=[file_path+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
-            inputf_read2=[file_path+"_read2_split_"+str(i) for i in xrange(0,num_procs)],
-            outputf_read2=[file_path+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+            inputf_read1=[prefix+"_read1_split_"+str(i) for i in xrange(0,num_procs)],
+            outputf_read1=[prefix+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+            inputf_read2=[prefix+"_read2_split_"+str(i) for i in xrange(0,num_procs)],
+            outputf_read2=[prefix+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
             adapter_seq_read1=adapter_seq_read1,
             adapter_seq_read2=adapter_seq_read2,
             error_rate=error_rate,
@@ -428,67 +429,62 @@ def run_mapping_pe(current_library,library_read1_files,library_read2_files,
             zero_cap=zero_cap,
             path_to_cutadapt=path_to_cutadapt)
         
-        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_read1_split_"+str(i) for i in xrange(0,num_procs)])))
-        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_read2_split_"+str(i) for i in xrange(0,num_procs)])))
+        subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_read1_split_"+str(i) for i in xrange(0,num_procs)])))
+        subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_read2_split_"+str(i) for i in xrange(0,num_procs)])))
         
         #Conversion
-        print_checkpoint("Begin converting reads for "+file_name)
+        print_checkpoint("Begin converting reads for "+str(current_library))
         pool = multiprocessing.Pool(num_procs)#read1
-        for inputf,output in zip([file_path+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
-                                 [file_path+"_read1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
+        for inputf,output in zip([prefix+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+                                 [prefix+"_read1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
             pool.apply_async(convert_reads_pe,(inputf,output))
-        for inputf,output in zip([file_path+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
-                                 [file_path+"_read2_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
+        for inputf,output in zip([prefix+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+                                 [prefix+"_read2_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
             pool.apply_async(convert_reads_pe,(inputf,output,True))
         pool.close()
         pool.join()
         subprocess.check_call(
-            shlex.split("rm "+" ".join([file_path+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
+            shlex.split("rm "+" ".join([prefix+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
         )
         subprocess.check_call(
-            shlex.split("rm "+" ".join([file_path+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
+            shlex.split("rm "+" ".join([prefix+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
         )        
         #Run bowtie
-        print_checkpoint("Begin Running Bowtie for "+file_name)
-        total_unique += run_bowtie_pe(current_library,
-                                      [file_path+"_read1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)],
-                                      [file_path+"_read2_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)],
-                                      sample,
-                                      forward_reference,reverse_reference,reference_fasta,
-                                      path_to_output=path_to_output,
-                                      aligner_options=aligner_options,
-                                      path_to_aligner=path_to_aligner,num_procs=num_procs,
-                                      keep_temp_files=keep_temp_files, bowtie2=bowtie2, sort_mem=sort_mem)
+        input_fastq_read1 = [prefix+"_read1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]
+        input_fastq_read2 = [prefix+"_read2_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]
     else:
         print_checkpoint("No trimming applied on reads")  
         #Conversion
-        print_checkpoint("Begin converting reads for "+file_name)
+        print_checkpoint("Begin converting reads for "+str(current_library))
         pool = multiprocessing.Pool(num_procs)#read1
-        for inputf,output in zip([file_path+"_read1_split_"+str(i) for i in xrange(0,num_procs)],
-                                 [file_path+"_read1_split_converted_"+str(i) for i in xrange(0,num_procs)]):
+        for inputf,output in zip([prefix+"_read1_split_"+str(i) for i in xrange(0,num_procs)],
+                                 [prefix+"_read1_split_converted_"+str(i) for i in xrange(0,num_procs)]):
             pool.apply_async(convert_reads_pe,(inputf,output))
-        for inputf,output in zip([file_path+"_read2_split_"+str(i) for i in xrange(0,num_procs)],
-                                 [file_path+"_read2_split_converted_"+str(i) for i in xrange(0,num_procs)]):
+        for inputf,output in zip([prefix+"_read2_split_"+str(i) for i in xrange(0,num_procs)],
+                                 [prefix+"_read2_split_converted_"+str(i) for i in xrange(0,num_procs)]):
             pool.apply_async(convert_reads_pe,(inputf,output,True))
         pool.close()
         pool.join()
-        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_read1_split_"+str(i) for i in xrange(0,num_procs)])))
-        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_read2_split_"+str(i) for i in xrange(0,num_procs)])))
-        #Run bowtie
-        print_checkpoint("Begin Running Bowtie for "+file_name)
-        total_unique += run_bowtie_pe(current_library,
-                                      [file_path+"_read1_split_converted_"+str(i) for i in xrange(0,num_procs)],
-                                      [file_path+"_read2_split_converted_"+str(i) for i in xrange(0,num_procs)],
-                                      sample,
-                                      forward_reference,reverse_reference,reference_fasta,
-                                      path_to_output=path_to_output,
-                                      path_to_samtools=path_to_samtools,
-                                      aligner_options=aligner_options,
-                                      path_to_aligner=path_to_aligner,num_procs=num_procs,
-                                      keep_temp_files=keep_temp_files,
-                                      bowtie2=bowtie2, sort_mem=sort_mem)
+        subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_read1_split_"+str(i) for i in xrange(0,num_procs)])))
+        subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_read2_split_"+str(i) for i in xrange(0,num_procs)])))
+        input_fastq_read1 = [prefix+"_read1_split_converted_"+str(i) for i in xrange(0,num_procs)]
+        input_fastq_read2 = [prefix+"_read2_split_converted_"+str(i) for i in xrange(0,num_procs)]
+                    
+    #Run bowtie
+    print_checkpoint("Begin Running Bowtie for "+current_library)
+    total_unique = run_bowtie_pe(current_library,
+                                  input_fastq_read1,
+                                  input_fastq_read2,
+                                  sample,
+                                  forward_reference,reverse_reference,reference_fasta,
+                                  path_to_output=path_to_output,
+                                  path_to_samtools=path_to_samtools,
+                                  aligner_options=aligner_options,
+                                  path_to_aligner=path_to_aligner,num_procs=num_procs,
+                                  keep_temp_files=keep_temp_files,
+                                  bowtie2=bowtie2, sort_mem=sort_mem)
     
-    return total_unique
+    return total_input,total_unique
 
 def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
                   sample,
@@ -727,8 +723,8 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
             output_pipe.stdin.write(current_line_2)
             total_unique += 1
 
-    output_handle.close()
     output_pipe.stdin.close()
+    output_handle.close()
     for index,filen in enumerate(files):
         file_handles[filen].close()
 
@@ -1036,117 +1032,6 @@ def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,n
     except:
         pass
 
-def fasta_iter(fasta_name,query_chrom):
-    """
-    given a fasta file. yield tuples of header, sequence
-    """
-    fh = open(fasta_name)
-    # ditch the boolean (x[0]) and just keep the header or sequence since
-    # we know they alternate.
-    from itertools import groupby
-    faiter = (x[1] for x in groupby(fh, lambda line: line[0] == ">"))
-    seq = None
-    for header in faiter:
-        # drop the ">"
-        header = header.next()[1:].strip().replace("chr","")
-        if header != query_chrom:
-            continue
-        # join all sequence lines to one.
-        seq = "".join(s.strip() for s in faiter.next())
-        return seq
-
-def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
-                          num_upstr_bases=0,num_downstr_bases=2,
-                          min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
-                          sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
-
-    """
-    inputf is the path to a bam file that contains mapped bisulfite sequencing reads
-    
-    sample is the name you'd like for the allc files. The files will be named like so:
-        allc_<sample>_<chrom>.tsv
-    
-    reference is the path to a samtools indexed fasta file
-    
-    control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your 
-        sample, or the non-conversion rate you'd like to use. Consequently, control is either a string, or a decimal
-        If control is a string then it should be in the following format: "chrom:start-end". 
-        If you'd like to specify an entire chromosome simply use "chrom:"
-    
-    sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining whether or not
-        a site is methylated
-    
-    num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
-    min_cov is an integer indicating the minimum number of reads for a site to be tested.
-    
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
-    bh is a True/False flag indicating whether or not you'd like to use the benjamini-hochberg FDR
-        instead of an FDR calculated from the control reference
-    
-    path_to_files is a string indicating the path for the output and the input bam, mpileup, or allc files
-        for methylation calling.
-    min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
-        mpileup file (and subsequently to be considered for methylation calling)
-    """
-    #Figure out all the correct quality options based on the offset or CASAVA version given
-    # quality_version >= 1.8:
-    quality_base = 33
-    if len(path_to_files)!=0:
-        path_to_files+="/"
-    if len(path_to_samtools)!=0:
-        path_to_samtools+="/"
-
-
-    try:
-        num_procs = int(num_procs)
-    except:
-        sys.exit("num_procs must be an integer")
-        
-    try:
-        #make sure bam file is indexed
-        open(path_to_files+inputf+".bai",'r')
-    except:
-        print_checkpoint("Input not indexed. Indexing...")
-        subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+path_to_files+inputf))
-
-    cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+path_to_files+inputf
-    pipes = subprocess.Popen(shlex.split(cmd),
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             universal_newlines=True)
-
-    output_filehandler = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'w')
-    complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
-    cur_chrom = ""
-    cur_chrom_nochr = ""
-    for line in pipes.stdout:
-        fields = line.split("\t")
-        if fields[0] != cur_chrom:
-            cur_chrom = fields[0]
-            cur_chrom_nochr = cur_chrom.replace("chr","")
-            seq = fasta_iter(reference_fasta,cur_chrom_nochr).upper()
-        if fields[2] == "C":
-            pos = int(fields[1])-1
-            context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
-            unconverted_c = fields[4].count(".")
-            converted_c = fields[4].count("T")
-            output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
-                                                     str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
-        elif fields[2] == "G":
-            pos = int(fields[1])-1
-            context = "".join([complement[base]
-                               for base in reversed(
-                                       seq[(pos-num_downstr_bases):(pos+num_upstr_bases+1)]
-                               )]
-            )
-            unconverted_c = fields[4].count(",")
-            converted_c = fields[4].count("a")
-            output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
-                                                     str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
-    output_filehandler.close()
-
 def expand_input_files(read_files,libraries):
     expanded_read_file_list = []
     expanded_library_list = []
@@ -1159,26 +1044,6 @@ def expand_input_files(read_files,libraries):
             expanded_read_file_list.append(filen)
             expanded_library_list.append(library)
     return(expanded_read_file_list,expanded_library_list)
-
-def count_input_reads(expanded_read_file_list):
-    # Assumption: matched read 1 and read2 are stored in files with similar filenames
-    # Need to add sort because glob returns files in arbitrary order
-    total_reads = 0
-    for filen in expanded_read_file_list:
-        if filen[-3:] == ".gz":
-            f = gzip.open(filen,'r')
-        elif filen[-4:] == ".bz2":
-            f = bz2.BZ2File(filen,'r')
-        else:
-            f = open(filen,'r')
-        # count lines
-        # https://stackoverflow.com/questions/845058/how-to-get-line-count-cheaply-in-python
-        i = -1 ## in case the file is empty
-        for i, l in enumerate(f):
-            pass
-        f.close()
-        total_reads += (i+1)/4
-    return(total_reads)
 
 def merge_bam_files(input_files,output,path_to_samtools=""):
     """
@@ -1203,7 +1068,7 @@ def merge_bam_files(input_files,output,path_to_samtools=""):
     ## Header
     for filen in input_files:
         f.write("@RG\tID:" + filen[:filen.rindex(".bam")] + "\tLB:" +
-                filen[filen.rindex("processed_reads_")+16:filen.rindex("_no_clonal.bam")] +
+                filen +
                 "\tSM:NA" + "\n")
     f.close()
     
