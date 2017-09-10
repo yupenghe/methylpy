@@ -11,7 +11,7 @@ import re
 import glob
 import cStringIO as cStr
 import bisect
-from methylpy.call_mc_se import call_methylated_sites
+from methylpy.call_mc_se import call_methylated_sites,remove_clonal_bam
 try:
     from argparse import ArgumentParser
 except Exception,e:
