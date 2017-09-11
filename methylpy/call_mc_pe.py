@@ -45,7 +45,7 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                                 
                                 num_upstr_bases=0,
                                 num_downstr_bases=2,
-                                generate_mpileup_file=False,
+                                generate_mpileup_file=True,
                                 compress_output=True,
                                 
                                 binom_test=True,bh=True,min_cov=2,                                
@@ -675,13 +675,13 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
         This file will be named as <output>+"_no_multimap_"+<index_num>
     """
     
-    #output_sam_file = prefix+"_processed_reads.sam"
+    output_sam_file = prefix+"_processed_reads.sam"
     output_bam_file = prefix+"_processed_reads.bam"
-    output_handle = open(output_bam_file,'w')
+    output_handle = open(output_sam_file,'w')
 
-    output_pipe = subprocess.Popen(
-        shlex.split(path_to_samtools+"samtools view -S -b -"),
-        stdin=subprocess.PIPE,stdout=output_handle)
+    #output_pipe = subprocess.Popen(
+    #    shlex.split(path_to_samtools+"samtools view -S -b -"),
+    #    stdin=subprocess.PIPE,stdout=output_handle)
 
     try:
         f = open(reference_fasta+".fai",'r')
@@ -693,10 +693,10 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
         except:
             sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
     #Create sam header based on reference genome
-    output_pipe.stdin.write("@HD\tVN:1.0\tSO:unsorted\n")
+    output_handle.write("@HD\tVN:1.0\tSO:unsorted\n")
     for line in f:
         fields = line.split("\t")
-        output_pipe.stdin.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
+        output_handle.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
     f.close()
 
     ## Merging alignment results of both strands
@@ -730,21 +730,21 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
                 fields[key]=lines[key].split("\t")[0]
         #Check if there is only one valid alignment
         if count_1 == 1:
-            output_pipe.stdin.write(current_line_1)
-            output_pipe.stdin.write(current_line_2)
+            output_handle.write(current_line_1)
+            output_handle.write(current_line_2)
             total_unique += 1
 
-    output_pipe.stdin.close()
-    #output_handle.close()
+    #output_pipe.stdin.close()
+    output_handle.close()
     
     for index,filen in enumerate(files):
         file_handles[filen].close()
 
-    #f = open(output_bam_file,'w')
-    #subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
-    #f.close()
+    f = open(output_bam_file,'w')
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
+    f.close()
 
-    #subprocess.check_call(shlex.split("rm "+output_sam_file))
+    subprocess.check_call(shlex.split("rm "+output_sam_file))
     subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
                                       " -o "+output_bam_file))
     
@@ -981,9 +981,9 @@ def flip_read2_strand(input_file,output_file,path_to_samtools=""):
     output_pipe.stdin.close()
 
     
-def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,num_procs = 1,
+def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
                              num_upstr_bases=0,num_downstr_bases=2,
-                             generate_mpileup_file=False,compress_output=True,                             
+                             generate_mpileup_file=True,compress_output=True,                             
                              min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=True,
                              path_to_files="",min_base_quality=1):
 
@@ -1031,7 +1031,7 @@ def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,n
     #Call methylated sites
     call_methylated_sites(inputf = inputf+".read2flipped.bam",
                           sample = sample,
-                          reference_fasta = reference,
+                          reference_fasta = reference_fasta,
                           control = control,
                           sig_cutoff = sig_cutoff,
                           num_procs = num_procs,
@@ -1047,7 +1047,7 @@ def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,n
                           bh = bh,
                           path_to_files = path_to_files,
                           min_base_quality = min_base_quality)
-    
+
     #Remove intermediate bam file
     try:
         subprocess.check_call(shlex.split("rm -f "+inputf+".read2flipped.bam"+

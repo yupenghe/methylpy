@@ -27,7 +27,7 @@ def run_methylation_pipeline(read_files,libraries,sample,
                              path_to_output="",sig_cutoff=0.01,
                              num_procs=1,sort_mem="500M",
                              num_upstr_bases=1,num_downstr_bases=2,
-                             generate_mpileup_file=False,compress_output=True,
+                             generate_mpileup_file=True,compress_output=True,
                              binom_test=True,bh=True,min_cov=2,
                              trim_reads=True,path_to_cutadapt="",
                              bowtie2=False,path_to_aligner="",aligner_options=[],
@@ -833,13 +833,13 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
         This file will be named as <output>+"_no_multimap_"+<index_num>
     """
 
-    #output_sam_file = prefix+"_processed_reads.sam"
+    output_sam_file = prefix+"_processed_reads.sam"
     output_bam_file = prefix+"_processed_reads.bam"
-    output_handle = open(output_bam_file,'w')
+    output_handle = open(output_sam_file,'w')
 
-    output_pipe = subprocess.Popen(
-        shlex.split(path_to_samtools+"samtools view -S -b -"),
-        stdin=subprocess.PIPE,stdout=output_handle)
+    #output_pipe = subprocess.Popen(
+    #    shlex.split(path_to_samtools+"samtools view -S -b -"),
+    #    stdin=subprocess.PIPE,stdout=output_handle)
 
     try:
         f = open(reference_fasta+".fai",'r')
@@ -851,10 +851,10 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
         except:
             sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
     #Create sam header based on reference genome
-    output_pipe.stdin.write("@HD\tVN:1.0\tSO:unsorted\n")
+    output_handle.write("@HD\tVN:1.0\tSO:unsorted\n")
     for line in f:
         fields = line.split("\t")
-        output_pipe.stdin.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
+        output_handle.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
     f.close()
 
     ## Merging alignment results of both strands    
@@ -882,20 +882,20 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
                 lines[key]=file_handles[key].readline()
                 fields[key]=lines[key].split("\t")[0]
         if count == 1:
-            output_pipe.stdin.write(current_line)
+            output_handle.write(current_line)
             total_unique += 1
             
-    output_pipe.stdin.close()
-    #output_handle.close()
+    #output_pipe.stdin.close()
+    output_handle.close()
     
     for index,filen in enumerate(files):
         file_handles[filen].close()
 
-    #f = open(output_bam_file,'w')
-    #subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
-    #f.close()
+    f = open(output_bam_file,'w')
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
+    f.close()
 
-    #subprocess.check_call(shlex.split("rm "+output_sam_file))
+    subprocess.check_call(shlex.split("rm "+output_sam_file))
     subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
                                       " -o "+output_bam_file))
     
@@ -1060,7 +1060,7 @@ def fasta_iter(fasta_name,query_chrom):
 
 def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
                           num_upstr_bases=0,num_downstr_bases=2,
-                          generate_mpileup_file=False,compress_output=True,
+                          generate_mpileup_file=True,compress_output=True,
                           min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
                           sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
 
@@ -1174,6 +1174,8 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
     fhandle.close()
     output_filehandler.close()
 
+    if generate_mpileup_file:
+        subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output.tsv"))
     
 def parse_args():
      # create the top-level parser
