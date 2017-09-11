@@ -26,6 +26,8 @@ def run_methylation_pipeline(read_files,libraries,sample,
                              unmethylated_control = "chrL:",
                              path_to_output="",sig_cutoff=0.01,
                              num_procs=1,sort_mem="500M",
+                             num_upstr_bases=1,num_downstr_bases=2,
+                             generate_mpileup_file=False,compress_output=True,
                              binom_test=True,bh=True,min_cov=2,
                              trim_reads=True,path_to_cutadapt="",
                              bowtie2=False,path_to_aligner="",aligner_options=[],
@@ -208,7 +210,7 @@ def run_methylation_pipeline(read_files,libraries,sample,
     if remove_clonal == True:
         total_non_clonal = total_unique - total_clonal
         print_checkpoint("There are " + str(total_non_clonal) + " non-clonal reads, " +
-                         str(float(total_non_clonal/2) / total_input*100) + " percent remaining")
+                         str(float(total_non_clonal) / total_input*100) + " percent remaining")
         ## Merge bam files to get final bam file
         library_files = [path_to_output+sample+"_"+str(library)+"_processed_reads_no_clonal.bam"
                          for library in set(libraries)]
@@ -238,6 +240,10 @@ def run_methylation_pipeline(read_files,libraries,sample,
                           unmethylated_control,
                           sig_cutoff=sig_cutoff,
                           num_procs=num_procs,
+                          num_upstr_bases=num_upstr_bases,
+                          num_downstr_bases=num_downstr_bases,
+                          generate_mpileup_file=generate_mpileup_file,
+                          compress_output=compress_output,
                           min_cov=min_cov,
                           binom_test=binom_test,
                           bh=bh,
@@ -826,7 +832,8 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
     output is a prefix you'd like prepended to the bam file containing the uniquely mapping reads
         This file will be named as <output>+"_no_multimap_"+<index_num>
     """
-    
+
+    #output_sam_file = prefix+"_processed_reads.sam"
     output_bam_file = prefix+"_processed_reads.bam"
     output_handle = open(output_bam_file,'w')
 
@@ -879,11 +886,16 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
             total_unique += 1
             
     output_pipe.stdin.close()
-    output_handle.close()
+    #output_handle.close()
     
     for index,filen in enumerate(files):
         file_handles[filen].close()
 
+    #f = open(output_bam_file,'w')
+    #subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
+    #f.close()
+
+    #subprocess.check_call(shlex.split("rm "+output_sam_file))
     subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
                                       " -o "+output_bam_file))
     
@@ -1048,6 +1060,7 @@ def fasta_iter(fasta_name,query_chrom):
 
 def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
                           num_upstr_bases=0,num_downstr_bases=2,
+                          generate_mpileup_file=False,compress_output=True,
                           min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
                           sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
 
@@ -1102,17 +1115,33 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
         print_checkpoint("Input not indexed. Indexing...")
         subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+path_to_files+inputf))
 
-    cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+path_to_files+inputf
-    pipes = subprocess.Popen(shlex.split(cmd),
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             universal_newlines=True)
+    ## Input
+    if not generate_mpileup_file:
+        cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+path_to_files+inputf
+        pipes = subprocess.Popen(shlex.split(cmd),
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE,
+                                 universal_newlines=True)
+        fhandle = pipes.stdout
+    else:
+        with open(path_to_files+sample+"_mpileup_output.tsv",'w') as f:
+            subprocess.check_call(
+                shlex.split(
+                    path_to_samtools+"samtools mpileup -Q "+
+                    str(min_base_quality)+" -B -f "+reference_fasta+" "+path_to_files+inputf),
+                stdout=f)
+        fhandle = open(path_to_files+sample+"_mpileup_output.tsv" ,'r')
 
-    output_filehandler = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'w')
+    ## Output
+    if compress_output:
+        output_filehandler = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'w')
+    else:
+        output_filehandler = open(path_to_files+"allc_"+sample+".tsv",'w')
+        
     complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
     cur_chrom = ""
     cur_chrom_nochr = ""
-    for line in pipes.stdout:
+    for line in fhandle:
         fields = line.split("\t")
         if fields[0] != cur_chrom:
             cur_chrom = fields[0]
@@ -1142,8 +1171,7 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
             converted_c = fields[4].count("a")
             output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
                                                      str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
-    print "Finish call methylated sites"
-    pipe.stdout.close()
+    fhandle.close()
     output_filehandler.close()
 
     

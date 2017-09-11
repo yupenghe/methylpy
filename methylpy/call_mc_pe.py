@@ -42,6 +42,12 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                                 path_to_output="",sig_cutoff=0.01,
                                 pbat=False,
                                 num_procs=1,sort_mem="500M",
+                                
+                                num_upstr_bases=0,
+                                num_downstr_bases=2,
+                                generate_mpileup_file=False,
+                                compress_output=True,
+                                
                                 binom_test=True,bh=True,min_cov=2,                                
                                 trim_reads=True,path_to_cutadapt="",
                                 bowtie2=True,path_to_aligner="",aligner_options=[],
@@ -278,12 +284,17 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
         output_bam_file = path_to_output+sample+"_processed_reads_no_clonal.bam"
     else:
         output_bam_file = path_to_output+sample+"_processed_reads.bam"
+
         
     call_methylated_sites_pe(output_bam_file,sample,
                              reference_fasta,
                              unmethylated_control,
                              sig_cutoff=sig_cutoff,
                              num_procs=num_procs,
+                             num_upstr_bases=num_upstr_bases,
+                             num_downstr_bases=num_downstr_bases,
+                             generate_mpileup_file=generate_mpileup_file,
+                             compress_output=compress_output,
                              min_cov=min_cov,
                              binom_test=binom_test,
                              bh=bh,
@@ -663,6 +674,8 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
     output is a prefix you'd like prepended to the file containing the uniquely mapping reads
         This file will be named as <output>+"_no_multimap_"+<index_num>
     """
+    
+    #output_sam_file = prefix+"_processed_reads.sam"
     output_bam_file = prefix+"_processed_reads.bam"
     output_handle = open(output_bam_file,'w')
 
@@ -722,13 +735,19 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
             total_unique += 1
 
     output_pipe.stdin.close()
-    output_handle.close()
+    #output_handle.close()
+    
     for index,filen in enumerate(files):
         file_handles[filen].close()
 
+    #f = open(output_bam_file,'w')
+    #subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
+    #f.close()
+
+    #subprocess.check_call(shlex.split("rm "+output_sam_file))
     subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
                                       " -o "+output_bam_file))
-
+    
     return total_unique
 
 def convert_reads_pe(inputf,output,is_read2=False):
@@ -963,6 +982,8 @@ def flip_read2_strand(input_file,output_file,path_to_samtools=""):
 
     
 def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,num_procs = 1,
+                             num_upstr_bases=0,num_downstr_bases=2,
+                             generate_mpileup_file=False,compress_output=True,                             
                              min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",bh=True,
                              path_to_files="",min_base_quality=1):
 
@@ -1000,6 +1021,7 @@ def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,n
     #Flip the strand of read 2 and create a new bam file
     ##input: sample+"_processed_reads_no_clonal.bam"
     ##output: sample+"_processed_reads_no_clonal_flipped.bam"
+
     print_checkpoint("Begin flipping the strand of read 2")
     flip_read2_strand(input_file = inputf,
                    output_file = inputf+".read2flipped.bam",
@@ -1013,7 +1035,10 @@ def call_methylated_sites_pe(inputf, sample, reference, control,sig_cutoff=.01,n
                           control = control,
                           sig_cutoff = sig_cutoff,
                           num_procs = num_procs,
-                          num_upstr_bases=0,num_downstr_bases=2,
+                          num_upstr_bases=num_upstr_bases,
+                          num_downstr_bases=num_downstr_bases,
+                          generate_mpileup_file=generate_mpileup_file,
+                          compress_output=compress_output,                          
                           min_cov = min_cov,
                           binom_test = binom_test,
                           min_mc = min_mc,

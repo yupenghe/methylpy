@@ -605,7 +605,7 @@ def print_checkpoint(message):
     """
     print message
     tabs = message.count("\t")
-    print ("\t" * tabs) + time.asctime(time.localtime(time.time()))
+    print ("\t" * tabs) + time.asctime(time.localtime(time.time())) + "\n"
     sys.stdout.flush()
 
 
