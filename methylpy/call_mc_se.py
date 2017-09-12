@@ -3,7 +3,7 @@ import multiprocessing
 import subprocess
 import scipy.stats as sci
 from scipy.stats.mstats import mquantiles
-from methylpy.utilities import print_checkpoint,print_error
+from methylpy.utilities import print_checkpoint, print_error
 from methylpy.utilities import split_fastq_file
 import pdb
 import shlex
@@ -15,25 +15,25 @@ import bisect
 import gzip
 try:
     from argparse import ArgumentParser
-except Exception,e:
+except Exception, e:
     exc_type, exc_obj, exc_tb = exc_info()
     print(exc_type, exc_tb.tb_lineno)
     print e
     exit("methylpy.call_mc requires ArgumentParser from the argparse module")
-    
-def run_methylation_pipeline(read_files,libraries,sample,
-                             forward_reference,reverse_reference,reference_fasta,
-                             unmethylated_control = "chrL:",
-                             path_to_output="",sig_cutoff=0.01,
-                             num_procs=1,sort_mem="500M",
-                             num_upstr_bases=1,num_downstr_bases=2,
-                             generate_mpileup_file=True,compress_output=True,
-                             binom_test=True,bh=True,min_cov=2,
-                             trim_reads=True,path_to_cutadapt="",
-                             bowtie2=False,path_to_aligner="",aligner_options=[],
-                             remove_clonal=True,path_to_picard="",
-                             path_to_samtools="", 
-                             adapter_seq = "AGATCGGAAGAGCACACGTCTG",
+
+def run_methylation_pipeline(read_files, libraries, sample,
+                             forward_reference, reverse_reference, reference_fasta,
+                             unmethylated_control="chrL:",
+                             path_to_output="", sig_cutoff=0.01,
+                             num_procs=1, sort_mem="500M",
+                             num_upstr_bases=1, num_downstr_bases=2,
+                             generate_mpileup_file=True, compress_output=True,
+                             binom_test=True, bh=True, min_cov=2,
+                             trim_reads=True, path_to_cutadapt="",
+                             bowtie2=False, path_to_aligner="", aligner_options=[],
+                             remove_clonal=True, path_to_picard="",
+                             path_to_samtools="",
+                             adapter_seq="AGATCGGAAGAGCACACGTCTG",
                              max_adapter_removal=None,
                              overlap_length=None, zero_cap=None,
                              error_rate=None, min_qual_score=10,
@@ -42,170 +42,186 @@ def run_methylation_pipeline(read_files,libraries,sample,
                              min_base_quality=1):
 
     """
-    read_files is a list of all the fastq files you'd like to run through the pipeline. 
+    read_files is a list of all the fastq files you'd like to run through the pipeline.
         Note that globbing is supported here (i.e., you can use * in your paths)
-    
+
     libraries is a list of library IDs (in the same order as the files list) indiciating which
         libraries each set of fastq files belong to. If you use a glob, you only need to indicate
         the library ID for those fastqs once (i.e., the length of files and libraries should be
         the same)
-    
+
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-        
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-        
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-        
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
         input is the path to a bam file that contains mapped bisulfite sequencing reads
 
-    unmethylated_control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your 
-        sample, or the non-conversion rate you'd like to use. Consequently, control is either a string, or a decimal
-        If control is a string then it should be in the following format: "chrom:start-end". 
+    unmethylated_control is the name of the chromosome/region that you want to use to estimate
+        the non-conversion rate of your sample, or the non-conversion rate you'd like to use.
+        Consequently, control is either a string, or a decimal.
+        If control is a string then it should be in the following format: "chrom:start-end".
         If you'd like to specify an entire chromosome simply use "chrom:"
-        
-    remove_clonal is a boolean indicating that you want to remove clonal reads (PCR duplicates). If true,
-        picard.jar should be available in folder specified in path_to_picard.
-    
-    path_to_picard is a string of the path to "picard.jar". "picard.jar" is assumed to be 
-        in your path if this option isn't used
-            
-    path_to_samtools is a string indicating the path to the directory containing your 
+
+    remove_clonal is a boolean indicating that you want to remove clonal reads (PCR duplicates).
+        If true, picard.jar should be available in folder specified in path_to_picard.
+
+    path_to_picard is a string of the path to "picard.jar". "picard.jar" is assumed to be
+        in your path if this option isn't used.
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided    
+        provided.
 
     path_to_aligner is a string indicating the path to the folder in which bowtie resides. Bowtie
-        is assumed to be in your path if this option isn't used
-            
-    aligner_options is a list of strings indicating options you'd like passed to bowtie 
-        (e.g., ["-k 1","-l 2"]
-    
-    num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
+        is assumed to be in your path if this option isn't used.
+
+    aligner_options is a list of strings indicating options you'd like passed to the aligner.
+
+    num_procs is an integer indicating how many num_procs you'd like to run this function over.
+
     trim_reads is a boolean indicating that you want to have reads trimmed by cutadapt.
 
-    path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in your
-        path.
+    path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in 
+        your path.
 
-    adapter_seq is the sequence of an adapter that was ligated to the 3' end. The adapter itself and 
+    adapter_seq is the sequence of an adapter that was ligated to the 3' end. The adapter itself and
         anything that follows is trimmed.
 
-    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter 
-        gets appended multiple times.
-        
-    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than 
-        LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.
+    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when
+        an adapter gets appended multiple times.
 
-    zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation faults in BWA).
-        
-    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region) 
-        (default: 0.1)
-    
-    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the 
-        one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
-        sequence; cut sequence at the index at which the sum is minimal).
-        
-    min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even before adapter removal
-        are also discarded. In colorspace, an initial primer is not counted.
-        
-    sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining whether or not
-        a site is methylated
+    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is
+        shorter than LENGTH, the read is not modified. This reduces the no. of bases trimmed purely
+        due to short random adapter matches.
+
+    zero_cap causes negative quality values to be set to zero (workaround to avoid
+        segmentation faults in BWA).
+
+    error_rate is the maximum allowed error rate (no. of errors divided by the length of the
+        matching region). Default: 0.1
+
+    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The
+        algorithm is the same as the one used by BWA (Subtract CUTOFF from all qualities; compute
+        partial sums from all indices to the end of the sequence; cut sequence at the index at
+        which the sum is minimal).
+
+    min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even
+        before adapter removal are also discarded. In colorspace, an initial primer is not counted.
+
+    sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining 
+        whether or not a site is methylated
 
     min_cov is an integer indicating the minimum number of reads for a site to be tested.
 
-    binom_tests indicates that you'd like to use a binomial test, rather than the alternative method outlined here
-        https://bitbucket.org/schultzmattd/methylpy/wiki/Methylation%20Calling
+    binom_tests indicates that you'd like to use a binomial test, rather than the alternative method
+        outlined here: https://bitbucket.org/schultzmattd/methylpy/wiki/Methylation%20Calling
 
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-        
-    bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
-    path_to_output is the path to a directory where you would like the output to be stored. The default is the
-        same directory as the input fastqs.
 
-    min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
-        mpileup file (and subsequently to be considered for methylation calling)        
+    bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
+
+    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
+
+    path_to_output is the path to a directory where you would like the output to be stored.
+        The default is the same directory as the input fastqs.
+
+    min_base_quality is an integer indicating the minimum PHRED quality score for a base to be
+        included in the mpileup file (and subsequently to be considered for methylation calling).
     """
 
     #Default bowtie option
     if len(aligner_options) == 0:
         if not bowtie2:
-            aligner_options=["-S","-k 1","-m 1","--chunkmbs 3072",
-                             "--best","--strata","-o 4","-e 80","-l 20","-n 0"]
+            aligner_options = ["-S", "-k 1", "-m 1", "--chunkmbs 3072",
+                               "--best", "--strata", "-o 4", "-e 80",
+                               "-l 20", "-n 0"]
 
     # CASAVA >= 1.8
     aligner_options.append("--phred33-quals")
     quality_base = 33
 
-    if len(path_to_samtools)!=0:
-        path_to_samtools +="/"
-    if len(path_to_aligner)!=0:
-        path_to_aligner+="/"
-    if len(path_to_output) !=0:
-        path_to_output+="/"
-        
+    if len(path_to_samtools) != 0:
+        path_to_samtools += "/"
+    if len(path_to_aligner) != 0:
+        path_to_aligner += "/"
+    if len(path_to_output) != 0:
+        path_to_output += "/"
+
     if sort_mem:
         if sort_mem.find("-S") == -1:
             sort_mem = " -S " + sort_mem
     else:
         sort_mem = ""
-        
+
     expanded_file_list = []
     expanded_library_list = []
-    
+
     total_input = 0
     total_unique = 0
     total_clonal = 0
-    for path,library in zip(read_files,libraries):
+    for path, library in zip(read_files, libraries):
         glob_list = glob.glob(path)
         for filen in glob_list:
             expanded_file_list.append(filen)
             expanded_library_list.append(library)
-    
+
     for current_library in set(libraries):
-        library_files = [filen for filen,library
-                         in zip(expanded_file_list,expanded_library_list)
+        library_files = [filen for filen, library
+                         in zip(expanded_file_list, expanded_library_list)
                          if library == current_library]
-        
+
         #deal with actual filename rather than path to file
-        lib_input,lib_unique = run_mapping(current_library,library_files,sample,
-                                           forward_reference,reverse_reference,reference_fasta,
-                                           path_to_output=path_to_output,
-                                           path_to_samtools=path_to_samtools,path_to_aligner=path_to_aligner,
-                                           aligner_options=aligner_options,num_procs=num_procs,
-                                           trim_reads=trim_reads,path_to_cutadapt=path_to_cutadapt,
-                                           adapter_seq = adapter_seq,max_adapter_removal=max_adapter_removal,
-                                           overlap_length=overlap_length,zero_cap=zero_cap,quality_base=quality_base,
-                                           error_rate=error_rate,
-                                           min_qual_score=min_qual_score,min_read_len=min_read_len,
-                                           keep_temp_files=keep_temp_files,
-                                           bowtie2=bowtie2, sort_mem=sort_mem)
+        lib_input, lib_unique = run_mapping(current_library, library_files, sample,
+                                            forward_reference, reverse_reference, reference_fasta,
+                                            path_to_output=path_to_output,
+                                            path_to_samtools=path_to_samtools,
+                                            path_to_aligner=path_to_aligner,
+                                            aligner_options=aligner_options,
+                                            num_procs=num_procs,
+                                            trim_reads=trim_reads,
+                                            path_to_cutadapt=path_to_cutadapt,
+                                            adapter_seq=adapter_seq,
+                                            max_adapter_removal=max_adapter_removal,
+                                            overlap_length=overlap_length, zero_cap=zero_cap,
+                                            quality_base=quality_base,
+                                            error_rate=error_rate,
+                                            min_qual_score=min_qual_score,
+                                            min_read_len=min_read_len,
+                                            keep_temp_files=keep_temp_files,
+                                            bowtie2=bowtie2, sort_mem=sort_mem)
         total_input += lib_input
         total_unique += lib_unique
 
         ## Remove clonal reads
         if remove_clonal == True:
-            lib_clonal = remove_clonal_bam(input_bam = path_to_output+sample+"_"+str(current_library)
-                                           +"_processed_reads.bam",
-                                           output_bam = path_to_output+sample+"_"+str(current_library)
-                                           +"_processed_reads_no_clonal.bam",                                           
-                                           metric = path_to_output+sample+"_"+str(current_library)+".metric",
-                                           is_pe = False,
+            lib_clonal = remove_clonal_bam(input_bam=path_to_output+sample+"_"+
+                                           str(current_library)+"_processed_reads.bam",
+                                           
+                                           output_bam=path_to_output+sample+"_"+
+                                           str(current_library)+"_processed_reads_no_clonal.bam",
+                                           
+                                           metric=path_to_output+sample+"_"+
+                                           str(current_library)+".metric",
+                                           
+                                           is_pe=False,
                                            path_to_picard=path_to_picard)
-            
-            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+str(current_library)+"_processed_reads.bam"+
-                                              " "+path_to_output+sample+"_"+str(current_library)+".metric"))
+
+            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+
+                                              str(current_library)+"_processed_reads.bam"+
+                                              " "+path_to_output+sample+"_"+
+                                              str(current_library)+".metric"))
             total_clonal += lib_clonal
-    print_checkpoint("There are " + str(total_input) + " total input reads")
-    print_checkpoint("There are " + str(total_unique) + " uniquely mapping reads, " +
-                     str(float(total_unique) / total_input*100) + " percent remaining")
+    print_checkpoint("There are "+str(total_input)+" total input reads")
+    print_checkpoint("There are "+str(total_unique)+" uniquely mapping reads, " +
+                     str(float(total_unique) / total_input*100)+" percent remaining")
 
     if remove_clonal == True:
         total_non_clonal = total_unique - total_clonal
@@ -215,25 +231,27 @@ def run_methylation_pipeline(read_files,libraries,sample,
         library_files = [path_to_output+sample+"_"+str(library)+"_processed_reads_no_clonal.bam"
                          for library in set(libraries)]
         if len(library_files) > 1:
-            merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
+            merge_bam_files(library_files, path_to_output+sample+"_processed_reads_no_clonal.bam", path_to_samtools)
             subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
         else:
-            subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads_no_clonal.bam"))
+            subprocess.check_call(shlex.split("mv "+library_files[0]+" "+
+                                              path_to_output+sample+"_processed_reads_no_clonal.bam"))
     ## If not removing clonal reads
     else:
-        library_files = [path_to_output+sample+"_"+str(library)+"_processed_reads.bam" for library in set(libraries)]
+        library_files = [path_to_output+sample+"_"+str(library)+
+                         "_processed_reads.bam" for library in set(libraries)]
         if len(library_files) > 1:
-            merge_bam_files(library_files,path_to_output+sample+"_processed_reads.bam",path_to_samtools)
+            merge_bam_files(library_files, path_to_output+sample+"_processed_reads.bam", path_to_samtools)
             subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
         else:
             subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads.bam"))
 
     print_checkpoint("Begin calling mCs")
-    if remove_clonal==True:
+    if remove_clonal == True:
         output_bam_file = path_to_output+sample+"_processed_reads_no_clonal.bam"
     else:
         output_bam_file = path_to_output+sample+"_processed_reads.bam"
-        
+
     call_methylated_sites(output_bam_file,
                           sample,
                           reference_fasta,
@@ -252,110 +270,113 @@ def run_methylation_pipeline(read_files,libraries,sample,
                           path_to_samtools=path_to_samtools,
                           min_base_quality=min_base_quality)
     print_checkpoint("Done")
-    
-def run_mapping(current_library,library_files,sample,
-                forward_reference,reverse_reference,reference_fasta,
+
+def run_mapping(current_library, library_files, sample,
+                forward_reference, reverse_reference, reference_fasta,
                 path_to_output="",
-                path_to_samtools="",path_to_aligner="",
+                path_to_samtools="", path_to_aligner="",
                 aligner_options=[],
-                num_procs=1,trim_reads=True,path_to_cutadapt="",
-                adapter_seq = "AGATCGGAAGAGCACACGTCTG",
-                max_adapter_removal=None,overlap_length=None,zero_cap=None,
-                quality_base=None,error_rate=None,
-                min_qual_score=10,min_read_len=30,keep_temp_files=False,bowtie2=False,
+                num_procs=1, trim_reads=True, path_to_cutadapt="",
+                adapter_seq="AGATCGGAAGAGCACACGTCTG",
+                max_adapter_removal=None, overlap_length=None, zero_cap=None,
+                quality_base=None, error_rate=None,
+                min_qual_score=10, min_read_len=30,
+                keep_temp_files=False, bowtie2=False,
                 sort_mem="500M"):
     """
     This function runs the mapping portion of the methylation calling pipeline.
-    
+
     current_library is the ID that you'd like to run mapping on.
-    
+
     libraries is a list of library IDs (in the same order as the files list) indiciating which
         libraries each set of fastq files belong to. If you use a glob, you only need to indicate
         the library ID for those fastqs once (i.e., the length of files and libraries should be
         the same)
-    
+
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-        
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-        
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-        
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
 
-    path_to_samtools is a string indicating the path to the directory containing your 
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided.    
-    
+        provided.
+
     path_to_aligner is a string indicating the path to the folder in which bowtie resides. Bowtie
-        is assumed to be in your path if this option isn't used
-            
-    aligner_options is a list of strings indicating options you'd like passed to bowtie 
-        (e.g., ["-k 1","-l 2"]
+        is assumed to be in your path if this option isn't used.
+
+    aligner_options is a list of strings indicating options you'd like passed to bowtie
     
     num_procs is an integer indicating how many num_procs you'd like to run this function over
-    
-    trim_reads is a boolean indicating that you want to have reads trimmed by cutadapt
+
+    trim_reads is a boolean indicating that you want to have reads trimmed by cutadapt.
 
     path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in your
         path.
 
-    adapter_seq is the sequence of an adapter that was ligated to the 3' end. The adapter itself and 
+    adapter_seq is the sequence of an adapter that was ligated to the 3' end. The adapter itself and
         anything that follows is trimmed.
 
-    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter 
-        gets appended multiple times.
-        
-    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than 
-        LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.
+    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when
+        an adapter gets appended multiple times.
 
-    zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation faults in BWA).
+    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is
+        shorter than LENGTH, the read is not modified. This reduces the no. of bases trimmed purely
+        due to short random adapter matches.
 
-    quality_base is the offset for quality scores. In other words, assume that quality values are encoded as ascii(quality + QUALITY_BASE). 
-        The default (33) is usually correct, except for reads produced by some versions of the Illumina pipeline, where this should
-        be set to 64.
-        
-    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region) 
-        (default: 0.1)
-    
-    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the 
-        one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
-        sequence; cut sequence at the index at which the sum is minimal).
-        
-    min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even before adapter removal
-        are also discarded. In colorspace, an initial primer is not counted.
+    zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation faults
+        in BWA).
+
+    quality_base is the offset for quality scores. In other words, assume that quality values are
+        encoded as ascii(quality + QUALITY_BASE). The default (33) is usually correct, except for
+        reads produced by some versions of the Illumina pipeline, where this should be set to 64.
+
+    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching
+        region). Default: 0.1
+
+    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm
+        is the same as the one used by BWA (Subtract CUTOFF from all qualities; compute partial sums
+        from all indices to the end of the sequence; cut sequence at the index at which the sum is minimal).
+
+    min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even
+        before adapter removal are also discarded. In colorspace, an initial primer is not counted.
 
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-        
+
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
+
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
 
     if len(aligner_options) == 0:
         if not bowtie2:
-            aligner_options=["-S","-k 1","-m 1","--chunkmbs 3072",
-                             "--best","--strata","-o 4","-e 80","-l 20","-n 0"]
+            aligner_options=["-S", "-k 1", "-m 1", "--chunkmbs 3072",
+                             "--best", "--strata", "-o 4", "-e 80", "-l 20", "-n 0"]
 
-    if len(path_to_output) !=0:
-        path_to_output+="/"
-        
+    if len(path_to_output) != 0:
+        path_to_output += "/"
+
     total_unique = 0
 
     file_name = sample+"_"+str(current_library)
     file_path = path_to_output+file_name
 
     print_checkpoint("Begin splitting reads for "+file_name)
-    total_input = split_fastq_file(num_procs,library_files,file_path+"_split_")
+    total_input = split_fastq_file(num_procs, library_files, file_path+"_split_")
 
     if trim_reads:
         print_checkpoint("Begin trimming reads for "+file_name)
-        quality_trim([file_path+"_split_"+str(i) for i in xrange(0,num_procs)],
-                     output=[file_path+"_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+        quality_trim([file_path+"_split_"+str(i) for i in xrange(0, num_procs)],
+                     output=[file_path+"_split_trimmed_"+str(i)
+                             for i in xrange(0, num_procs)],
                      adapter_seq=adapter_seq,
                      error_rate=error_rate,
                      quality_base = quality_base,
@@ -367,45 +388,49 @@ def run_mapping(current_library,library_files,sample,
                      overlap_length=overlap_length,
                      zero_cap=zero_cap,
                      path_to_cutadapt=path_to_cutadapt)
-        
-        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_split_"+str(i) for i in xrange(0,num_procs)])))
-        
+
+        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_split_"+str(i)
+                                                          for i in xrange(0,num_procs)])))
+
         print_checkpoint("Begin converting reads for "+file_name)
         pool = multiprocessing.Pool(num_procs)
-        for inputf,output in zip([file_path+"_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
-                                 [file_path+"_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
+        for inputf, output in zip([file_path+"_split_trimmed_"+str(i) for i in xrange(0, num_procs)],
+                                 [file_path+"_split_trimmed_converted_"+str(i)
+                                  for i in xrange(0, num_procs)]):
             pool.apply_async(convert_reads,(inputf,output))
         pool.close()
         pool.join()
         subprocess.check_call(shlex.split("rm "+
-                                          " ".join([file_path+"_split_trimmed_"+str(i) for i in xrange(0,num_procs)])))
-        input_fastq = [file_path+"_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]
+                                          " ".join([file_path+"_split_trimmed_"+str(i)
+                                                    for i in xrange(0,num_procs)])))
+        input_fastq = [file_path+"_split_trimmed_converted_"+str(i) for i in xrange(0, num_procs)]
     else:
         print_checkpoint("No trimming on reads")
         print_checkpoint("Begin converting reads for "+file_name)
         pool = multiprocessing.Pool(num_procs)
-        for inputf,output in zip([file_path+"_split_"+str(i) for i in xrange(0,num_procs)],
-                                 [file_path+"_split_converted_"+str(i) for i in xrange(0,num_procs)]):
-            pool.apply_async(convert_reads,(inputf,output))
+        for inputf, output in zip([file_path+"_split_"+str(i) for i in xrange(0, num_procs)],
+                                 [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]):
+            pool.apply_async(convert_reads, (inputf, output))
         pool.close()
         pool.join()
-        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_split_"+str(i) for i in xrange(0,num_procs)])))
-        input_fastq = [file_path+"_split_converted_"+str(i) for i in xrange(0,num_procs)]
+        subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_split_"+str(i)
+                                                          for i in xrange(0, num_procs)])))
+        input_fastq = [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]
 
     print_checkpoint("Begin Running Bowtie for "+current_library)
     total_unique = run_bowtie(current_library,
                               input_fastq,
                               sample,
-                              forward_reference,reverse_reference,reference_fasta,
+                              forward_reference, reverse_reference, reference_fasta,
                               path_to_output=path_to_output,
                               aligner_options=aligner_options,                                   
-                              path_to_aligner=path_to_aligner,num_procs=num_procs,
+                              path_to_aligner=path_to_aligner, num_procs=num_procs,
                               keep_temp_files=keep_temp_files,
                               bowtie2=bowtie2, sort_mem=sort_mem)
 
     subprocess.check_call(shlex.split("rm " + " ".join(input_fastq)))
 
-    return total_input,total_unique
+    return total_input, total_unique
 
 def merge_bam_files(input_files,output,path_to_samtools=""):
     """

@@ -3,7 +3,7 @@ import multiprocessing
 import subprocess
 import scipy.stats as sci
 from scipy.stats.mstats import mquantiles
-from methylpy.utilities import print_checkpoint,print_error,split_fastq_file
+from methylpy.utilities import print_checkpoint, print_error, split_fastq_file
 import pdb
 import shlex
 import itertools
@@ -11,18 +11,18 @@ import re
 import glob
 import cStringIO as cStr
 import bisect
-from methylpy.call_mc_se import call_methylated_sites,remove_clonal_bam
+from methylpy.call_mc_se import call_methylated_sites, remove_clonal_bam
 try:
     from argparse import ArgumentParser
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
+except Exception, e:
+    exc_type, exc_obj, exc_tb = sys.exc_info()
     print(exc_type, exc_tb.tb_lineno)
     print(e)
     exit("methylpy.call_mc_pe requires ArgumentParser from the argparse module")
 # bz2
 try:
     import bz2
-except Exception,e:
+except Exception, e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     print(exc_type, exc_tb.tb_lineno)
     print e
@@ -30,156 +30,159 @@ except Exception,e:
 # gzip
 try:
     import gzip
-except Exception,e:
+except Exception, e:
     exc_type, exc_obj, exc_tb = sys.exc_info()
     print(exc_type, exc_tb.tb_lineno)
     print e
     sys.exit("methylpy.call_mc_pe requires the gzip module")
 
-def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
-                                forward_reference,reverse_reference,reference_fasta,
-                                unmethylated_control = "chrL:",
-                                path_to_output="",sig_cutoff=0.01,
+def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
+                                forward_reference, reverse_reference, reference_fasta,
+                                unmethylated_control="chrL:",
+                                path_to_output="", sig_cutoff=0.01,
                                 pbat=False,
-                                num_procs=1,sort_mem="500M",
-                                
+                                num_procs=1, sort_mem="500M",
                                 num_upstr_bases=0,
                                 num_downstr_bases=2,
                                 generate_mpileup_file=True,
                                 compress_output=True,
-                                
-                                binom_test=True,bh=True,min_cov=2,                                
-                                trim_reads=True,path_to_cutadapt="",
-                                bowtie2=True,path_to_aligner="",aligner_options=[],
-                                remove_clonal=True,path_to_picard="",
+                                binom_test=True, bh=True, min_cov=2,
+                                trim_reads=True, path_to_cutadapt="",
+                                bowtie2=True, path_to_aligner="", aligner_options=[],
+                                remove_clonal=True, path_to_picard="",
                                 path_to_samtools="",
-                                adapter_seq_read1 = "AGATCGGAAGAGCACACGTCTGAAC",
-                                adapter_seq_read2 = "AGATCGGAAGAGCGTCGTGTAGGGA",
+                                adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
+                                adapter_seq_read2="AGATCGGAAGAGCGTCGTGTAGGGA",
                                 max_adapter_removal=None,
-                                overlap_length=None,zero_cap=None,
-                                error_rate=None,min_qual_score=10,
+                                overlap_length=None, zero_cap=None,
+                                error_rate=None, min_qual_score=10,
                                 min_read_len=30,
                                 keep_temp_files=False,
                                 min_base_quality=1):
-                                
+
     """
-    This function 
+    This function
 
     read1_files and read2_files are lists of fastq files of the forward and reverse reads
         from paired-end bisulfite sequencing data, which you'd like to run through the pipeline.
-        The length of read1_files and read2_files should be the same. Also, Files in there two 
+        The length of read1_files and read2_files should be the same. Also, Files in there two
         lists should be ordered such that the forward reads for a particular read set are in the
         same position of read1_files as the reverse reads are in the read2_files.
         (i.e. the elements in each of these lists are paired)
         Note that globbing is supported here (i.e., you can use * in your paths)
-    
+
     libraries is a list of library IDs (in the same order as the files list) indiciating which
         libraries each set of fastq files belong to. If you use a glob, you only need to indicate
         the library ID for those fastqs once (i.e., the length of files and libraries should be
         the same)
-    
+
     sample is a string indicating the name of the sample you're processing. It will be included
         in the output files.
-        
+
     forward_reference is a string indicating the path to the forward strand reference created by
         build_ref
-        
+
     reverse_reference is a string indicating the path to the reverse strand reference created by
         build_ref
-        
+
     reference_fasta is a string indicating the path to a fasta file containing the sequences
         you used for mapping
         input is the path to a bam file that contains mapped bisulfite sequencing reads
 
     unmethylated_control is the name of the chromosome/region that you want to use to estimate
-        the non-conversion rate of your sample, or the non-conversion rate you'd like to use. 
+        the non-conversion rate of your sample, or the non-conversion rate you'd like to use.
         Consequently, control is either a string, or a decimal.
-        If control is a string then it should be in the following format: "chrom:start-end". 
+        If control is a string then it should be in the following format: "chrom:start-end".
         If you'd like to specify an entire chromosome simply use "chrom:"
         Default: "chrL:"
-        
-    path_to_output is the path to a directory where you would like the output to be stored. The default is the
-        same directory as the input fastqs.
+
+    path_to_output is the path to a directory where you would like the output to be stored.
+        The default is the same directory as the input fastqs.
 
     num_procs is an integer indicating how many num_procs you'd like to run this function over
 
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command. Default: "500M"
 
-    sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining whether or not
-        a site is methylated
+    sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for
+        determining whether or not a site is methylated.
 
-    pbat indicates whether the input data is from PBAT protocol instead of MethylC-seq protocol. Default: False
-        To be implemented.
+    pbat indicates whether the input data is from PBAT protocol instead of MethylC-seq protocol.
+        Default: False. To be implemented.
 
-    binom_tests indicates that you'd like to use a binomial test, rather than the alternative method outlined here
-        https://bitbucket.org/schultzmattd/methylpy/wiki/Methylation%20Calling
+    binom_tests indicates that you'd like to use a binomial test, rather than the alternative
+        method outlined here: https://bitbucket.org/schultzmattd/methylpy/wiki/Methylation%20Calling
 
     min_cov is an integer indicating the minimum number of reads for a site to be tested.
-            
+
     trim_reads is a boolean indicating that you want to have reads trimmed by cutadapt.
 
-    path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in your
-        path.
+    path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in
+        your path.
 
     bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie. Default: True
-    
+
     path_to_aligner is a string indicating the path to the folder in which aligner resides. Aligner
         is assumed to be in your path if this option isn't used
-            
-    aligner_options is a list of strings indicating options you'd like passed to aligner (bowtie or bowtie2)
+
+    aligner_options is a list of strings indicating options you'd like passed to aligner.
         (default for bowtie2: "-X 1000 -k 2 --no-mixed --no-discordant")
         (default for bowtie: "-X 1000 -S -k 1 -m 1 --best --strata --chunkmbs 64 -n 1")
 
-    remove_clonal is a boolean indicating that you want to remove clonal reads (PCR duplicates). If true,
-        executable picard should be available in folder specified in path_to_picard.
-    
-    path_to_picard is a string of the path to "picard.jar". "picard.jar" is assumed to be 
-        in your path if this option isn't used
+    remove_clonal is a boolean indicating that you want to remove clonal reads (PCR duplicates).
+        If true, executable picard should be available in folder specified in path_to_picard.
 
-    path_to_samtools is a string indicating the path to the directory containing your 
+    path_to_picard is a string of the path to "picard.jar". "picard.jar" is assumed to be
+        in your path if this option isn't used.
+
+    path_to_samtools is a string indicating the path to the directory containing your
         installation of samtools. Samtools is assumed to be in your path if this is not
-        provided    
-        
+        provided.
+
     adapter_seq_read1:
-        Sequence of an adapter that was ligated to the 3' end of read 1. The adapter itself and anything that follows is
-        trimmed.
+        Sequence of an adapter that was ligated to the 3' end of read 1. The adapter itself
+        and anything that follows is trimmed.
 
     adapter_seq_read2:
-        Sequence of an adapter that was ligated to the 3' end of read 2. The adapter itself and anything that follows is
-        trimmed.
+        Sequence of an adapter that was ligated to the 3' end of read 2. The adapter itself
+        and anything that follows is trimmed.
 
-    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful when an adapter 
-        gets appended multiple times.
-        
-    overlap_length is the minimum overlap length. If the overlap between the read and the adapter is shorter than 
-        LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.
+    max_adapter_removal indicates the maximum number of times to try to remove adapters. Useful
+        when an adapter gets appended multiple times.
 
-    zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation faults in BWA).
-        
-    error_rate is the maximum allowed error rate (no. of errors divided by the length of the matching region) 
-        (default: 0.1)
-    
-    min_qual_score allows you to trim low-quality ends from reads before adapter removal. The algorithm is the same as the 
-        one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from all indices to the end of the
-        sequence; cut sequence at the index at which the sum is minimal).
-        
-    min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even before adapter removal
-        are also discarded. In colorspace, an initial primer is not counted. It is not recommended to change this value in paired-end processing because it may results in the situation that one of the two reads in a pair is discarded. And this will lead to error.        
+    overlap_length is the minimum overlap length. If the overlap between the read and the
+        adapter is shorter than LENGTH, the read is not modified. This reduces the no. of bases
+        trimmed purely due to short random adapter matches.
+
+    zero_cap causes negative quality values to be set to zero (workaround to avoid segmentation
+        faults in BWA).
+
+    error_rate is the maximum allowed error rate (no. of errors divided by the length of the
+        matching region). Default: 0.1
+
+    min_qual_score allows you to trim low-quality ends from reads before adapter removal.
+        The algorithm is the same as the one used by BWA (Subtract CUTOFF from all qualities;
+        compute partial sums from all indices to the end of the sequence; cut sequence at the
+        index at which the sum is minimal).
+
+    min_read_len indicates the minimum length a read must be to be kept. Reads that are too short even
+        before adapter removal are also discarded. In colorspace, an initial primer is not counted.
+        It is not recommended to change this value in paired-end processing because it may results in
+        the situation that one of the two reads in a pair is discarded. And this will lead to error.
 
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
-             
-    min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
-        mpileup file (and subsequently to be considered for methylation calling)    
+
+    min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included
+        in the mpileup file (and subsequently to be considered for methylation calling)    
     """
 
     #Default bowtie option
     if len(aligner_options) == 0:
         if bowtie2:
-            aligner_options = ["-X 1000","-k 2","--no-discordant","--no-mixed"]
+            aligner_options = ["-X 1000", "-k 2", "--no-discordant", "--no-mixed"]
         else:
-            aligner_options=["-X 1000","-S","-k 1","-m 1","--best","--strata",
-                            "--chunkmbs 3072","-n 1","-e 100"]
+            aligner_options = ["-X 1000", "-S", "-k 1", "-m 1", "--best", "--strata",
+                               "--chunkmbs 3072", "-n 1", "-e 100"]
 
     # CASAVA >= 1.8
     aligner_options.append("--phred33-quals")
@@ -187,67 +190,75 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
 
     #just to avoid any paths missing a slash. It's ok to add an extra slash if
     #there's already one at the end
-    if len(path_to_samtools)!=0:
-        path_to_samtools +="/"
-    if len(path_to_aligner)!=0:
-        path_to_aligner+="/"
-    if len(path_to_output) !=0:
-        path_to_output+="/"
-        
+    if len(path_to_samtools) != 0:
+        path_to_samtools += "/"
+    if len(path_to_aligner) != 0:
+        path_to_aligner += "/"
+    if len(path_to_output) != 0:
+        path_to_output += "/"
+
     if sort_mem:
         if sort_mem.find("-S") == -1:
             sort_mem = " -S " + sort_mem
     else:
         sort_mem = ""
-        
-    # This code allows the user to supply paths with "*" in them rather than listing out every single
-    # file    
+
+    # This code allows the user to supply paths with "*" in them rather than listing
+    # out every single file
     total_input = 0
     total_unique = 0
     total_clonal = 0
-    
+
     # Get expanded file list
-    expanded_read1_file_list,expanded_library_list = expand_input_files(read1_files,libraries)
-    expanded_read2_file_list,expanded_library_list = expand_input_files(read2_files,libraries)
+    expanded_read1_file_list, expanded_library_list = expand_input_files(read1_files,libraries)
+    expanded_read2_file_list, expanded_library_list = expand_input_files(read2_files,libraries)
 
     #Processing
     for current_library in set(libraries):
-        library_read1_files = [filen for filen,library in zip(expanded_read1_file_list,expanded_library_list)
+        library_read1_files = [filen for filen, library
+                               in zip(expanded_read1_file_list, expanded_library_list)
                                if library == current_library]
-        library_read2_files = [filen for filen,library in zip(expanded_read2_file_list,expanded_library_list)
+        library_read2_files = [filen for filen, library
+                               in zip(expanded_read2_file_list, expanded_library_list)
                                if library == current_library]
-        
+
         #deal with actual filename rather than path to file
-        lib_input,lib_unique = run_mapping_pe(
-            current_library,library_read1_files,library_read2_files,sample,
-            forward_reference,reverse_reference,reference_fasta,
+        lib_input, lib_unique = run_mapping_pe(
+            current_library, library_read1_files, library_read2_files, sample,
+            forward_reference, reverse_reference, reference_fasta,
             path_to_output=path_to_output,
-            path_to_samtools=path_to_samtools,path_to_aligner=path_to_aligner,
-            aligner_options=aligner_options,num_procs=num_procs,
-            trim_reads=trim_reads,path_to_cutadapt=path_to_cutadapt,
-            adapter_seq_read1 = adapter_seq_read1, adapter_seq_read2 = adapter_seq_read2,
-            max_adapter_removal=max_adapter_removal,overlap_length=overlap_length,
-            zero_cap=zero_cap,quality_base=quality_base,error_rate=error_rate,
-            min_qual_score=min_qual_score,min_read_len=min_read_len,
+            path_to_samtools=path_to_samtools, path_to_aligner=path_to_aligner,
+            aligner_options=aligner_options, num_procs=num_procs,
+            trim_reads=trim_reads, path_to_cutadapt=path_to_cutadapt,
+            adapter_seq_read1=adapter_seq_read1, adapter_seq_read2=adapter_seq_read2,
+            max_adapter_removal=max_adapter_removal, overlap_length=overlap_length,
+            zero_cap=zero_cap, quality_base=quality_base, error_rate=error_rate,
+            min_qual_score=min_qual_score, min_read_len=min_read_len,
             keep_temp_files=keep_temp_files,
-            bowtie2=bowtie2, 
+            bowtie2=bowtie2,
             sort_mem=sort_mem)
 
         total_input += lib_input
         total_unique += lib_unique
-    
+
         ## Remove clonal reads
         if remove_clonal == True:
             lib_clonal = remove_clonal_bam(input_bam = path_to_output+sample+"_"+str(current_library)
                                            +"_processed_reads.bam",
+
                                            output_bam = path_to_output+sample+"_"+str(current_library)
                                            +"_processed_reads_no_clonal.bam",                                           
-                                           metric = path_to_output+sample+"_"+str(current_library)+".metric",
+
+                                           metric = path_to_output+sample+"_"+
+                                           str(current_library)+".metric",
+
                                            is_pe = True,
                                            path_to_picard=path_to_picard)
-            
-            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+str(current_library)+"_processed_reads.bam"+
-                                              " "+path_to_output+sample+"_"+str(current_library)+".metric"))
+
+            subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+
+                                              str(current_library)+"_processed_reads.bam"+
+                                              " "+path_to_output+sample+"_"+
+                                              str(current_library)+".metric"))
             total_clonal += lib_clonal
 
     print_checkpoint("There are " + str(total_input) + " total input reads")
@@ -256,17 +267,19 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
 
     if remove_clonal == True:
         total_non_clonal = total_unique - total_clonal
-        print_checkpoint("There are " + str(total_non_clonal) + " non-clonal reads, " +
-                         str(float(total_non_clonal) / total_input*100) + " percent remaining")
+        print_checkpoint("There are "+str(total_non_clonal)+" non-clonal reads, "+
+                         str(float(total_non_clonal) / total_input*100)+" percent remaining")
         ## Merge bam files to get final bam file
         library_files = [path_to_output+sample+"_"+str(library)+"_processed_reads_no_clonal.bam"
                          for library in set(libraries)]
         if len(library_files) > 1:
-            merge_bam_files(library_files,path_to_output+sample+"_processed_reads_no_clonal.bam",path_to_samtools)
+            merge_bam_files(library_files, path_to_output+sample+
+                            "_processed_reads_no_clonal.bam", path_to_samtools)
             subprocess.check_call(shlex.split("rm "+" ".join(library_files)))
         else:
             subprocess.check_call(
-                shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads_no_clonal.bam")
+                shlex.split("mv "+library_files[0]+" "+
+                            path_to_output+sample+"_processed_reads_no_clonal.bam")
             )
     ## If not removing clonal reads
     else:
@@ -279,14 +292,14 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
             subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads.bam"))
 
     #Calling methylated sites
-    print_checkpoint("Begin calling mCs")    
+    print_checkpoint("Begin calling mCs")
     if remove_clonal == True:
         output_bam_file = path_to_output+sample+"_processed_reads_no_clonal.bam"
     else:
         output_bam_file = path_to_output+sample+"_processed_reads.bam"
 
-        
-    call_methylated_sites_pe(output_bam_file,sample,
+    call_methylated_sites_pe(output_bam_file,
+                             sample,
                              reference_fasta,
                              unmethylated_control,
                              sig_cutoff=sig_cutoff,
@@ -302,27 +315,26 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
                              path_to_files=path_to_output,
                              path_to_samtools=path_to_samtools,
                              min_base_quality=min_base_quality)
-    
     print_checkpoint("Done")
- 
-def run_mapping_pe(current_library,library_read1_files,library_read2_files,
-                   sample,forward_reference,reverse_reference,reference_fasta,
+
+def run_mapping_pe(current_library, library_read1_files, library_read2_files,
+                   sample, forward_reference, reverse_reference, reference_fasta,
                    path_to_output="",
-                   path_to_samtools="",path_to_aligner="",
+                   path_to_samtools="", path_to_aligner="",
                    aligner_options=[],
-                   num_procs=1,trim_reads=True,path_to_cutadapt="",
-                   adapter_seq_read1 = "AGATCGGAAGAGCACACGTCTGAAC",
-                   adapter_seq_read2 = "AGATCGGAAGAGCGTCGTGTAGGGA",
-                   max_adapter_removal=None,overlap_length=None,zero_cap=None,
-                   quality_base=None,error_rate=None,min_qual_score=10,
-                   min_read_len=30,keep_temp_files=False,
+                   num_procs=1, trim_reads=True, path_to_cutadapt="",
+                   adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
+                   adapter_seq_read2="AGATCGGAAGAGCGTCGTGTAGGGA",
+                   max_adapter_removal=None, overlap_length=None, zero_cap=None,
+                   quality_base=None, error_rate=None, min_qual_score=10,
+                   min_read_len=30, keep_temp_files=False,
                    bowtie2=True, sort_mem="500M"):
     """
     This function runs the mapping portion of the methylation calling pipeline.
     For Paired-end data processing.
-    
+
     current_library is the ID that you'd like to run mapping on.
-    
+
     library_read1_files is a list of library IDs (in the same order as the files list) indiciating
     which libraries each set of fastq files belong to. If you use a glob, you only need to 
     indicate the library ID for those fastqs once (i.e., the length of files and libraries 
@@ -564,7 +576,8 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
         args.append(prefix+"_forward_strand_hits.sam")
     subprocess.check_call(shlex.split(" ".join(args)))
     print_checkpoint("Processing forward strand hits")
-    find_multi_mappers_pe(prefix+"_forward_strand_hits.sam",prefix,num_procs=num_procs,keep_temp_files=keep_temp_files)
+    find_multi_mappers_pe(prefix+"_forward_strand_hits.sam",prefix,
+                          num_procs=num_procs,keep_temp_files=keep_temp_files)
 
     ## Reverse    
     if bowtie2:
@@ -585,7 +598,8 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
         args.append(prefix+"_reverse_strand_hits.sam")
     subprocess.check_call(shlex.split(" ".join(args)))
     print_checkpoint("Processing reverse strand hits")
-    sam_header = find_multi_mappers_pe(prefix+"_reverse_strand_hits.sam",prefix,num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
+    find_multi_mappers_pe(prefix+"_reverse_strand_hits.sam",prefix,
+                          num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
     
     ## Clear temporary files
     if keep_temp_files==False:
@@ -1531,14 +1545,14 @@ def parse_args():
          if not args.aligner_options:
              args.aligner_options = ["-S","-k 1","-m 1","--chunkmbs 3072","--best","--strata","-o 4","-e 80","-l 20","-n 0"]
         
-         run_methylation_pipeline(args.files,args.libraries,args.sample,args.forward_ref,args.reverse_ref,args.ref_fasta,
-                                  args.unmethylated_control,args.path_to_samtools,args.path_to_aligner,
-                                  args.aligner_options,args.num_procs,args.trim_reads,
-                                  args.path_to_cutadapt,args.adapter_seq,args.max_adapter_removal,
-                                  args.overlap_length,args.zero_cap,args.error_rate,args.min_qual_score,args.min_read_len,
-                                  args.sig_cutoff,args.min_cov,args.binom_test,args.keep_temp_files,
-                                  args.save_space,
-                                  args.bowtie2,args.sort_mem,args.path_to_output)
+         run_methylation_pipeline_pe(args.files,args.libraries,args.sample,args.forward_ref,args.reverse_ref,args.ref_fasta,
+                                     args.unmethylated_control,args.path_to_samtools,args.path_to_aligner,
+                                     args.aligner_options,args.num_procs,args.trim_reads,
+                                     args.path_to_cutadapt,args.adapter_seq,args.max_adapter_removal,
+                                     args.overlap_length,args.zero_cap,args.error_rate,args.min_qual_score,args.min_read_len,
+                                     args.sig_cutoff,args.min_cov,args.binom_test,args.keep_temp_files,
+                                     args.save_space,
+                                     args.bowtie2,args.sort_mem,args.path_to_output)
                                   
      elif args.command == "call_methylated_sites":
          call_methylated_sites(args.inputf, args.sample, args.reference, args.control, args.casava_version, args.sig_cutoff,

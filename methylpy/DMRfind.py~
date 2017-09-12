@@ -78,6 +78,14 @@ except Exception,e:
     print e
     exit("methylpy.DMRfind requires scipy.stats module")
 
+#NOTE: DELETE THIS IMPORT AFTER ARGPARSE IS MOVED TO NEW FILE!
+try:
+    from methylpy.call_mc import call_methylated_sites
+except Exception,e:
+    exc_type, exc_obj, exc_tb = exc_info()
+    print(exc_type, exc_tb.tb_lineno)
+    print e
+    exit("methylpy.DMRfind requires call_methylated_sites from the call_mc module")
 import subprocess
 import shlex
 
