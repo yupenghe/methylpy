@@ -49,7 +49,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
                                 binom_test=True, bh=True, min_cov=2,
                                 trim_reads=True, path_to_cutadapt="",
                                 bowtie2=True, path_to_aligner="", aligner_options=[],
-                                remove_clonal=True, path_to_picard="",java_options="-Xmx20g",
+                                remove_clonal=True, path_to_picard="",java_options="-Xmx20g"
                                 path_to_samtools="",
                                 adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
                                 adapter_seq_read2="AGATCGGAAGAGCGTCGTGTAGGGA",

@@ -1186,10 +1186,8 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
             context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
             unconverted_c = fields[4].count(".")
             converted_c = fields[4].count("T")
-            cov = unconverted_c+converted_c
-            if cov > 0:
-                output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
-                                                    str(unconverted_c),str(cov),"1"])+"\n")
+            output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
+                                                     str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
         elif fields[2] == "G":
             pos = int(fields[1])-1
             context = "".join([complement[base]
@@ -1199,10 +1197,8 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
             )
             unconverted_c = fields[4].count(",")
             converted_c = fields[4].count("a")
-            cov = unconverted_c+converted_c
-            if cov > 0:
-                output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
-                                                    str(unconverted_c),str(cov),"1"])+"\n")
+            output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
+                                                     str(unconverted_c),str(unconverted_c+converted_c),"1"])+"\n")
     fhandle.close()
     output_filehandler.close()
 
