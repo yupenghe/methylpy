@@ -265,6 +265,7 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
             line = f.readline()
             if not line:
                 break
+            line = line.rstrip()
             file_handles[current_file].write(line.split(" ")[0]+"\n")
             total_reads += 1
             for index in xrange(0,3):
