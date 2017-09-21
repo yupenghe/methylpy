@@ -40,7 +40,6 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
                                 forward_reference, reverse_reference, reference_fasta,
                                 unmethylated_control="chrL:",
                                 path_to_output="", sig_cutoff=0.01,
-                                pbat=False,
                                 num_procs=1, sort_mem="500M",
                                 num_upstr_bases=0,
                                 num_downstr_bases=2,
@@ -49,6 +48,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
                                 binom_test=True, bh=True, min_cov=2,
                                 trim_reads=True, path_to_cutadapt="",
                                 bowtie2=True, path_to_aligner="", aligner_options=[],
+                                pbat=False,
                                 remove_clonal=True, path_to_picard="",java_options="-Xmx20g",
                                 path_to_samtools="",
                                 adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
@@ -210,8 +210,12 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
     total_clonal = 0
 
     # Get expanded file list
-    expanded_read1_file_list, expanded_library_list = expand_input_files(read1_files,libraries)
-    expanded_read2_file_list, expanded_library_list = expand_input_files(read2_files,libraries)
+    if pbat:
+        expanded_read1_file_list, expanded_library_list = expand_input_files(read2_files,libraries)
+        expanded_read2_file_list, expanded_library_list = expand_input_files(read1_files,libraries)
+    else:
+        expanded_read1_file_list, expanded_library_list = expand_input_files(read1_files,libraries)
+        expanded_read2_file_list, expanded_library_list = expand_input_files(read2_files,libraries)
 
     #Processing
     for current_library in set(libraries):

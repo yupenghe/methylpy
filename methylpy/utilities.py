@@ -278,6 +278,63 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
 
     return total_reads
 
+def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
+    """
+    This function mimics the unix split utility.
+    """
+
+    def reverse_complement(dna):
+        complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
+        return "".join([complement[base] for base in dna[::-1]])
+
+    if not isinstance(input_files, list):
+        if isinstance(input_files, basestring):
+            input_files = [input_files]
+        else:
+            sys.exit("input_files must be a list of strings")
+    file_handles = {}
+    for index in xrange(0,num_chunks):
+        file_handles[index]=open(output_prefix+str(index),'w')
+    cycle = itertools.cycle(range(0,num_chunks))
+    total_reads=0
+    for inputf in input_files:
+        if inputf[-3:] == ".gz":
+            f = gzip.open(inputf,'r')
+        elif inputf[-4:] == ".bz2":
+            f = bz2.BZ2File(inputf,'r')
+        else:
+            f = open(inputf,'r')
+                
+        while True:
+            current_file = cycle.next()
+            # processing read id
+            # remove any string after the first space character
+            line = f.readline()
+            if not line:
+                break
+            # read id
+            line = line.rstrip()
+            file_handles[current_file].write(line.split(" ")[0]+"\n")
+            total_reads += 1
+            # seq
+            line = f.readline()
+            line = line.rstrip()
+            file_handles[current_file].write(reverse_complement(line)+"\n")
+            # 
+            line = f.readline()
+            file_handles[current_file].write(line)
+            # qual
+            line = f.readline()
+            line = line.rstrip()
+            file_handles[current_file].write(line[::-1]+"\n")
+
+        f.close()
+
+    for index in xrange(0,num_chunks):
+        file_handles[index].close()
+
+    return total_reads
+
 def split_mpileup_file(num_chunks,inputf,output_prefix):
     """
     This function mimics the unix split utility.

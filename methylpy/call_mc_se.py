@@ -5,6 +5,7 @@ import scipy.stats as sci
 from scipy.stats.mstats import mquantiles
 from methylpy.utilities import print_checkpoint, print_error
 from methylpy.utilities import split_fastq_file
+from methylpy.utilities import split_fastq_file_pbat
 import pdb
 import shlex
 import itertools
@@ -27,9 +28,11 @@ def run_methylation_pipeline(read_files, libraries, sample,
                              path_to_output="", sig_cutoff=0.01,
                              num_procs=1, sort_mem="500M",
                              num_upstr_bases=1, num_downstr_bases=2,
+                             generate_allc_file=True,
                              generate_mpileup_file=True, compress_output=True,
                              binom_test=True, bh=True, min_cov=2,
                              trim_reads=True, path_to_cutadapt="",
+                             pbat=False,
                              bowtie2=False, path_to_aligner="", aligner_options=[],
                              remove_clonal=True, path_to_picard="",java_options="-Xmx20g",
                              path_to_samtools="",
@@ -185,6 +188,7 @@ def run_methylation_pipeline(read_files, libraries, sample,
                                             path_to_samtools=path_to_samtools,
                                             path_to_aligner=path_to_aligner,
                                             aligner_options=aligner_options,
+                                            pbat=pbat,
                                             num_procs=num_procs,
                                             trim_reads=trim_reads,
                                             path_to_cutadapt=path_to_cutadapt,
@@ -253,30 +257,31 @@ def run_methylation_pipeline(read_files, libraries, sample,
     else:
         output_bam_file = path_to_output+sample+"_processed_reads.bam"
 
-    call_methylated_sites(output_bam_file,
-                          sample,
-                          reference_fasta,
-                          unmethylated_control,
-                          sig_cutoff=sig_cutoff,
-                          num_procs=num_procs,
-                          num_upstr_bases=num_upstr_bases,
-                          num_downstr_bases=num_downstr_bases,
-                          generate_mpileup_file=generate_mpileup_file,
-                          compress_output=compress_output,
-                          min_cov=min_cov,
-                          binom_test=binom_test,
-                          bh=bh,
-                          sort_mem=sort_mem,
-                          path_to_files=path_to_output,
-                          path_to_samtools=path_to_samtools,
-                          min_base_quality=min_base_quality)
+    if generate_allc_file:
+        call_methylated_sites(output_bam_file,
+                              sample,
+                              reference_fasta,
+                              unmethylated_control,
+                              sig_cutoff=sig_cutoff,
+                              num_procs=num_procs,
+                              num_upstr_bases=num_upstr_bases,
+                              num_downstr_bases=num_downstr_bases,
+                              generate_mpileup_file=generate_mpileup_file,
+                              compress_output=compress_output,
+                              min_cov=min_cov,
+                              binom_test=binom_test,
+                              bh=bh,
+                              sort_mem=sort_mem,
+                              path_to_files=path_to_output,
+                              path_to_samtools=path_to_samtools,
+                              min_base_quality=min_base_quality)
     print_checkpoint("Done")
 
 def run_mapping(current_library, library_files, sample,
                 forward_reference, reverse_reference, reference_fasta,
                 path_to_output="",
                 path_to_samtools="", path_to_aligner="",
-                aligner_options=[],
+                aligner_options=[],pbat=False,
                 num_procs=1, trim_reads=True, path_to_cutadapt="",
                 adapter_seq="AGATCGGAAGAGCACACGTCTG",
                 max_adapter_removal=None, overlap_length=None, zero_cap=None,
@@ -371,7 +376,10 @@ def run_mapping(current_library, library_files, sample,
     file_path = path_to_output+file_name
 
     print_checkpoint("Begin splitting reads for "+file_name)
-    total_input = split_fastq_file(num_procs, library_files, file_path+"_split_")
+    if pbat:
+        total_input = split_fastq_file_pbat(num_procs, library_files, file_path+"_split_")
+    else:
+        total_input = split_fastq_file(num_procs, library_files, file_path+"_split_")
 
     if trim_reads:
         print_checkpoint("Begin trimming reads for "+file_name)
@@ -424,7 +432,7 @@ def run_mapping(current_library, library_files, sample,
                               sample,
                               forward_reference, reverse_reference, reference_fasta,
                               path_to_output=path_to_output,
-                              aligner_options=aligner_options,                                   
+                              aligner_options=aligner_options,
                               path_to_aligner=path_to_aligner, num_procs=num_procs,
                               keep_temp_files=keep_temp_files,
                               bowtie2=bowtie2, sort_mem=sort_mem)
@@ -1056,14 +1064,16 @@ def remove_clonal_bam(input_bam,output_bam,metric,is_pe=False,path_to_picard="",
     )
     total_clonal = 0
     with open(metric,'r') as f:
-        for line in f:
-            if line[0] == "#" or len(line) == 1:
-                continue
-            fields = line.split("\t")
-            if is_pe:
-                total_clonal = fields[5]
-            else:
-                total_clonal = fields[4]
+        while True:
+            line = f.readline()
+            if line[0] != "#" and len(line) != 1:
+                break
+        line = f.readline()
+        fields = line.split("\t")
+        if is_pe:
+            total_clonal = fields[5]
+        else:
+            total_clonal = fields[4]
     return int(total_clonal)
 
     
