@@ -1099,6 +1099,7 @@ def fasta_iter(fasta_name,query_chrom):
 def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
                           num_upstr_bases=0,num_downstr_bases=2,
                           generate_mpileup_file=True,compress_output=True,
+                          buffer_line_number = 100000,
                           min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
                           sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
 
@@ -1179,6 +1180,8 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
     complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
     cur_chrom = ""
     cur_chrom_nochr = ""
+    line_counts = 0
+    out = ""
     for line in fhandle:
         fields = line.split("\t")
         if fields[0] != cur_chrom:
@@ -1198,8 +1201,11 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
             converted_c = fields[4].count("T")
             cov = unconverted_c+converted_c
             if cov > 0:
-                output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
-                                                    str(unconverted_c),str(cov),"1"])+"\n")
+                line_counts += 1
+                #output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
+                #                                    str(unconverted_c),str(cov),"1"])+"\n")
+                out += "\t".join([cur_chrom_nochr,str(pos+1),"+",context,
+                                  str(unconverted_c),str(cov),"1"])+"\n"
         elif fields[2] == "G":
             pos = int(fields[1])-1
             context = "".join([complement[base]
@@ -1211,8 +1217,20 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
             converted_c = fields[4].count("a")
             cov = unconverted_c+converted_c
             if cov > 0:
-                output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
-                                                    str(unconverted_c),str(cov),"1"])+"\n")
+                line_counts += 1
+                #output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
+                #                                    str(unconverted_c),str(cov),"1"])+"\n")
+                out += "\t".join([cur_chrom_nochr,str(pos+1),"-",context,
+                                  str(unconverted_c),str(cov),"1"])+"\n"
+        if line_counts >= buffer_line_number:
+            output_filehandler.write(out)
+            line_counts = 0
+            out = ""
+            
+    if line_counts > 0:
+        output_filehandler.write(out)
+        line_counts = 0
+        out = ""
     fhandle.close()
     output_filehandler.close()
 
