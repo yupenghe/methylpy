@@ -285,18 +285,18 @@ def run_methylation_pipeline(files,libraries,sample,forward_reference,reverse_re
     if path_to_MarkDuplicates != False:
         subprocess.check_call(shlex.split(" ".join(["java","-Xmx20g","-jar",
                                                     path_to_MarkDuplicates+"/picard.jar MarkDuplicates",
-                                                    "INPUT="+sample+"_processed_reads_no_clonal.bam",
-                                                    "OUTPUT="+sample+"_processed_reads_no_clonal_final.bam",
+                                                    "INPUT="+path_to_output+sample+"_processed_reads_no_clonal.bam",
+                                                    "OUTPUT="+path_to_output+sample+"_processed_reads_no_clonal_final.bam",
                                                     "ASSUME_SORTED=true",
                                                     "REMOVE_DUPLICATES=true",
                                                     "METRICS_FILE=/dev/null",
                                                     "VALIDATION_STRINGENCY=LENIENT"])))
         subprocess.check_call(shlex.split(" ".join(["mv",
-                                                    sample+"_processed_reads_no_clonal_final.bam",
-                                                    sample+"_processed_reads_no_clonal.bam"])))
+                                                    path_to_output+sample+"_processed_reads_no_clonal_final.bam",
+                                                    path_to_output+sample+"_processed_reads_no_clonal.bam"])))
 
     print_checkpoint("Begin calling mCs")
-    call_methylated_sites(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
+    call_methylated_sites(path_to_output+sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
     print_checkpoint("Done")
 
 def run_mapping(current_library,library_files,sample,forward_reference,reverse_reference,reference_fasta,
@@ -1733,19 +1733,19 @@ def run_methylation_pipeline_pe(read1_files,read2_files,libraries,sample,
     if path_to_MarkDuplicates != False:
         subprocess.check_call(shlex.split(" ".join(["java","-Xmx20g","-jar",
                                                     path_to_MarkDuplicates+"/picard.jar MarkDuplicates",
-                                                    "INPUT="+sample+"_processed_reads_no_clonal.bam",
-                                                    "OUTPUT="+sample+"_processed_reads_no_clonal_final.bam",
+                                                    "INPUT="+path_to_output+sample+"_processed_reads_no_clonal.bam",
+                                                    "OUTPUT="+path_to_output+sample+"_processed_reads_no_clonal_final.bam",
                                                     "ASSUME_SORTED=true",
                                                     "REMOVE_DUPLICATES=true",
                                                     "METRICS_FILE=/dev/null",
                                                     "VALIDATION_STRINGENCY=LENIENT"])))
         subprocess.check_call(shlex.split(" ".join(["mv",
-                                                    sample+"_processed_reads_no_clonal_final.bam",
-                                                    sample+"_processed_reads_no_clonal.bam"])))
+                                                    path_to_output+sample+"_processed_reads_no_clonal_final.bam",
+                                                    path_to_output+sample+"_processed_reads_no_clonal.bam"])))
 
     #Calling methylated sites
     print_checkpoint("Begin calling mCs")
-    call_methylated_sites_pe(sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
+    call_methylated_sites_pe(path_to_output+sample+"_processed_reads_no_clonal.bam",sample,reference_fasta,unmethylated_control,quality_version,sig_cutoff=sig_cutoff,num_procs=num_procs,min_cov=min_cov,binom_test=binom_test,bh=bh,sort_mem=sort_mem,path_to_files=path_to_output,path_to_samtools=path_to_samtools,min_base_quality=min_base_quality)
     print_checkpoint("Done")
 
 
