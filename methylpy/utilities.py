@@ -118,14 +118,20 @@ def browser_file(collapsed, uncollapsed):
     
     for filen in file_handles:
         file_handles[filen].close()
-    
+
 def expand_nucleotide_code(mc_type):
-    iub_dict = {"N":["A","C","G","T"],"H":["A","C","T"],"C":["C"],"G":["G"],"T":["T"],"A":["A"]}
-    
-    for type in mc_type[:]:
-        type += "N" * (3 - len(type))
-        mc_type.extend(["".join(i) for i in itertools.product(*[iub_dict[nuc] for nuc in type])])
-    
+    iub_dict = {"N":["A","C","G","T"],
+                "H":["A","C","T"],
+                "C":["C"],
+                "G":["G"],
+                "T":["T"],
+                "A":["A"]}
+
+    for motif in mc_type[:]:
+        motif += "N" * (3 - len(motif))
+        mc_type.extend(["".join(i) for i in
+                        itertools.product(*[iub_dict[nuc] for nuc in motif])])
+
     if "C" in mc_type:
         mc_type.extend(["CG", "CHG", "CHH","CNN"])
     if "CG" in mc_type:

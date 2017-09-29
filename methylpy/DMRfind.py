@@ -81,10 +81,14 @@ except Exception,e:
 import subprocess
 import shlex
 
-def DMRfind(mc_type, region_dict, samples, path_to_allc, num_procs=1, save_result="temp", 
-            min_cov=0,keep_temp_files=False,mc_max_dist=0,dmr_max_dist=100,resid_cutoff=.01,sig_cutoff=.01,
-            num_sims=1000,num_sig_tests=10,seed=-1,min_num_dms=0,collapse_samples=False,
-            sample_category=False, min_cluster=0,use_mc_status=True,max_iterations=1000,convergence_diff=1):
+def DMRfind(mc_type, region_dict, samples, path_to_allc,
+            num_procs=1, save_result="temp", 
+            min_cov=0,keep_temp_files=False,mc_max_dist=0,
+            dmr_max_dist=100,resid_cutoff=.01,sig_cutoff=.01,
+            num_sims=1000,num_sig_tests=10,seed=-1,
+            min_num_dms=0,collapse_samples=False,
+            sample_category=False, min_cluster=0,
+            max_iterations=1000,convergence_diff=1):
     """
     This function will take a set of allc files, and look for differentially methylated regions. Note that in the output file, 
     -1 is used to represent missing data.
@@ -132,10 +136,6 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc, num_procs=1, save_resul
     sample_category - A list of categories that each respective sample belongs to; the categories must begin at 0 and increase by
         1 for each category added. ex: samples [A,B,C] categories [0,1,2] or categories [0, 1, 0] 
     min_cluster - The minimum number of each sample category that must be present in every block that is output.
-    use_mc_status is a boolean value indicating whether or not you'd like to use the methylation
-        status of a site when calculating the methylation level. The methylation status is typically
-        derived from a binomial test, and if this is set to true, any site with a methylation status of 0
-        will have its methylated read count automatically set to 0.
     max_iterations is the maximum number of iterations performed by the algorithm described in the paper cited above
     convergence_diff determines when the algorithm will terminate. When the current m0 estimate and the last m0 estimate differ by no
         more than convergence_diff.
@@ -281,7 +281,7 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc, num_procs=1, save_resul
 
     print_checkpoint("Begin Defining Windows")
     collapse_dmr_windows(save_result+"_rms_results.tsv",save_result+"_rms_results_collapsed.tsv",column=4,sig_cutoff=pvalue_cutoff,max_dist=dmr_max_dist,resid_cutoff=resid_cutoff,min_num_dms=min_num_dms,collapse_samples=collapse_samples, sample_category=sample_category, min_cluster=min_cluster)
-    get_methylation_levels_DMRfind(save_result+"_rms_results_collapsed.tsv",save_result+"_rms_results_collapsed_with_levels.tsv",samples,path_to_allc=path_to_allc,mc_type=mc_type,num_procs=num_procs,use_mc_status=use_mc_status)
+    get_methylation_levels_DMRfind(save_result+"_rms_results_collapsed.tsv",save_result+"_rms_results_collapsed_with_levels.tsv",samples,path_to_allc=path_to_allc,mc_type=mc_type,num_procs=num_procs)
     subprocess.check_call(shlex.split("mv "+save_result+"_rms_results_collapsed_with_levels.tsv "+save_result+"_rms_results_collapsed.tsv"))
     print_checkpoint("Done")
 
@@ -734,7 +734,7 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
     g.close()
     return block_count
 
-def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type=["C"],num_procs=1,use_mc_status=True):
+def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type=["C"],num_procs=1):
     """
     This function assumes that allc files are of the format allc_<sample>_<chr>.tsv
     input is the path to a file containing collapsed DMR results
@@ -743,10 +743,6 @@ def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type
     path_to_allc is the path to the directory containing the allc files for these samples
     num_procs is an integer indicating the number of processors you'd like to use for calculating
         methylation level. This function can be parallelized up to the number of samples
-    use_mc_status is a boolean value indicating whether or not you'd like to use the methylation
-        status of a site when calculating the methylation level. The methylation status is typically
-        derived from a binomial test, and if this is set to true, any site with a methylation status of 0
-        will have its methylated read count automatically set to 0.
     """
     #dictionary of sample_name -> file handle
     allc_files = {}
@@ -769,12 +765,12 @@ def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type
             dmr_lines.append(line)
         if num_procs == 1:
             for sample in samples:
-                methylation_levels[sample]=get_methylation_level_DMRfind_worker(dmr_lines,mc_type,sample,path_to_allc,output,use_mc_status=use_mc_status)
+                methylation_levels[sample]=get_methylation_level_DMRfind_worker(dmr_lines,mc_type,sample,path_to_allc,output)
         else:
             pool = Pool(num_procs)
             results = {}
             for sample in samples:
-                results[sample]=pool.apply_async(get_methylation_level_DMRfind_worker,(dmr_lines,mc_type,sample,path_to_allc,output),{"use_mc_status":use_mc_status})
+                results[sample]=pool.apply_async(get_methylation_level_DMRfind_worker,(dmr_lines,mc_type,sample,path_to_allc,output))
             pool.close()
             pool.join()
             for sample in results:
@@ -792,7 +788,8 @@ def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type
         for sample in samples:
             temp_files[sample].close()
             subprocess.check_call(shlex.split("rm "+output.replace(".tsv","")+"_"+sample+"_temp_methylation_levels.tsv"))
-def get_methylation_level_DMRfind_worker(dmr_lines,mc_type,sample,path_to_allc,output,use_mc_status=True):
+
+def get_methylation_level_DMRfind_worker(dmr_lines,mc_type,sample,path_to_allc,output):
     mc_type = expand_nucleotide_code(mc_type)
     prev_chrom = ""
     prev_end = ""
@@ -843,8 +840,7 @@ def get_methylation_level_DMRfind_worker(dmr_lines,mc_type,sample,path_to_allc,o
             h = 0
             while allc_line and int(allc_field[1]) >= dmr_start and int(allc_field[1]) <= dmr_end:
                 if allc_field[3] in mc_type:
-                    if use_mc_status == False or allc_field[6] == "1\n":
-                        mc += int(allc_field[4])
+                    mc += int(allc_field[4])
                     h += int(allc_field[5])
                 allc_line=allc_file.readline()
                 allc_field=allc_line.split("\t")
@@ -858,6 +854,7 @@ def get_methylation_level_DMRfind_worker(dmr_lines,mc_type,sample,path_to_allc,o
             prev_chrom = dmr_chr
             prev_end = dmr_end
     return methylation_level_list
+
 def parse_args():
      # create the top-level parser
      parser = ArgumentParser(prog='PROG')
