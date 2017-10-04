@@ -28,7 +28,7 @@ def run_methylation_pipeline(read_files, libraries, sample,
                              path_to_output="", sig_cutoff=0.01,
                              num_procs=1, sort_mem="500M",
                              num_upstr_bases=1, num_downstr_bases=2,
-                             generate_allc_file=True,
+                             generate_allc_file=True,split_allc_files=False,
                              generate_mpileup_file=True, compress_output=True,
                              binom_test=True, bh=True, min_cov=2,
                              trim_reads=True, path_to_cutadapt="",
@@ -268,6 +268,7 @@ def run_methylation_pipeline(read_files, libraries, sample,
                               num_downstr_bases=num_downstr_bases,
                               generate_mpileup_file=generate_mpileup_file,
                               compress_output=compress_output,
+                              split_allc_files=split_allc_files,
                               min_cov=min_cov,
                               binom_test=binom_test,
                               bh=bh,
@@ -1098,7 +1099,9 @@ def fasta_iter(fasta_name,query_chrom):
 
 def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
                           num_upstr_bases=0,num_downstr_bases=2,
-                          generate_mpileup_file=True,compress_output=True,
+                          generate_mpileup_file=True,
+                          compress_output=True,
+                          split_allc_files=False,
                           buffer_line_number = 100000,
                           min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
                           sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
@@ -1226,7 +1229,7 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
             output_filehandler.write(out)
             line_counts = 0
             out = ""
-            
+
     if line_counts > 0:
         output_filehandler.write(out)
         line_counts = 0
@@ -1236,6 +1239,50 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
 
     if generate_mpileup_file:
         subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output.tsv"))
+
+    
+    if not split_allc_files:
+        return 0
+    
+    # Split allc files
+    if compress_output:
+        fhandle = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'r')
+    else:
+        fhandle = open(path_to_files+"allc_"+sample+".tsv",'r')
+    cur_chrom = ""
+    out = ""
+    line_counts = 0
+    for line in fhandle:
+        fields = line.split("\t")
+        if fields[0] != cur_chrom:
+            # output
+            if line_counts > 0:
+                output_handle.write(out)
+                line_counts = 0
+                out = ""
+                output_handle.close()
+            cur_chrom = fields[0]
+            if compress_output:
+                output_handle = gzip.open(path_to_files+"allc_"+sample+"_"+cur_chrom+".tsv.gz",'w')
+            else:
+                output_handle = open(path_to_files+"allc_"+sample+"_"+cur_chrom+".tsv",'w')
+        else:
+            # data
+            line_counts += 1
+            out += line
+
+    if line_counts > 0:
+        output_handle.write(out)
+        line_counts = 0
+        out = ""
+    output_handle.close()
+
+    if compress_output:
+        subprocess.check_call(shlex.split("rm -f "+path_to_files+"allc_"+sample+".tsv.gz",'w'))
+    else:
+        subprocess.check_call(shlex.split("rm -f "+path_to_files+"allc_"+sample+".tsv",'w'))
+
+    return 0
     
 def parse_args():
      # create the top-level parser
