@@ -33,15 +33,10 @@ Step -1 Set directory for temporary files
 Before running methylpy, please set the directory for storing temporary files to be a directory with large space by adding below command to ~/.bashrc file: 
 export TMPDIR=/YOUR/TMP/DIR/
 
-
-
-
-
 ### Step 0 Prepare (converted) reference genome for mapping
 Include the sequence of lambda phage genome (as control) into the reference genome fasta file. For example: 
 cat mm10.fa chrL.fa > mm10_with_lambda.fa
 chrL.fa can be downloaded from [here](http://neomorph.salk.edu/yupeng/share/chrL.fa).
-
 
 ### Step 1 Build bowtie/bowtie2 index for converted genome
 Build the bowtie/bowtie2 index for bisulfite-converted genome. Note that the genome index used for WGBS data processing is different from the one used for ChIP-seq or genome sequence data processing.  
@@ -50,7 +45,6 @@ from methylpy.call_mc import build_ref
 #fasta file(s) of genome                                                        
 #Specifying multiple files like input_files=['chr1.fa','chr2.fa',...,'chrY.fa','chrL.fa'] also #work
 input_files=['mm10_with_lambda.fa']
-```	
 #Prefix of output files                                                      
 output='mm10'
 
@@ -58,7 +52,7 @@ output='mm10'
 build_ref(input_files,output,bowtie2=True)
 	
 #Build bowtie index
-#build_ref(input_files,output,bowtie2=False)
+build_ref(input_files,output,bowtie2=False)
 ```	
 	
 ### Step 2.1 Create script to run methylpy (paired-end data)
