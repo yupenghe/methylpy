@@ -1283,7 +1283,132 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
         subprocess.check_call(shlex.split("rm -f "+path_to_files+"allc_"+sample+".tsv",'w'))
 
     return 0
+
+def bam_quality_mch_filter(inputf,
+                           outputf,
+                           reference_fasta,
+                           quality_cutoff = 30,
+                           min_ch = 3,
+                           max_mch_ratio = 0.7,
+                           buffer_line_number = 100000,
+                           path_to_samtools = ""):
+    """
     
+    """
+
+    min_ch = int(min_ch)
+    max_mch_ratio = float(max_mch_ratio)
+    
+    # quality filter
+    cmd = path_to_samtools+"samtools view -q"+str(quality_cutoff)+" "+inputf
+    pipes = subprocess.Popen(shlex.split(cmd),
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+                             universal_newlines=True)
+    fhandle = pipes.stdout
+
+    # open up output file
+    out_handle = open(outputf+".sam",'w')
+    # print header
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -H "+inputf),
+                          stdout=out_handle)
+
+    line_counts = 0
+    out = ""
+    cur_chrom = ""
+    for line in fhandle:
+        fields = line.split("\t")
+        if fields[2] != cur_chrom:
+            cur_chrom = fields[2]
+            cur_chrom_nochr = cur_chrom.replace("chr","")
+            seq = fasta_iter(reference_fasta,cur_chrom_nochr)
+            if seq != None:
+                seq = seq.upper()
+
+        if seq == None:
+            continue
+
+        # get mc state
+        read_pos = int(fields[3]) - 1
+        uch = 0
+        mch = 0
+        num_ch = 0
+        #mc_state = ["." for ind in range(len(fields[9]))]
+        if int(fields[1]) & 16 == 0: # + strand
+            for ind in range(len(fields[9])):
+                pos = ind + read_pos
+                if seq[pos] != "C":
+                    continue
+                if fields[9][ind] == "C":
+                    if seq[pos+1] == "G":
+                        continue
+                        #mc_state[ind] = "Z"
+                    #elif seq[pos+2] == "G":
+                        #mc_state[ind] = "X"
+                    else:
+                        mch += 1
+                        #mc_state[ind] = "H"
+                elif fields[9][ind] == "T":
+                    if seq[pos+1] == "G":
+                        continue
+                        #mc_state[ind] = "z"
+                    #elif seq[pos+2] == "G":
+                        #mc_state[ind] = "x"
+                    else:
+                        uch += 1
+                        #mc_state[ind] = "h"
+        else: # - strand
+            for ind in range(len(fields[9])):
+                pos = ind + read_pos
+                if seq[pos] != "G":
+                    continue
+                if fields[9][ind] == "G":
+                    if seq[pos-1] == "C":
+                        continue
+                        #mc_state[ind] = "Z"
+                    #elif seq[pos-2] == "C":
+                        #mc_state[ind] = "X"
+                    else:
+                        mch += 1
+                        #mc_state[ind] = "H"
+                elif fields[9][ind] == "A":
+                    if seq[pos-1] == "C":
+                        continue
+                        #mc_state[ind] = "z"
+                    #elif seq[pos-2] == "C":
+                        #mc_state[ind] = "x"
+                    else:
+                        uch += 1
+                        #mc_state[ind] = "h"
+
+        # apply filter
+        tot_ch = float(mch+uch)
+        if tot_ch >= min_ch and float(mch)/float(tot_ch) > max_mch_ratio:
+            continue
+        
+        line_counts += 1
+        #out += line.rstrip() + "\tXM:Z:" + "".join(mc_state) + "\n"
+        out += line
+        if line_counts >= buffer_line_number:
+            out_handle.write(out)
+            out = ""
+            line_counts = 0
+        
+    if line_counts > 0:
+        out_handle.write(out)
+        out = ""
+    out_handle.close()
+    
+    # sam to bam
+    f = open(outputf,'w')
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -Sb "+outputf+".sam"),stdout=f)
+    f.close()
+    
+    # remove sam
+    subprocess.check_call(shlex.split("rm " +outputf+".sam"))
+    
+
+
 def parse_args():
      # create the top-level parser
      parser = ArgumentParser(prog='PROG')
