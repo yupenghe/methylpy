@@ -50,7 +50,8 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
                                 trim_reads=True, path_to_cutadapt="",
                                 bowtie2=True, path_to_aligner="", aligner_options=[],
                                 pbat=False,
-                                remove_clonal=True, path_to_picard="",java_options="-Xmx20g",
+                                remove_clonal=True, keep_clonal_stats=False,
+                                path_to_picard="",java_options="-Xmx20g",
                                 path_to_samtools="",
                                 adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
                                 adapter_seq_read2="AGATCGGAAGAGCGTCGTGTAGGGA",
@@ -262,9 +263,10 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
                                            java_options=java_options)
 
             subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+
-                                              str(current_library)+"_processed_reads.bam"+
-                                              " "+path_to_output+sample+"_"+
-                                              str(current_library)+".metric"))
+                                              str(current_library)+"_processed_reads.bam"))
+            if not keep_clonal_stats:
+                subprocess.check_call(shlex.split("rm "+" "+path_to_output+sample+"_"+
+                                                  str(current_library)+".metric"))
             total_clonal += lib_clonal
 
     print_checkpoint("There are " + str(total_input) + " total input reads")
@@ -462,15 +464,24 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
         
         #Conversion
         print_checkpoint("Begin converting reads for "+str(current_library))
-        pool = multiprocessing.Pool(num_procs)#read1
-        for inputf,output in zip([prefix+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
-                                 [prefix+"_read1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
-            pool.apply_async(convert_reads_pe,(inputf,output))
-        for inputf,output in zip([prefix+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
-                                 [prefix+"_read2_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
-            pool.apply_async(convert_reads_pe,(inputf,output,True))
-        pool.close()
-        pool.join()
+        if num_procs > 1:
+            pool = multiprocessing.Pool(num_procs)#read1
+            for inputf,output in zip([prefix+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+                                     [prefix+"_read1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
+                pool.apply_async(convert_reads_pe,(inputf,output))
+            for inputf,output in zip([prefix+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+                                     [prefix+"_read2_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
+                pool.apply_async(convert_reads_pe,(inputf,output,True))
+            pool.close()
+            pool.join()
+        else:
+            for inputf,output in zip([prefix+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+                                     [prefix+"_read1_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
+                convert_reads_pe(inputf,output)
+            for inputf,output in zip([prefix+"_read2_split_trimmed_"+str(i) for i in xrange(0,num_procs)],
+                                     [prefix+"_read2_split_trimmed_converted_"+str(i) for i in xrange(0,num_procs)]):
+                convert_reads_pe(inputf,output,True)
+                
         subprocess.check_call(
             shlex.split("rm "+" ".join([prefix+"_read1_split_trimmed_"+str(i) for i in xrange(0,num_procs)]))
         )
@@ -484,22 +495,33 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
         print_checkpoint("No trimming applied on reads")  
         #Conversion
         print_checkpoint("Begin converting reads for "+str(current_library))
-        pool = multiprocessing.Pool(num_procs)#read1
-        for inputf,output in zip([prefix+"_read1_split_"+str(i) for i in xrange(0,num_procs)],
-                                 [prefix+"_read1_split_converted_"+str(i) for i in xrange(0,num_procs)]):
-            pool.apply_async(convert_reads_pe,(inputf,output))
-        for inputf,output in zip([prefix+"_read2_split_"+str(i) for i in xrange(0,num_procs)],
-                                 [prefix+"_read2_split_converted_"+str(i) for i in xrange(0,num_procs)]):
-            pool.apply_async(convert_reads_pe,(inputf,output,True))
-        pool.close()
-        pool.join()
+        if num_procs > 1:
+            pool = multiprocessing.Pool(num_procs)#read1
+            for inputf,output in zip([prefix+"_read1_split_"+str(i) for i in xrange(0,num_procs)],
+                                     [prefix+"_read1_split_converted_"+str(i) for i in xrange(0,num_procs)]):
+                pool.apply_async(convert_reads_pe,(inputf,output))
+            for inputf,output in zip([prefix+"_read2_split_"+str(i) for i in xrange(0,num_procs)],
+                                     [prefix+"_read2_split_converted_"+str(i) for i in xrange(0,num_procs)]):
+                pool.apply_async(convert_reads_pe,(inputf,output,True))
+            pool.close()
+            pool.join()
+        else:
+            for inputf,output in zip([prefix+"_read1_split_"+str(i) for i in xrange(0,num_procs)],
+                                     [prefix+"_read1_split_converted_"+str(i) for i in xrange(0,num_procs)]):
+                convert_reads_pe(inputf,output)
+            for inputf,output in zip([prefix+"_read2_split_"+str(i) for i in xrange(0,num_procs)],
+                                     [prefix+"_read2_split_converted_"+str(i) for i in xrange(0,num_procs)]):
+                convert_reads_pe(inputf,output,True)
         subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_read1_split_"+str(i) for i in xrange(0,num_procs)])))
         subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_read2_split_"+str(i) for i in xrange(0,num_procs)])))
         input_fastq_read1 = [prefix+"_read1_split_converted_"+str(i) for i in xrange(0,num_procs)]
         input_fastq_read2 = [prefix+"_read2_split_converted_"+str(i) for i in xrange(0,num_procs)]
                     
     #Run bowtie
-    print_checkpoint("Begin Running Bowtie for "+current_library)
+    if bowtie2:
+        print_checkpoint("Begin Running Bowtie2 for "+current_library)
+    else:
+        print_checkpoint("Begin Running Bowtie for "+current_library)
     total_unique = run_bowtie_pe(current_library,
                                   input_fastq_read1,
                                   input_fastq_read2,
@@ -611,12 +633,21 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
     ## Clear temporary files
     if keep_temp_files==False:
         subprocess.check_call(shlex.split("rm "+" ".join(library_read1_files+library_read2_files)))
-
-    pool = multiprocessing.Pool(num_procs)
-    for file_num in xrange(0,num_procs):
-        pool.apply_async(subprocess.check_call,(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)),))
-    pool.close()
-    pool.join()
+    if num_procs > 1:
+        pool = multiprocessing.Pool(num_procs)
+        for file_num in xrange(0,num_procs):
+            pool.apply_async(subprocess.check_call,(
+                shlex.split("env LC_COLLATE=C sort" + sort_mem +
+                            " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+
+                            prefix+"_sorted_"+str(file_num)),))
+        pool.close()
+        pool.join()
+    else:
+        for file_num in xrange(0,num_procs):
+            subprocess.check_call(shlex.split("env LC_COLLATE=C sort" + sort_mem +
+                                              " -t '\t' -k 1 -o "+
+                                              prefix+"_sorted_"+str(file_num)+" "+
+                                              prefix+"_sorted_"+str(file_num)))
     print_checkpoint("Finding multimappers")
 
     total_unique = merge_sorted_multimap_pe(current_library,
@@ -939,14 +970,18 @@ def quality_trim_pe(inputf_read1, outputf_read1,inputf_read2, outputf_read2,qual
     options += " -a " + adapter_seq_read1
     options += " -A " + adapter_seq_read2
     options += " " + zero
-    pool = multiprocessing.Pool(num_procs)
-    #adapter trimming
-    for current_input_read1,current_output_read1,current_input_read2,current_output_read2 in zip(inputf_read1,outputf_read1,inputf_read2,outputf_read2):
-        options += " -o " + current_output_read1 + " " + " -p " + current_output_read2 + " "
-        pool.apply_async(subprocess.check_call,(base_cmd + options + current_input_read1 + " " + current_input_read2,),{"shell":True})
-    pool.close()
-    pool.join()
-
+    if num_procs > 1:
+        pool = multiprocessing.Pool(num_procs)
+        #adapter trimming
+        for current_input_read1,current_output_read1,current_input_read2,current_output_read2 in zip(inputf_read1,outputf_read1,inputf_read2,outputf_read2):
+            options += " -o " + current_output_read1 + " " + " -p " + current_output_read2 + " "
+            pool.apply_async(subprocess.check_call,(base_cmd + options + current_input_read1 + " " + current_input_read2,),{"shell":True})
+        pool.close()
+        pool.join()
+    else:
+        for current_input_read1,current_output_read1,current_input_read2,current_output_read2 in zip(inputf_read1,outputf_read1,inputf_read2,outputf_read2):
+            options += " -o " + current_output_read1 + " " + " -p " + current_output_read2 + " "
+        subprocess.check_call(base_cmd + options + current_input_read1 + " " + current_input_read2,shell = True)
 
 def flip_read2_strand(input_file,output_file,path_to_samtools=""):
     """

@@ -34,7 +34,8 @@ def run_methylation_pipeline(read_files, libraries, sample,
                              trim_reads=True, path_to_cutadapt="",
                              pbat=False,
                              bowtie2=False, path_to_aligner="", aligner_options=[],
-                             remove_clonal=True, path_to_picard="",java_options="-Xmx20g",
+                             remove_clonal=True,keep_clonal_stats=False,
+                             path_to_picard="",java_options="-Xmx20g",
                              path_to_samtools="",
                              adapter_seq="AGATCGGAAGAGCACACGTCTG",
                              max_adapter_removal=None,
@@ -220,9 +221,11 @@ def run_methylation_pipeline(read_files, libraries, sample,
                                            java_options=java_options)
 
             subprocess.check_call(shlex.split("rm "+path_to_output+sample+"_"+
-                                              str(current_library)+"_processed_reads.bam"+
-                                              " "+path_to_output+sample+"_"+
-                                              str(current_library)+".metric"))
+                                              str(current_library)+"_processed_reads.bam"))
+            if not keep_clonal_stats:
+                subprocess.check_call(shlex.split("rm "+" "+path_to_output+sample+"_"+
+                                                  str(current_library)+".metric"))
+
             total_clonal += lib_clonal
     print_checkpoint("There are "+str(total_input)+" total input reads")
     print_checkpoint("There are "+str(total_unique)+" uniquely mapping reads, " +
@@ -403,13 +406,19 @@ def run_mapping(current_library, library_files, sample,
                                                           for i in xrange(0,num_procs)])))
 
         print_checkpoint("Begin converting reads for "+file_name)
-        pool = multiprocessing.Pool(num_procs)
-        for inputf, output in zip([file_path+"_split_trimmed_"+str(i) for i in xrange(0, num_procs)],
-                                 [file_path+"_split_trimmed_converted_"+str(i)
-                                  for i in xrange(0, num_procs)]):
-            pool.apply_async(convert_reads,(inputf,output))
-        pool.close()
-        pool.join()
+        if num_procs > 1:
+            pool = multiprocessing.Pool(num_procs)
+            for inputf, output in zip([file_path+"_split_trimmed_"+str(i) for i in xrange(0, num_procs)],
+                                     [file_path+"_split_trimmed_converted_"+str(i)
+                                      for i in xrange(0, num_procs)]):
+                pool.apply_async(convert_reads,(inputf,output))
+            pool.close()
+            pool.join()
+        else:
+            for inputf, output in zip([file_path+"_split_trimmed_"+str(i) for i in xrange(0, num_procs)],
+                                     [file_path+"_split_trimmed_converted_"+str(i)
+                                      for i in xrange(0, num_procs)]):
+                                          convert_reads(inputf,output)
         subprocess.check_call(shlex.split("rm "+
                                           " ".join([file_path+"_split_trimmed_"+str(i)
                                                     for i in xrange(0,num_procs)])))
@@ -417,12 +426,17 @@ def run_mapping(current_library, library_files, sample,
     else:
         print_checkpoint("No trimming on reads")
         print_checkpoint("Begin converting reads for "+file_name)
-        pool = multiprocessing.Pool(num_procs)
-        for inputf, output in zip([file_path+"_split_"+str(i) for i in xrange(0, num_procs)],
-                                 [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]):
-            pool.apply_async(convert_reads, (inputf, output))
-        pool.close()
-        pool.join()
+        if num_procs > 1:
+            pool = multiprocessing.Pool(num_procs)
+            for inputf, output in zip([file_path+"_split_"+str(i) for i in xrange(0, num_procs)],
+                                     [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]):
+                pool.apply_async(convert_reads, (inputf, output))
+            pool.close()
+            pool.join()
+        else:
+            for inputf, output in zip([file_path+"_split_"+str(i) for i in xrange(0, num_procs)],
+                                     [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]):
+                convert_reads(inputf, output)
         subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_split_"+str(i)
                                                           for i in xrange(0, num_procs)])))
         input_fastq = [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]
@@ -791,11 +805,16 @@ def run_bowtie(current_library,library_read_files,
     print_checkpoint("Processing reverse strand hits")
     sam_header = find_multi_mappers(prefix+"_reverse_strand_hits.sam",prefix,num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
     ## Clear temporary files
-    pool = multiprocessing.Pool(num_procs)
-    for file_num in xrange(0,num_procs):
-        pool.apply_async(subprocess.check_call,(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)),))
-    pool.close()
-    pool.join()
+    if num_procs > 1:
+        pool = multiprocessing.Pool(num_procs)
+        for file_num in xrange(0,num_procs):
+            pool.apply_async(subprocess.check_call,(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)),))
+        pool.close()
+        pool.join()
+    else:
+        for file_num in xrange(0,num_procs):
+            subprocess.check_call(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)))
+
     print_checkpoint("Finding multimappers")
 
     total_unique = merge_sorted_multimap(current_library,
@@ -1034,14 +1053,21 @@ def quality_trim(inputf, output = None, quality_base = None, min_qual_score = No
         options += " --quality-base=" + str(quality_base)
     options += " -a " + adapter_seq
     options += " " + zero
-    pool = multiprocessing.Pool(num_procs)
-    #adapter trimming
-    for current_input,current_output in zip(inputf,output):
-        if output:
-            options += " -o " + current_output + " "
-        pool.apply_async(subprocess.check_call,(base_cmd + options + current_input,),{"shell":True})
-    pool.close()
-    pool.join()
+    if num_procs > 1:
+        pool = multiprocessing.Pool(num_procs)
+        #adapter trimming
+        for current_input,current_output in zip(inputf,output):
+            if output:
+                options += " -o " + current_output + " "
+            pool.apply_async(subprocess.check_call,(base_cmd + options + current_input,),{"shell":True})
+        pool.close()
+        pool.join()
+    else:
+        for current_input,current_output in zip(inputf,output):
+            if output:
+                options += " -o " + current_output + " "
+            subprocess.check_call(base_cmd + options + current_input, shell=True)
+        
 
 def remove_clonal_bam(input_bam,output_bam,metric,is_pe=False,path_to_picard="",java_options="-Xmx20g"):
     """
