@@ -80,6 +80,7 @@ except Exception,e:
 
 import subprocess
 import shlex
+import gzip
 
 def DMRfind(mc_type, region_dict, samples, path_to_allc,
             num_procs=1, save_result="temp", 
@@ -734,7 +735,174 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
     g.close()
     return block_count
 
-def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type=["C"],num_procs=1):
+
+def get_methylation_levels_DMRfind(input_tsv_file,
+                                   output,
+                                   input_allc_files,
+                                   samples,
+                                   mc_type=["CGN"],                                
+                                   num_procs=1,
+                                   buffer_line_number=100000):
+    """
+    This function assumes that allc files are of the format allc_<sample>_<chr>.tsv
+    input is the path to a file containing collapsed DMR results
+    output is the path to a file where the methylation values should be stored
+    samples is a list of samples you'd like to compute the methylation level for
+    path_to_allc is the path to the directory containing the allc files for these samples
+    num_procs is an integer indicating the number of processors you'd like to use for calculating
+        methylation level. This function can be parallelized up to the number of samples
+    """
+    # need to check
+    # 1. whether the tsv file is sorted by coordinate
+    # 1. check whether allc files are stored in a list
+    # 2. check whether samples are stored in a list
+    # 4. whether samples and allc files have the same length
+    
+    with open(output,'w') as g:
+        # header
+        f = open(input_tsv_file,'r')
+        line = f.readline()
+        line = line.rstrip("\n")
+        fields = line.split("\t")
+        g.write("\t".join(fields)+"\t"+
+                "\t".join(["methylation_level_"+sample for sample in samples])+"\n")
+        # 
+        methylation_levels = {}
+        if num_procs == 1:
+            for ind in range(len(samples)):
+                get_methylation_level_DMRfind_worker(
+                    input_tsv_file,
+                    input_allc_files[ind],
+                    samples[ind],
+                    output,
+                    mc_type,
+                    buffer_line_number)
+        else:
+            pool = Pool(min(num_procs,len(samples)))
+            results = {}
+            for ind in range(len(samples)):
+                pool.apply_async(
+                    get_methylation_level_DMRfind_worker,
+                    (input_tsv_file,
+                     input_allc_files[ind],
+                     samples[ind],
+                     output,
+                     mc_type,
+                     buffer_line_number)
+                )
+            pool.close()
+            pool.join()
+        temp_files = {}
+        for sample in samples:
+            temp_files[sample]=open(output.replace(".tsv","")+"_"+sample+"_temp_methylation_levels.tsv",'r')
+
+        f.seek(0)
+        line = f.readline()
+        for line in f:
+            g.write(line.rstrip("\n"))
+            for sample in samples:
+                g.write("\t"+temp_files[sample].readline().rstrip("\n"))
+            g.write("\n")
+        for sample in samples:
+            temp_files[sample].close()
+            subprocess.check_call(shlex.split("rm "+output.replace(".tsv","")+"_"+sample+"_temp_methylation_levels.tsv"))
+
+def get_methylation_level_DMRfind_worker(inputf_tsv,
+                                         inputf_allc,
+                                         sample,
+                                         output,
+                                         mc_type = ["CGN"],                                        
+                                         buffer_line_number=100000):
+    # open allc file
+    if inputf_allc[-3:] == ".gz":
+        allc_file = gzip.open(inputf_allc,'r')
+    elif inputf_allc[-4:] == ".bz2":
+        allc_file = bz2.BZ2File(inputf_allc,'r')
+    else:
+        allc_file = open(inputf_allc,'r')
+    # scan allc file to set up a table for fast look-up of lines belong
+    # to different chromosomes
+    chrom_pointer = {}
+    cur_chrom = ""
+    cur_pointer = 0
+    while True:
+        line = allc_file.readline()
+        if not line: break
+        fields = line.split("\t")
+        if fields[0] != cur_chrom:
+            chrom_pointer[fields[0]] = cur_pointer
+            cur_chrom = fields[0]
+        cur_pointer = allc_file.tell()
+
+    # init 
+    mc_type = expand_nucleotide_code(mc_type)
+    prev_chrom = ""
+    prev_end = ""
+
+    # get methylation level for each DMR
+    out = ""
+    line_counts = 0
+    with open(inputf_tsv,'r') as f,open(output.replace(".tsv","")+"_"+sample+
+                                        "_temp_methylation_levels.tsv",'w') as g:
+        f.readline() # skip header
+        for line in f:
+            line = line.rstrip("\n")
+            fields = line.split("\t")
+            dmr_chr=fields[0]
+            dmr_start = int(fields[1])
+            dmr_end = int(fields[2])
+            
+            # get to new chromosome and redirect pointer to related lines in allc file
+            if prev_chrom != fields[0]:
+                allc_file.seek(chrom_pointer[dmr_chr])
+                allc_prevbyte = chrom_pointer[dmr_chr]
+                # update allc line
+                allc_line=allc_file.readline()
+                allc_field=allc_line.split("\t")
+
+
+            #If this new dmr overlaps with the previous, begin where the previous start was found
+            elif prev_end and dmr_start < prev_end:
+                allc_file.seek(allc_prevbyte)
+                allc_line = allc_file.readline()
+                allc_field = allc_line.split("\t")
+                
+            #read up to the beginning of the dmr
+            byte = allc_prevbyte #in case the new dmr never enters the loop, keep byte the same as previously
+            while allc_line and int(allc_field[1]) < dmr_start:
+                byte = allc_file.tell()
+                allc_line=allc_file.readline()
+                allc_field=allc_line.split("\t")
+            allc_prevbyte = byte #record the byte where dmr_start was found
+            
+            mc = 0
+            h = 0
+            while allc_line and int(allc_field[1]) >= dmr_start and int(allc_field[1]) <= dmr_end:
+                if allc_field[3] in mc_type:
+                    mc += int(allc_field[4])
+                    h += int(allc_field[5])
+                allc_line=allc_file.readline()
+                allc_field=allc_line.split("\t")
+            if h != 0:
+                methylation_level = str(float(mc) / h)
+            else:
+                methylation_level = "NA"
+
+            out += str(methylation_level)+"\n"
+            line_counts += 1
+            if line_counts > buffer_line_number:
+                g.write(out)
+                line_counts = 0
+                out = ""
+                
+            prev_chrom = dmr_chr
+            prev_end = dmr_end
+
+        if line_counts > 0:
+            g.write(out)
+            line_counts = 0
+    
+def get_methylation_levels_DMRfind_legacy(inputf,output,samples,path_to_allc="",mc_type=["C"],num_procs=1):
     """
     This function assumes that allc files are of the format allc_<sample>_<chr>.tsv
     input is the path to a file containing collapsed DMR results
@@ -755,6 +923,7 @@ def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type
         fields = line.split("\t")
         prefix_len = len(fields)    #number of fields in original file
         mc_type = expand_nucleotide_code(mc_type)
+        # header
         g.write("\t".join(fields[:prefix_len])+"\t"+"\t".join(["methylation_level_"+sample for sample in samples])+"\n")
         prev_chrom = ""
         prev_end = ""
@@ -765,12 +934,12 @@ def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type
             dmr_lines.append(line)
         if num_procs == 1:
             for sample in samples:
-                methylation_levels[sample]=get_methylation_level_DMRfind_worker(dmr_lines,mc_type,sample,path_to_allc,output)
+                methylation_levels[sample]=get_methylation_level_DMRfind_worker_legacy(dmr_lines,mc_type,sample,path_to_allc,output)
         else:
             pool = Pool(num_procs)
             results = {}
             for sample in samples:
-                results[sample]=pool.apply_async(get_methylation_level_DMRfind_worker,(dmr_lines,mc_type,sample,path_to_allc,output))
+                results[sample]=pool.apply_async(get_methylation_level_DMRfind_worker_legacy,(dmr_lines,mc_type,sample,path_to_allc,output))
             pool.close()
             pool.join()
             for sample in results:
@@ -782,14 +951,13 @@ def get_methylation_levels_DMRfind(inputf,output,samples,path_to_allc="",mc_type
         for index,line in enumerate(dmr_lines):
             g.write(line)
             for sample in samples:
-                #g.write("\t"+methylation_levels[sample][index])
                 g.write("\t"+temp_files[sample].readline().rstrip("\n"))
             g.write("\n")
         for sample in samples:
             temp_files[sample].close()
             subprocess.check_call(shlex.split("rm "+output.replace(".tsv","")+"_"+sample+"_temp_methylation_levels.tsv"))
 
-def get_methylation_level_DMRfind_worker(dmr_lines,mc_type,sample,path_to_allc,output):
+def get_methylation_level_DMRfind_worker_legacy(dmr_lines,mc_type,sample,path_to_allc,output):
     mc_type = expand_nucleotide_code(mc_type)
     prev_chrom = ""
     prev_end = ""

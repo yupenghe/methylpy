@@ -1251,7 +1251,7 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
                 #                                    str(unconverted_c),str(cov),"1"])+"\n")
                 out += "\t".join([cur_chrom_nochr,str(pos+1),"-",context,
                                   str(unconverted_c),str(cov),"1"])+"\n"
-        if line_counts >= buffer_line_number:
+        if line_counts > buffer_line_number:
             output_filehandler.write(out)
             line_counts = 0
             out = ""
@@ -1415,7 +1415,7 @@ def bam_quality_mch_filter(inputf,
         line_counts += 1
         #out += line.rstrip() + "\tXM:Z:" + "".join(mc_state) + "\n"
         out += line
-        if line_counts >= buffer_line_number:
+        if line_counts > buffer_line_number:
             out_handle.write(out)
             out = ""
             line_counts = 0
