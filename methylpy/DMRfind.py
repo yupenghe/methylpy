@@ -82,11 +82,12 @@ import subprocess
 import shlex
 import gzip
 
-def DMRfind(mc_type, region_dict, samples, path_to_allc,
-            num_procs=1, save_result="temp", 
+def DMRfind(allc_files, samples,
+            mc_type, region_dict,
+            num_procs=1, save_result="temp",
             min_cov=0,keep_temp_files=False,mc_max_dist=0,
             dmr_max_dist=100,resid_cutoff=.01,sig_cutoff=.01,
-            num_sims=1000,num_sig_tests=10,seed=-1,
+            num_sims=3000,num_sig_tests=100,seed=-1,
             min_num_dms=0,collapse_samples=False,
             sample_category=False, min_cluster=0,
             max_iterations=1000,convergence_diff=1):
@@ -143,25 +144,19 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
     """
     
     #User input checks
-    path_to_allc += "/"
+    if not isinstance(allc_files, list):
+        exit("mc_type must be a list of string(s)")
     if not isinstance(mc_type, list):
         if isinstance(mc_type, basestring):
             mc_type = [mc_type]
         else:
             exit("mc_type must be a list of string(s)")
     if not isinstance(samples, list):
-        if isinstance(samples, basestring):
-            samples = [samples]
-        else:
-            exit("samples must be a list of string(s)")
+        exit("samples must be a list of string(s)")
     try:
         num_procs = int(num_procs)
     except:
         exit("In DMRfind, num_procs must be an integer")
-    if mc_max_dist <0:
-        exit("In DMRfind, mc_max_dist must be greater than or equal to 0")
-    if dmr_max_dist <0:
-        exit("In DMRfind, dmr_max_dist must be greater than 0")
 
     try:
         mc_max_dist = int(mc_max_dist)
@@ -171,6 +166,7 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
         dmr_max_dist = int(dmr_max_dist)
     except:
         exit("In DMRfind, dmr_max_dist must be an integer")
+
     try:
         min_cov = int(min_cov)
     except:
@@ -185,9 +181,16 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
             exit("sample_category must be a list of strings")
         for sample in collapse_samples:
             if sample not in samples:
-                exit("There is a sample in collapse_samples that is not in samples. collapse_samples MUST be a subset of samples.")   
+                exit("There is a sample in collapse_samples that is not in samples."+
+                     "collapse_samples MUST be a subset of samples.")   
     elif sample_category != False:
-        exit("In order to use sample_category, you must specify a corresponding list of samples in collapse_samples!")
+        exit("In order to use sample_category, you must specify a corresponding"+
+             " list of samples in collapse_samples!")
+
+    if mc_max_dist <0:
+        exit("In DMRfind, mc_max_dist must be greater than or equal to 0")
+    if dmr_max_dist <0:
+        exit("In DMRfind, dmr_max_dist must be greater than 0")
     
     #This code creates all variations of the shorthand C contexts (e.g., CHG->CHG,CAG,CCG,CTG)
     mc_type = expand_nucleotide_code(mc_type)
@@ -208,8 +211,9 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
                 region_dict[chr_key][0] = int(region_dict[chr_key][0])
                 region_dict[chr_key][1] = int(region_dict[chr_key][1])
             except:
-                exit("The elements of the tuples in region_dict must be positive integers, or objects that can be cast as integers (e.g., a string)")                
-    
+                exit("The elements of the tuples in region_dict must be positive integers, "+
+                     "or objects that can be cast as integers (e.g., a string)")
+
             results = []
             print_checkpoint("Splitting allc files for chromosome "+str(chrom))
             allc_files = []
@@ -217,7 +221,10 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
                 allc_files.extend(glob(path_to_allc+"allc_"+sample+"_"+str(chrom)+".tsv"))
             if len(allc_files) == 0:
                 exit("allc files couldn't be found at "+path_to_allc+". Are you sure your path is correct?")
-            split_files_by_position(allc_files,num_procs,mc_type,nrange=region_dict[chr_key],num_procs=num_procs,min_cov=min_cov,pool=pool,max_dist=mc_max_dist)
+            split_files_by_position(allc_files,num_procs,mc_type,
+                                    nrange=region_dict[chr_key],
+                                    num_procs=num_procs,min_cov=min_cov,
+                                    pool=pool,max_dist=mc_max_dist)
             print_checkpoint("Running rms tests for chromosome "+str(chrom))
             if num_procs > 1:
                 for chunk in xrange(0,num_procs):
@@ -227,7 +234,14 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
                     if len(filenames) == 0:
                         print "Nothing to run for chunk "+str(chunk)
                         continue
-                    pool.apply_async(run_rms_tests,(filenames,save_result+"_rms_results_for_"+str(chrom)+"_chunk_"+str(chunk)+".tsv",samples),{"min_cov":min_cov,"num_sims":num_sims,"num_sig_tests":num_sig_tests,"seed":seed,"keep_temp_files":keep_temp_files})
+                    pool.apply_async(run_rms_tests,
+                                     (filenames,
+                                      save_result+"_rms_results_for_"+str(chrom)+
+                                      "_chunk_"+str(chunk)+".tsv",samples),
+                                     {"min_cov":min_cov,
+                                      "num_sims":num_sims,
+                                      "num_sig_tests":num_sig_tests,
+                                      "seed":seed,"keep_temp_files":keep_temp_files})
             else:
                 filenames = []
                 for sample in samples:
@@ -235,7 +249,9 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
                 if len(filenames) == 0:
                     print "Nothing to run for chunk "+str(chunk)
                     continue
-                run_rms_tests(filenames,save_result+"_rms_results_for_"+str(chrom)+"_chunk_0.tsv",samples,min_cov=min_cov,num_sims=num_sims,num_sig_tests=num_sig_tests,seed=seed,keep_temp_files=keep_temp_files)
+                run_rms_tests(filenames,save_result+"_rms_results_for_"+str(chrom)+"_chunk_0.tsv",
+                              samples,min_cov=min_cov,num_sims=num_sims,num_sig_tests=num_sig_tests,
+                              seed=seed,keep_temp_files=keep_temp_files)
         if pool != False:
             pool.close()
             pool.join()
@@ -252,7 +268,13 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
         exit("Running RMS tests failed.")
         
     print_checkpoint("Merging sorted "+save_result+"_rms_results.tsv files.")
-    header = "\t".join(["chr","pos","strand","mc_class","pvalue"])+"\t"+"\t".join(["mc_"+sample for sample in samples])+"\t"+"\t".join(["h_"+sample for sample in samples])+"\t"+"\t".join(["frac_"+sample for sample in samples])+"\t"+"\t".join(["mc_residual_"+sample for sample in samples])+"\t"+"\t".join(["uc_residual_"+sample for sample in samples])+"\tnum_simulations_sig\tnum_simulations_run"+"\n"
+    header = "\t".join(["\t".join(["chr","pos","strand","mc_class","pvalue"]),
+                        "\t".join(["mc_"+sample for sample in samples]),
+                        "\t".join(["h_"+sample for sample in samples]),
+                        "\t".join(["frac_"+sample for sample in samples]),
+                        "\t".join(["mc_residual_"+sample for sample in samples]),
+                        "\t".join(["uc_residual_"+sample for sample in samples]),
+                        "num_simulations_sig\tnum_simulations_run"+"\n"])
     #I put this up here because it's actually a lot harder to prepend a header file than you might think
     g = open(save_result+"_rms_results.tsv",'w')
     g.write(header)
@@ -268,22 +290,43 @@ def DMRfind(mc_type, region_dict, samples, path_to_allc,
     g.close()
     if keep_temp_files == False:
         basecmd = ['rm'] 
-        file_paths = glob(save_result+"_rms_results_for_*_chunk_[0-9].tsv") + glob(save_result+"_rms_results_for_*_chunk_[0-9][0-9].tsv") + glob(save_result+"_rms_results_for_*_chunk_[0-9][0-9][0-9].tsv")
+        file_paths = glob(save_result+"_rms_results_for_*_chunk_[0-9].tsv") +
+        glob(save_result+"_rms_results_for_*_chunk_[0-9][0-9].tsv") +
+        glob(save_result+"_rms_results_for_*_chunk_[0-9][0-9][0-9].tsv")
         if file_paths:
             try:
                 check_call(basecmd + file_paths)
             except:
                 pass
     print_checkpoint("Begin FDR Correction")
-    pvalue_cutoff=histogram_correction_DMRfind(save_result+"_rms_results.tsv",num_sims,num_sig_tests,target_fdr =sig_cutoff,max_iterations=max_iterations,convergence_diff=convergence_diff)
+    pvalue_cutoff=histogram_correction_DMRfind(save_result+"_rms_results.tsv",
+                                               num_sims,num_sig_tests,
+                                               target_fdr =sig_cutoff,
+                                               max_iterations=max_iterations,
+                                               convergence_diff=convergence_diff)
 
     print_checkpoint("Calculating Residual Cutoff")
-    resid_cutoff = get_resid_cutoff(resid_cutoff, pvalue_cutoff, len(samples), save_result+"_rms_results.tsv")
+    resid_cutoff = get_resid_cutoff(resid_cutoff, pvalue_cutoff,
+                                    len(samples), save_result+"_rms_results.tsv")
 
     print_checkpoint("Begin Defining Windows")
-    collapse_dmr_windows(save_result+"_rms_results.tsv",save_result+"_rms_results_collapsed.tsv",column=4,sig_cutoff=pvalue_cutoff,max_dist=dmr_max_dist,resid_cutoff=resid_cutoff,min_num_dms=min_num_dms,collapse_samples=collapse_samples, sample_category=sample_category, min_cluster=min_cluster)
-    get_methylation_levels_DMRfind(save_result+"_rms_results_collapsed.tsv",save_result+"_rms_results_collapsed_with_levels.tsv",samples,path_to_allc=path_to_allc,mc_type=mc_type,num_procs=num_procs)
-    subprocess.check_call(shlex.split("mv "+save_result+"_rms_results_collapsed_with_levels.tsv "+save_result+"_rms_results_collapsed.tsv"))
+    collapse_dmr_windows(save_result+"_rms_results.tsv",
+                         save_result+"_rms_results_collapsed.tsv",
+                         column=4,sig_cutoff=pvalue_cutoff,
+                         max_dist=dmr_max_dist,
+                         resid_cutoff=resid_cutoff,
+                         min_num_dms=min_num_dms,
+                         collapse_samples=collapse_samples,
+                         sample_category=sample_category,
+                         min_cluster=min_cluster)
+    get_methylation_levels_DMRfind(save_result+"_rms_results_collapsed.tsv",
+                                   save_result+"_rms_results_collapsed_with_levels.tsv",
+                                   samples,
+                                   path_to_allc=path_to_allc,
+                                   mc_type=mc_type,
+                                   num_procs=num_procs)
+    subprocess.check_call(shlex.split("mv "+save_result+"_rms_results_collapsed_with_levels.tsv "+
+                                      save_result+"_rms_results_collapsed.tsv"))
     print_checkpoint("Done")
 
 def filter_collapsed(filen,output,min_level_diff=0,min_DMS=0,samples = [],hyper_samples=[],hypo_samples=[],strict=False):
@@ -901,127 +944,6 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
         if line_counts > 0:
             g.write(out)
             line_counts = 0
-    
-def get_methylation_levels_DMRfind_legacy(inputf,output,samples,path_to_allc="",mc_type=["C"],num_procs=1):
-    """
-    This function assumes that allc files are of the format allc_<sample>_<chr>.tsv
-    input is the path to a file containing collapsed DMR results
-    output is the path to a file where the methylation values should be stored
-    samples is a list of samples you'd like to compute the methylation level for
-    path_to_allc is the path to the directory containing the allc files for these samples
-    num_procs is an integer indicating the number of processors you'd like to use for calculating
-        methylation level. This function can be parallelized up to the number of samples
-    """
-    #dictionary of sample_name -> file handle
-    allc_files = {}
-    allc_lines = {}
-    allc_fields = {}
-    allc_prevbyte = {} #sample_name -> prevbyte (started from) in the file
-    with open(inputf,'r') as f, open(output,'w') as g:
-        line = f.readline()
-        line = line.rstrip("\n")
-        fields = line.split("\t")
-        prefix_len = len(fields)    #number of fields in original file
-        mc_type = expand_nucleotide_code(mc_type)
-        # header
-        g.write("\t".join(fields[:prefix_len])+"\t"+"\t".join(["methylation_level_"+sample for sample in samples])+"\n")
-        prev_chrom = ""
-        prev_end = ""
-        dmr_lines=[]
-        methylation_levels = {}
-        for line in f:
-            line = line.rstrip("\n")
-            dmr_lines.append(line)
-        if num_procs == 1:
-            for sample in samples:
-                methylation_levels[sample]=get_methylation_level_DMRfind_worker_legacy(dmr_lines,mc_type,sample,path_to_allc,output)
-        else:
-            pool = Pool(num_procs)
-            results = {}
-            for sample in samples:
-                results[sample]=pool.apply_async(get_methylation_level_DMRfind_worker_legacy,(dmr_lines,mc_type,sample,path_to_allc,output))
-            pool.close()
-            pool.join()
-            for sample in results:
-                methylation_levels[sample]=results[sample].get()
-        temp_files = {}
-        for sample in samples:
-            temp_files[sample]=open(output.replace(".tsv","")+"_"+sample+"_temp_methylation_levels.tsv",'r')
-
-        for index,line in enumerate(dmr_lines):
-            g.write(line)
-            for sample in samples:
-                g.write("\t"+temp_files[sample].readline().rstrip("\n"))
-            g.write("\n")
-        for sample in samples:
-            temp_files[sample].close()
-            subprocess.check_call(shlex.split("rm "+output.replace(".tsv","")+"_"+sample+"_temp_methylation_levels.tsv"))
-
-def get_methylation_level_DMRfind_worker_legacy(dmr_lines,mc_type,sample,path_to_allc,output):
-    mc_type = expand_nucleotide_code(mc_type)
-    prev_chrom = ""
-    prev_end = ""
-    methylation_level_list = []
-    with open(output.replace(".tsv","")+"_"+sample+"_temp_methylation_levels.tsv",'w') as f:
-        for line in dmr_lines:
-            line = line.rstrip("\n")
-            fields = line.split("\t")
-            dmr_chr=fields[0]
-            dmr_start = int(fields[1])
-            dmr_end = int(fields[2])
-            #line_prefix = fields[:prefix_len]
-            if prev_chrom != fields[0]:
-                try:
-                    allc_file.close()
-                except:
-                    pass
-                allc_file=open(path_to_allc+"allc_"+sample+"_"+dmr_chr+".tsv",'r')
-                allc_line=allc_file.readline()
-                allc_field=allc_line.split("\t")
-                allc_prevbyte = 0
-                #read past header if it's present
-                try:
-                    int(allc_field[1])
-                except:
-                    allc_line=allc_file.readline()
-                    allc_field=allc_line.split("\t")
-            #If this new dmr overlaps with the previous, begin where the previous start was found
-            elif prev_end and dmr_start < prev_end:
-                allc_file.seek(allc_prevbyte)
-                allc_line = allc_file.readline()
-                allc_field = allc_line.split("\t")
-                #read past header if it's present
-                try:
-                    int(allc_field[1])
-                except:
-                    allc_line=allc_file.readline()
-                    allc_field=allc_line.split("\t")
-            #read up to the beginning of the dmr
-            byte = allc_prevbyte #in case the new dmr never enters the loop, keep byte the same as previously
-            while allc_line and int(allc_field[1]) < dmr_start:
-                byte = allc_file.tell()
-                allc_line=allc_file.readline()
-                allc_field=allc_line.split("\t")
-            allc_prevbyte = byte #record the byte where dmr_start was found
-            
-            mc = 0
-            h = 0
-            while allc_line and int(allc_field[1]) >= dmr_start and int(allc_field[1]) <= dmr_end:
-                if allc_field[3] in mc_type:
-                    mc += int(allc_field[4])
-                    h += int(allc_field[5])
-                allc_line=allc_file.readline()
-                allc_field=allc_line.split("\t")
-            if h != 0:
-                methylation_level = str(float(mc) / h)
-            else:
-                methylation_level = "NA"
-            #methylation_level_list.append(methylation_level)
-            f.write(str(methylation_level)+"\n")
-                
-            prev_chrom = dmr_chr
-            prev_end = dmr_end
-    return methylation_level_list
 
 def parse_args():
      # create the top-level parser

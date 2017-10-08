@@ -385,7 +385,9 @@ def split_mpileup_file(num_chunks,inputf,output_prefix):
     g.close()
     f.close()
   
-def parallel_count_lines(filename, nrange, min_cov, mc_class):
+def parallel_count_lines(filename,
+                         sample_chrom_pointer, chrom,
+                         min_cov, mc_class):
     """
     Parallel helper to count lines in files. Used in split_files_by_position.
     """
@@ -399,7 +401,7 @@ def parallel_count_lines(filename, nrange, min_cov, mc_class):
         except:
             f = open(filename,'r')
     finally:
-        f.seek(0)
+        f.seek(sample_chrom_pointer[chrom])
     num_lines = 0
 
     for line in f:
@@ -410,15 +412,16 @@ def parallel_count_lines(filename, nrange, min_cov, mc_class):
         except:
             print("WARNING: One of the lines in "+filename+" is not formatted correctly:\n"+line+"Skipping it.")
             continue
-        if int(fields[5]) >= min_cov and int(fields[1]) >= nrange[0] and fields[3] in mc_class:
-            if int(fields[1]) <= nrange[1]:
-                num_lines += 1
-            else:
-                break
+        if fields[0] != chrom: break
+        if fields[3] in mc_class and int(fields[5]) >= min_cov:
+            num_lines += 1
     
     return (num_lines, filename)
     
-def split_files_by_position(files,chunks,mc_class,nrange=[0,5000000000],num_procs=1, min_cov = 0,pool=False,max_dist=0,
+def split_files_by_position(files,samples,
+                            chunks,mc_class,
+                            chrom_pointer,chrom,
+                            num_procs=1, min_cov = 0,pool=False,max_dist=0,
                             weight_by_dist=False):
     """
     This function will split a group of files into chunks number of subfiles with the guarantee
@@ -451,62 +454,42 @@ def split_files_by_position(files,chunks,mc_class,nrange=[0,5000000000],num_proc
         line_results = []
         #If a pool has not been passed to this function 
         if pool == False:
-            pool = multiprocessing.Pool(num_procs)
-            for filename in files:
-                line_results.append(pool.apply_async(parallel_count_lines,(filename,nrange,min_cov,mc_class)))
-            pool.close()
-            pool.join()
+            pool_new = multiprocessing.Pool(num_procs)
+            for ind in range(len(files)):
+                line_results.append(pool_new.apply_async(parallel_count_lines,
+                                                     (files[ind],chrom_pointer[samples[ind]],
+                                                      chrom,min_cov,mc_class)))
+            pool_new.close()
+            pool_new.join()
         #If a pool has been passed to this function make sure it doesn't get closed by this funciton
         else:
-            for filename in files:
-                line_results.append(pool.apply_async(parallel_count_lines,(filename,nrange,min_cov,mc_class)))
+            for ind in range(len(files)):
+                line_results.append(pool.apply_async(parallel_count_lines,
+                                                     (files[ind],chrom_pointer[samples[ind]],
+                                                      chrom,min_cov,mc_class)))
         lines = [r.get() for r in line_results] #get() call blocks until all are finished so no need for wait()
-        min_entry = min(lines, key=lambda x: x[0])
-        min_lines = min(min_entry[0], min_lines)
-        min_file = min_entry[1]
     else:
-        for filename in files:
-            try:
-                f = gzip.open(filename,'r')
-                f.readline()
-            except:
-                try:
-                    f = bz2.BZ2File(filename,'r')
-                    f.readline()
-                except:
-                    f = open(filename,'r')
-            finally:
-                f.seek(0)
-            num_lines = 0
-    
-            for line in f:
-                fields = line.split("\t")
-                try:
-                    int(fields[1])
-                    int(fields[5])
-                except:
-                    print("WARNING: One of the lines in "+filename+" is not formatted correctly:\n"+line+"Skipping it.")
-                    continue
-                if int(fields[5]) >= min_cov and int(fields[1]) >= nrange[0] and fields[3] in mc_class:
-                    if int(fields[1]) <= nrange[1]:
-                        num_lines += 1
-                    else:
-                        break
-            if min_lines > num_lines:
-                min_lines = num_lines
-                min_file = filename
-            f.close()
+        lines = []
+        for ind in range(len(files)):
+            lines.append(parallel_count_lines(files[ind],chrom_pointer[samples[ind]],
+                                              chrom,min_cov,mc_class))
+    min_entry = min(lines, key=lambda x: x[0])
+    min_lines = min(min_entry[0], min_lines)
+    min_file = min_entry[1]
+    min_sample = 0
+    for ind in range(len(lines)):
+        if files[ind] == min_file:
+            min_sample = samples[ind]
+            break
     chunk_size = math.ceil(float(min_lines) / chunks)
     if chunk_size == 0:
-        sys.exit("No lines match your range and/or mc_class criteria")
+        sys.exit("No lines match your range and/or mc_class criteria")    
     chunk_num = 0
     count = 0
-    fields_deque = collections.deque()
-    added_values_deque = collections.deque()
     #This list stores the position cutoffs for each chunk
     cutoffs = {}
-    g = open(min_file+"_"+str(chunk_num),'w')
     with open(min_file,'r') as f:
+        f.seek(chrom_pointer[min_sample][chrom])
         for line in f:
             line = line.rstrip("\n")
             fields = line.split("\t")
@@ -516,50 +499,14 @@ def split_files_by_position(files,chunks,mc_class,nrange=[0,5000000000],num_proc
             except:
                 print("WARNING: One of the lines in "+min_file+" is not formatted correctly:\n"+line+"\nSkipping it.")
                 continue
-            if int(fields[1]) > nrange[1]:
+            if fields[0] != chrom:
                 break
-            elif int(fields[1]) >= nrange[0] and int(fields[1])<=nrange[1] and int(fields[5]) >= min_cov and fields[3] in mc_class:
-                fields_deque.append(fields)
-                mc = int(fields[4])
-                h=int(fields[5])
-                added_values_deque.append([mc,h])
-                while len(fields_deque)> 0 and (int(fields_deque[-1][1]) - int(fields_deque[0][1])) >= max_dist:
-                    #g.write(line)
-                    fields = fields_deque.popleft()
-                    added_values = added_values_deque.popleft()
-                    if added_values[0] != int(fields[4]):
-                        g.write("\t".join(fields[0:4])+"\t"+str(added_values[0])+"\t"+str(added_values[1])+"\t1\n")
-                    else:
-                        g.write("\t".join(fields[0:4])+"\t"+str(added_values[0])+"\t"+str(added_values[1])+"\t"+fields[6]+"\n")
-                    count += 1
-                    if count > chunk_size:
-                        g.close()
-                        cutoffs[chunk_num]=fields[1] 
-                        chunk_num += 1
-                        g = open(min_file+"_"+str(chunk_num),'w') #files[0]
-                        count = 0
-                if len(fields_deque) > 1:
-                    for index in xrange(0,len(added_values_deque)-1):
-                        if weight_by_dist:
-                            weighting_factor = float(max_dist - abs(int(fields_deque[index][1])-int(fields_deque[-1][1])))/max_dist
-                        else:
-                            weighting_factor = 1.0
-                        if(fields_deque[-1][6]=="1"):
-                            added_values_deque[index][0]+= int(round(mc * weighting_factor))
-                        added_values_deque[index][1]+=int(round(h * weighting_factor))
-                        if(fields_deque[index][6]=="1"):
-                            added_values_deque[-1][0]+=int(round(int(fields_deque[index][4])* weighting_factor))
-                        added_values_deque[-1][1]+=int(round(int(fields_deque[index][5])* weighting_factor))
-    
-        if len(added_values_deque) > 0:
-            fields = fields_deque.popleft()
-            added_values = added_values_deque.popleft()
-            if added_values[0] != int(fields[4]):
-                g.write("\t".join(fields[0:4])+"\t"+str(added_values[0])+"\t"+str(added_values[1])+"\t1\n")
-            else:
-                g.write("\t".join(fields[0:4])+"\t"+str(added_values[0])+"\t"+str(added_values[1])+"\t"+fields[6]+"\n")
-        g.close()
-    
+            elif int(fields[5]) >= min_cov and fields[3] in mc_class:
+                count += 1
+                if count > chunk_size:
+                    cutoffs[chunk_num]=int(fields[1])
+                    chunk_num += 1
+                    count = 0
     #Want to make sure that for the last chunk all remaining lines get output
     #There's an edge case where the initial sample has positions which aren't as far
     #along the chromosome as other samples
@@ -568,25 +515,39 @@ def split_files_by_position(files,chunks,mc_class,nrange=[0,5000000000],num_proc
     if num_procs > 1:
         #If a pool has not been passed to this function 
         if pool == False:
-            pool = multiprocessing.Pool(num_procs)
-            for filen in [filename for filename in files if filename != min_file]:
-                pool.apply_async(parallel_split_files_by_position,(filen,cutoffs,nrange,mc_class),
+            pool_new = multiprocessing.Pool(num_procs)
+            for ind in range(len(samples)):
+                pool_new.apply_async(parallel_split_files_by_position,(files[ind],cutoffs,
+                                                                   chrom_pointer[samples[ind]][chrom],
+                                                                   chrom,
+                                                                   mc_class),
                                  {"min_cov":min_cov, "max_dist":max_dist, "weight_by_dist":weight_by_dist})
-            pool.close()
-            pool.join()
+            pool_new.close()
+            pool_new.join()
         #If a pool has been passed to this function make sure it doesn't get closed by this funciton
         else:
             results = []
-            for filen in [filename for filename in files if filename != min_file]:
-                results.append(pool.apply_async(parallel_split_files_by_position,(filen,cutoffs,nrange,mc_class),
+            for ind in range(len(samples)):
+                results.append(pool.apply_async(parallel_split_files_by_position,(files[ind],cutoffs,
+                                                                                  chrom_pointer[samples[ind]][chrom],
+                                                                                  chrom,
+                                                                                  mc_class),
                                                 {"min_cov":min_cov, "max_dist":max_dist, "weight_by_dist":weight_by_dist}))
             for result in results:
                 result.wait()
     else:
-        for filen in [filename for filename in files if filename != min_file]:
-            parallel_split_files_by_position(filen,cutoffs,nrange,mc_class,min_cov=min_cov,max_dist=max_dist,weight_by_dist=weight_by_dist)
+        for ind in range(len(samples)):
+            parallel_split_files_by_position(files[ind],cutoffs,mc_class,
+                                             chrom_pointer[samples[ind]][chrom],
+                                             chrom,
+                                             min_cov=min_cov,max_dist=max_dist,
+                                             weight_by_dist=weight_by_dist)
 
-def parallel_split_files_by_position(filen,cutoffs,nrange,mc_class,min_cov=0,max_dist=0,weight_by_dist=False):
+def parallel_split_files_by_position(filen,cutoffs,
+                                     sample_chrom_pointer,chrom,
+                                     mc_class,
+                                     min_cov=0,max_dist=0,
+                                     weight_by_dist=False):
     chunk_num = 0
     try:
         f = gzip.open(filen,'r')
@@ -598,7 +559,7 @@ def parallel_split_files_by_position(filen,cutoffs,nrange,mc_class,min_cov=0,max
         except:
             f = open(filen,'r')
     finally:
-        f.seek(0)
+        f.seek(sample_chrom_pointer)
     #Just in case there's a header line in the file
     #I assume that if the position field can't be cast as an int
     #it must be a header
@@ -621,19 +582,17 @@ def parallel_split_files_by_position(filen,cutoffs,nrange,mc_class,min_cov=0,max
         except:
             print("WARNING: One of the lines in "+files[0]+" is not formatted correctly:\n"+line+"\nSkipping it.")
             continue
-        if int(fields[1]) > nrange[1]:
-            break
-        if int(fields[1]) >= int(cutoffs[chunk_num]):
+        if fields[0] != chrom: break
+        if int(fields[1]) >= cutoffs[chunk_num]:
             g.close()
             chunk_num += 1
             g = open(filen+"_"+str(chunk_num),'w')
-        if int(fields[1]) >= nrange[0] and int(fields[1])<=nrange[1] and int(fields[5]) >= min_cov and fields[3] in mc_class:
+        if fields[3] in mc_class and int(fields[5]) >= min_cov:
             fields_deque.append(fields)
             mc = int(fields[4])
             h=int(fields[5])
             added_values_deque.append([mc,h])
             while len(fields_deque)> 0 and (int(fields_deque[-1][1]) - int(fields_deque[0][1])) >= max_dist:
-                #g.write(line)
                 fields = fields_deque.popleft()
                 added_values = added_values_deque.popleft()
                 if added_values[0] != int(fields[4]):
@@ -643,14 +602,13 @@ def parallel_split_files_by_position(filen,cutoffs,nrange,mc_class,min_cov=0,max
             if len(fields_deque) > 1:
                 for index in xrange(0,len(added_values_deque)-1):
                     if weight_by_dist:
-                        weighting_factor = float(max_dist - abs(int(fields_deque[index][1])-int(fields_deque[-1][1])))/max_dist
+                        weighting_factor = float(max_dist - abs(int(fields_deque[index][1])-
+                                                                int(fields_deque[-1][1])))/max_dist
                     else:
                         weighting_factor = 1.0
-                    if(fields_deque[-1][6]=="1"):
-                        added_values_deque[index][0]+= int(round(mc * weighting_factor))
+                    added_values_deque[index][0]+= int(round(mc * weighting_factor))
                     added_values_deque[index][1]+=int(round(h * weighting_factor))
-                    if(fields_deque[index][6]=="1"):
-                        added_values_deque[-1][0]+=int(round(int(fields_deque[index][4])* weighting_factor))
+                    added_values_deque[-1][0]+=int(round(int(fields_deque[index][4])* weighting_factor))
                     added_values_deque[-1][1]+=int(round(int(fields_deque[index][5])* weighting_factor))
 
     if len(added_values_deque) > 0:
