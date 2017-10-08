@@ -83,14 +83,15 @@ import shlex
 import gzip
 
 def DMRfind(allc_files, samples,
-            mc_type, region_dict,
+            mc_type, chroms,
             num_procs=1, save_result="temp",
             min_cov=0,keep_temp_files=False,mc_max_dist=0,
             dmr_max_dist=100,resid_cutoff=.01,sig_cutoff=.01,
             num_sims=3000,num_sig_tests=100,seed=-1,
             min_num_dms=0,collapse_samples=False,
             sample_category=False, min_cluster=0,
-            max_iterations=1000,convergence_diff=1):
+            max_iterations=1000,convergence_diff=1,
+            buffer_line_number=100000):
     """
     This function will take a set of allc files, and look for differentially methylated regions. Note that in the output file, 
     -1 is used to represent missing data.
@@ -171,8 +172,8 @@ def DMRfind(allc_files, samples,
         min_cov = int(min_cov)
     except:
         exit("In DMRfind, min_cov must be an integer")
-    if isinstance(region_dict,dict) == False:
-        exit("In DMRfind, region_dict must be a dictionary")
+    if isinstance(chroms,list) == False:
+        exit("chroms must be a list of string(s)")
     
     if collapse_samples != False:
         if not isinstance(collapse_samples, list):
@@ -194,43 +195,46 @@ def DMRfind(allc_files, samples,
     
     #This code creates all variations of the shorthand C contexts (e.g., CHG->CHG,CAG,CCG,CTG)
     mc_type = expand_nucleotide_code(mc_type)
-    files = {} 
+    # scan allc file to set up a table for fast look-up of lines belong
+    # to different chromosomes
+    chrom_pointer = {}
+    for ind in range(len(samples)):
+        cp_dict = {}
+        with open(allc_files[ind],'r') as f:
+            cur_chrom = ""
+            cur_pointer = 0
+            while True:
+                line = f.readline()
+                if not line: break
+                fields = line.split("\t")
+                if fields[0] != cur_chrom:
+                    cp_dict[fields[0]] = cur_pointer
+                    cur_chrom = fields[0]
+                cur_pointer = f.tell()
+        chrom_pointer[samples[ind]] = cp_dict
+
     if num_procs > 1:
         pool = Pool(num_procs)
     else:
         pool = False
 
     try:
-        for chr_key in region_dict:
-            chrom = chr_key.replace("chr","")
-            if len(region_dict[chr_key]) != 2:
-                #This is equivalent to saying do the entire chromosome
-                #Will need to be updated if we work with an organism with a 5 Gb chromosome :)
-                region_dict[chr_key] = [0,5000000000]
-            try:
-                region_dict[chr_key][0] = int(region_dict[chr_key][0])
-                region_dict[chr_key][1] = int(region_dict[chr_key][1])
-            except:
-                exit("The elements of the tuples in region_dict must be positive integers, "+
-                     "or objects that can be cast as integers (e.g., a string)")
-
+        for chr_key in chroms:
+            chrom = str(chr_key).replace("chr","")
             results = []
             print_checkpoint("Splitting allc files for chromosome "+str(chrom))
-            allc_files = []
-            for sample in samples:
-                allc_files.extend(glob(path_to_allc+"allc_"+sample+"_"+str(chrom)+".tsv"))
-            if len(allc_files) == 0:
-                exit("allc files couldn't be found at "+path_to_allc+". Are you sure your path is correct?")
-            split_files_by_position(allc_files,num_procs,mc_type,
-                                    nrange=region_dict[chr_key],
+            split_files_by_position(allc_files,samples,
+                                    num_procs,mc_type,
+                                    chrom_pointer = chrom_pointer,
+                                    chrom=chrom,
                                     num_procs=num_procs,min_cov=min_cov,
                                     pool=pool,max_dist=mc_max_dist)
             print_checkpoint("Running rms tests for chromosome "+str(chrom))
             if num_procs > 1:
                 for chunk in xrange(0,num_procs):
                     filenames = []
-                    for sample in samples:
-                        filenames.extend(glob(path_to_allc+"allc_"+sample+"_"+str(chrom)+".tsv_"+str(chunk)))
+                    for ind in range(len(samples)):
+                        filenames.extend(glob(allc_files[ind]+"_"+chrom+"_"+str(chunk)))
                     if len(filenames) == 0:
                         print "Nothing to run for chunk "+str(chunk)
                         continue
@@ -244,8 +248,8 @@ def DMRfind(allc_files, samples,
                                       "seed":seed,"keep_temp_files":keep_temp_files})
             else:
                 filenames = []
-                for sample in samples:
-                    filenames.extend(glob(path_to_allc+"allc_"+sample+"_"+str(chrom)+".tsv_0"))
+                for ind in range(len(samples)):
+                    filenames.extend(glob(allc_files[ind]+"_"+chrom+"_0"))
                 if len(filenames) == 0:
                     print "Nothing to run for chunk "+str(chunk)
                     continue
@@ -278,8 +282,8 @@ def DMRfind(allc_files, samples,
     #I put this up here because it's actually a lot harder to prepend a header file than you might think
     g = open(save_result+"_rms_results.tsv",'w')
     g.write(header)
-    for chrom in sorted(region_dict.keys()):
-        chrom = chrom.replace("chr","")
+    for chr_key in sorted(chroms):
+        chrom = str(chr_key).replace("chr","")
         for chunk in xrange(0,num_procs):
             try:
                 with open(save_result+"_rms_results_for_"+chrom+"_chunk_"+str(chunk)+".tsv",'r') as f:
@@ -290,9 +294,10 @@ def DMRfind(allc_files, samples,
     g.close()
     if keep_temp_files == False:
         basecmd = ['rm'] 
-        file_paths = glob(save_result+"_rms_results_for_*_chunk_[0-9].tsv") +
-        glob(save_result+"_rms_results_for_*_chunk_[0-9][0-9].tsv") +
-        glob(save_result+"_rms_results_for_*_chunk_[0-9][0-9][0-9].tsv")
+        file_paths = glob(
+            save_result+"_rms_results_for_*_chunk_[0-9].tsv") + glob(
+                save_result+"_rms_results_for_*_chunk_[0-9][0-9].tsv") + glob(
+                    save_result+"_rms_results_for_*_chunk_[0-9][0-9][0-9].tsv")
         if file_paths:
             try:
                 check_call(basecmd + file_paths)
@@ -321,10 +326,11 @@ def DMRfind(allc_files, samples,
                          min_cluster=min_cluster)
     get_methylation_levels_DMRfind(save_result+"_rms_results_collapsed.tsv",
                                    save_result+"_rms_results_collapsed_with_levels.tsv",
+                                   allc_files,
                                    samples,
-                                   path_to_allc=path_to_allc,
                                    mc_type=mc_type,
-                                   num_procs=num_procs)
+                                   num_procs=num_procs,
+                                   buffer_line_number=buffer_line_number)
     subprocess.check_call(shlex.split("mv "+save_result+"_rms_results_collapsed_with_levels.tsv "+
                                       save_result+"_rms_results_collapsed.tsv"))
     print_checkpoint("Done")

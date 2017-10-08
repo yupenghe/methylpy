@@ -537,9 +537,10 @@ def split_files_by_position(files,samples,
                 result.wait()
     else:
         for ind in range(len(samples)):
-            parallel_split_files_by_position(files[ind],cutoffs,mc_class,
+            parallel_split_files_by_position(files[ind],cutoffs,
                                              chrom_pointer[samples[ind]][chrom],
                                              chrom,
+                                             mc_class,
                                              min_cov=min_cov,max_dist=max_dist,
                                              weight_by_dist=weight_by_dist)
 
@@ -572,7 +573,7 @@ def parallel_split_files_by_position(filen,cutoffs,
         pass
     fields_deque = collections.deque()
     added_values_deque = collections.deque()
-    g = open(filen+"_"+str(chunk_num),'w')
+    g = open(filen+"_"+chrom+"_"+str(chunk_num),'w')
     for line in f:
         line = line.rstrip("\n")
         fields = line.split("\t")
@@ -586,7 +587,7 @@ def parallel_split_files_by_position(filen,cutoffs,
         if int(fields[1]) >= cutoffs[chunk_num]:
             g.close()
             chunk_num += 1
-            g = open(filen+"_"+str(chunk_num),'w')
+            g = open(filen+"_"+chrom+"_"+str(chunk_num),'w')
         if fields[3] in mc_class and int(fields[5]) >= min_cov:
             fields_deque.append(fields)
             mc = int(fields[4])
