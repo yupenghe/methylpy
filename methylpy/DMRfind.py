@@ -77,9 +77,10 @@ import gzip
 
 def DMRfind(allc_files, samples,
             mc_type, chroms,
-            num_procs=1, save_result="temp",
+            output_prefix,
+            num_procs=1, 
             min_cov=0,keep_temp_files=False,mc_max_dist=0,
-            dmr_max_dist=100,resid_cutoff=.01,sig_cutoff=.01,
+            dmr_max_dist=250,resid_cutoff=.01,sig_cutoff=.01,
             num_sims=3000,num_sig_tests=100,seed=-1,
             min_num_dms=0,collapse_samples=False,
             sample_category=False, min_cluster=0,
@@ -188,7 +189,7 @@ def DMRfind(allc_files, samples,
         exit("In DMRfind, dmr_max_dist must be greater than 0")
     
     #This code creates all variations of the shorthand C contexts (e.g., CHG->CHG,CAG,CCG,CTG)
-    mc_type = expand_nucleotide_code(mc_type)
+    mc_class = expand_nucleotide_code(mc_type)
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
     chrom_pointer = {}
@@ -218,7 +219,7 @@ def DMRfind(allc_files, samples,
             results = []
             print_checkpoint("Splitting allc files for chromosome "+str(chrom))
             split_files_by_position(allc_files,samples,
-                                    num_procs,mc_type,
+                                    num_procs,mc_class,
                                     chrom_pointer = chrom_pointer,
                                     chrom=chrom,
                                     num_procs=num_procs,min_cov=min_cov,
@@ -234,7 +235,7 @@ def DMRfind(allc_files, samples,
                         continue
                     pool.apply_async(run_rms_tests,
                                      (filenames,
-                                      save_result+"_rms_results_for_"+str(chrom)+
+                                      output_prefix+"_rms_results_for_"+str(chrom)+
                                       "_chunk_"+str(chunk)+".tsv",samples),
                                      {"min_cov":min_cov,
                                       "num_sims":num_sims,
@@ -247,7 +248,7 @@ def DMRfind(allc_files, samples,
                 if len(filenames) == 0:
                     print "Nothing to run for chunk "+str(chunk)
                     continue
-                run_rms_tests(filenames,save_result+"_rms_results_for_"+str(chrom)+"_chunk_0.tsv",
+                run_rms_tests(filenames,output_prefix+"_rms_results_for_"+str(chrom)+"_chunk_0.tsv",
                               samples,min_cov=min_cov,num_sims=num_sims,num_sig_tests=num_sig_tests,
                               seed=seed,keep_temp_files=keep_temp_files)
         if pool != False:
@@ -265,7 +266,7 @@ def DMRfind(allc_files, samples,
             pass
         exit("Running RMS tests failed.")
         
-    print_checkpoint("Merging sorted "+save_result+"_rms_results.tsv files.")
+    print_checkpoint("Merging sorted "+output_prefix+"_rms_results.tsv files.")
     header = "\t".join(["\t".join(["chr","pos","strand","mc_class","pvalue"]),
                         "\t".join(["mc_"+sample for sample in samples]),
                         "\t".join(["h_"+sample for sample in samples]),
@@ -274,13 +275,13 @@ def DMRfind(allc_files, samples,
                         "\t".join(["uc_residual_"+sample for sample in samples]),
                         "num_simulations_sig\tnum_simulations_run"+"\n"])
     #I put this up here because it's actually a lot harder to prepend a header file than you might think
-    g = open(save_result+"_rms_results.tsv",'w')
+    g = open(output_prefix+"_rms_results.tsv",'w')
     g.write(header)
     for chr_key in sorted(chroms):
         chrom = str(chr_key).replace("chr","")
         for chunk in xrange(0,num_procs):
             try:
-                with open(save_result+"_rms_results_for_"+chrom+"_chunk_"+str(chunk)+".tsv",'r') as f:
+                with open(output_prefix+"_rms_results_for_"+chrom+"_chunk_"+str(chunk)+".tsv",'r') as f:
                     for line in f:
                         g.write(line)
             except:
@@ -289,16 +290,16 @@ def DMRfind(allc_files, samples,
     if keep_temp_files == False:
         basecmd = ['rm'] 
         file_paths = glob(
-            save_result+"_rms_results_for_*_chunk_[0-9].tsv") + glob(
-                save_result+"_rms_results_for_*_chunk_[0-9][0-9].tsv") + glob(
-                    save_result+"_rms_results_for_*_chunk_[0-9][0-9][0-9].tsv")
+            output_prefix+"_rms_results_for_*_chunk_[0-9].tsv") + glob(
+                output_prefix+"_rms_results_for_*_chunk_[0-9][0-9].tsv") + glob(
+                    output_prefix+"_rms_results_for_*_chunk_[0-9][0-9][0-9].tsv")
         if file_paths:
             try:
                 check_call(basecmd + file_paths)
             except:
                 pass
     print_checkpoint("Begin FDR Correction")
-    pvalue_cutoff=histogram_correction_DMRfind(save_result+"_rms_results.tsv",
+    pvalue_cutoff=histogram_correction_DMRfind(output_prefix+"_rms_results.tsv",
                                                num_sims,num_sig_tests,
                                                target_fdr =sig_cutoff,
                                                max_iterations=max_iterations,
@@ -306,11 +307,11 @@ def DMRfind(allc_files, samples,
 
     print_checkpoint("Calculating Residual Cutoff")
     resid_cutoff = get_resid_cutoff(resid_cutoff, pvalue_cutoff,
-                                    len(samples), save_result+"_rms_results.tsv")
+                                    len(samples), output_prefix+"_rms_results.tsv")
 
     print_checkpoint("Begin Defining Windows")
-    collapse_dmr_windows(save_result+"_rms_results.tsv",
-                         save_result+"_rms_results_collapsed.tsv",
+    collapse_dmr_windows(output_prefix+"_rms_results.tsv",
+                         output_prefix+"_rms_results_collapsed.tsv",
                          column=4,sig_cutoff=pvalue_cutoff,
                          max_dist=dmr_max_dist,
                          resid_cutoff=resid_cutoff,
@@ -318,15 +319,15 @@ def DMRfind(allc_files, samples,
                          collapse_samples=collapse_samples,
                          sample_category=sample_category,
                          min_cluster=min_cluster)
-    get_methylation_levels_DMRfind(save_result+"_rms_results_collapsed.tsv",
-                                   save_result+"_rms_results_collapsed_with_levels.tsv",
+    get_methylation_levels_DMRfind(output_prefix+"_rms_results_collapsed.tsv",
+                                   output_prefix+"_rms_results_collapsed_with_levels.tsv",
                                    allc_files,
                                    samples,
                                    mc_type=mc_type,
                                    num_procs=num_procs,
                                    buffer_line_number=buffer_line_number)
-    subprocess.check_call(shlex.split("mv "+save_result+"_rms_results_collapsed_with_levels.tsv "+
-                                      save_result+"_rms_results_collapsed.tsv"))
+    subprocess.check_call(shlex.split("mv "+output_prefix+"_rms_results_collapsed_with_levels.tsv "+
+                                      output_prefix+"_rms_results_collapsed.tsv"))
     print_checkpoint("Done")
 
 def filter_collapsed(filen,output,min_level_diff=0,min_DMS=0,samples = [],hyper_samples=[],hypo_samples=[],strict=False):
@@ -812,7 +813,7 @@ def get_methylation_levels_DMRfind(input_tsv_file,
         # 
         methylation_levels = {}
         if num_procs == 1:
-            for allc_file,sample in zip(allc_files,samples):
+            for allc_file,sample in zip(input_allc_files,samples):
                 get_methylation_level_DMRfind_worker(
                     input_tsv_file,
                     allc_file,
@@ -823,12 +824,13 @@ def get_methylation_levels_DMRfind(input_tsv_file,
         else:
             pool = Pool(min(num_procs,len(samples)))
             results = {}
-            for allc_file,sample in zip(input_allc_files,samples):
+            #for allc_file,sample in zip(input_allc_files,samples):
+            for ind in xrange(len(samples)):
                 pool.apply_async(
                     get_methylation_level_DMRfind_worker,
                     (input_tsv_file,
-                     allc_file,
-                     sample,
+                     input_allc_files[ind],
+                     samples[ind],
                      output,
                      mc_type,
                      buffer_line_number)
@@ -877,8 +879,8 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
             cur_chrom = fields[0]
         cur_pointer = allc_file.tell()
 
-    # init 
-    mc_type = expand_nucleotide_code(mc_type)
+    # init
+    mc_class = expand_nucleotide_code(mc_type)
     prev_chrom = ""
     prev_end = ""
 
@@ -921,7 +923,7 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
             mc = 0
             h = 0
             while allc_line and int(allc_field[1]) >= dmr_start and int(allc_field[1]) <= dmr_end:
-                if allc_field[3] in mc_type:
+                if allc_field[3] in mc_class:
                     mc += int(allc_field[4])
                     h += int(allc_field[5])
                 allc_line=allc_file.readline()
