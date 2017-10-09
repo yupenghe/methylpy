@@ -26,13 +26,6 @@ except Exception,e:
     exit("methylpy.DMRfind requires check_call and check_output from the subprocess module")
 
 try:
-    from argparse import ArgumentParser
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires ArgumentParser from the argparse module")
-try:
     from shlex import split
 except Exception,e:
     exc_type, exc_obj, exc_tb = exc_info()
@@ -174,7 +167,8 @@ def DMRfind(allc_files, samples,
         exit("In DMRfind, min_cov must be an integer")
     if isinstance(chroms,list) == False:
         exit("chroms must be a list of string(s)")
-    
+    chroms = map(str,chroms)
+        
     if collapse_samples != False:
         if not isinstance(collapse_samples, list):
             exit("collapse_samples must be a list of strings")
@@ -198,9 +192,9 @@ def DMRfind(allc_files, samples,
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
     chrom_pointer = {}
-    for ind in range(len(samples)):
+    for allc_file,sample in zip(allc_files,samples):
         cp_dict = {}
-        with open(allc_files[ind],'r') as f:
+        with open(allc_file,'r') as f:
             cur_chrom = ""
             cur_pointer = 0
             while True:
@@ -211,7 +205,7 @@ def DMRfind(allc_files, samples,
                     cp_dict[fields[0]] = cur_pointer
                     cur_chrom = fields[0]
                 cur_pointer = f.tell()
-        chrom_pointer[samples[ind]] = cp_dict
+        chrom_pointer[sample] = cp_dict
 
     if num_procs > 1:
         pool = Pool(num_procs)
@@ -233,8 +227,8 @@ def DMRfind(allc_files, samples,
             if num_procs > 1:
                 for chunk in xrange(0,num_procs):
                     filenames = []
-                    for ind in range(len(samples)):
-                        filenames.extend(glob(allc_files[ind]+"_"+chrom+"_"+str(chunk)))
+                    for allc_file in allc_files:
+                        filenames.extend(glob(allc_file+"_"+chrom+"_"+str(chunk)))
                     if len(filenames) == 0:
                         print "Nothing to run for chunk "+str(chunk)
                         continue
@@ -248,8 +242,8 @@ def DMRfind(allc_files, samples,
                                       "seed":seed,"keep_temp_files":keep_temp_files})
             else:
                 filenames = []
-                for ind in range(len(samples)):
-                    filenames.extend(glob(allc_files[ind]+"_"+chrom+"_0"))
+                for allc_file in allc_files:
+                    filenames.extend(glob(allc_file+"_"+chrom+"_0"))
                 if len(filenames) == 0:
                     print "Nothing to run for chunk "+str(chunk)
                     continue
@@ -450,7 +444,7 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
         if pvalue not in sorted_pvalues:
             sorted_pvalues.append((numerator,num_sims))
         last_pvalue = pvalue
-    for denominator in range(num_sig_tests,num_sims)[::-1]:
+    for denominator in reversed(xrange(num_sig_tests,num_sims)):
         pvalue = round(float(num_sig_tests) / denominator,precision)
         expected_value=(pvalue-last_pvalue)*total_tests
         table[(num_sig_tests,denominator)]=[expected_value,0]
@@ -818,23 +812,23 @@ def get_methylation_levels_DMRfind(input_tsv_file,
         # 
         methylation_levels = {}
         if num_procs == 1:
-            for ind in range(len(samples)):
+            for allc_file,sample in zip(allc_files,samples):
                 get_methylation_level_DMRfind_worker(
                     input_tsv_file,
-                    input_allc_files[ind],
-                    samples[ind],
+                    allc_file,
+                    sample,
                     output,
                     mc_type,
                     buffer_line_number)
         else:
             pool = Pool(min(num_procs,len(samples)))
             results = {}
-            for ind in range(len(samples)):
+            for allc_file,sample in zip(input_allc_files,samples):
                 pool.apply_async(
                     get_methylation_level_DMRfind_worker,
                     (input_tsv_file,
-                     input_allc_files[ind],
-                     samples[ind],
+                     allc_file,
+                     sample,
                      output,
                      mc_type,
                      buffer_line_number)
@@ -950,63 +944,3 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
         if line_counts > 0:
             g.write(out)
             line_counts = 0
-
-def parse_args():
-     # create the top-level parser
-     parser = ArgumentParser(prog='PROG')
-     subparsers = parser.add_subparsers(help='Process all commands', dest='command')
-
-     # create the parser for the "DMRfind" command
-     parser_dmrfind = subparsers.add_parser('DMRfind', help='Use to run the DMRfind function')
-     parser_dmrfind.add_argument('--mc_type', type=str, nargs="+", required=True, help="List of space separated mc nucleotide contexts \
-        for which you want to look for DMRs. These classifications may use the wildcards H (indicating anything but a G) and N \
-        (indicating any nucleotide)")
-     parser_dmrfind.add_argument('--region', type=str, nargs="+", required=True, help="Space separated listing of \
-         chromosome, start, and end. The list elements should be positive integers. chr1 start end chr2 start end")
-     parser_dmrfind.add_argument('--samples', type=str, nargs="+", required=True, help='List of space separated samples')
-     parser_dmrfind.add_argument('--path_to_allc', type=str, required=True, help="String indicating the beginning of tab \
-        separated files containing methylation information for all C nucleotides in the genome")
-     parser_dmrfind.add_argument('--num_procs', type=int, default=1, help='Number of processors you wish to use to \
-        parallelize this function')
-     parser_dmrfind.add_argument('--save_result', type=str, default="temp", help='String indicating the prefix for result files')
-     parser_dmrfind.add_argument('--min_cov', type=int, default=0, help='Minimum number of reads that must cover a site \
-        for it to be considered')
-     parser_dmrfind.add_argument('--keep_temp_files', type=bool, default=False, help='Boolean; keep intermediate files?')
-     parser_dmrfind.add_argument('--mc_max_dist', type=int, default=0, help='Integer indicating the maximum distance two sites can be \
-        from one another for their methylation counts to be combined. This option helps with low coverage experiments where you may \
-        want to leverage the correlation of methylation between sites to get more statistical power.')
-     parser_dmrfind.add_argument('--dmr_max_dist', type=int, default=100, help='Maximum distance two significant sites can be \
-        to be included in the same block')
-     parser_dmrfind.add_argument('--resid_cutoff', type=int, default=2, help='Results will have to show deviations in the \
-        contingency table in the same direction as the rest of the window')
-     parser_dmrfind.add_argument('--sig_cutoff', type=float, default=.01, help='Float indicating at what FDR you want to \
-        consider a result significant')
-     parser_dmrfind.add_argument('--num_sims', type=int, default=10000, help="Number of permutation tests you'd like to run \
-        to estimate the p-values of the differential methylation tests")
-     parser_dmrfind.add_argument('--min_tests', type=int, default=100, help="Minimum number of permuation tests you'd like \
-        to run for each mC")
-     parser_dmrfind.add_argument('--seed', type=int, default=-1, help='A seed to provide to the random number generator for permutation testing. Only change this if you are debugging and want to make sure the permutation output is consistent')
-     parser_dmrfind.add_argument('--min_num_dms', type=int, default=0, help='The minimum number of differentially methylated sites that a differentially methylated region needs to contain to be reported')
-     parser_dmrfind.add_argument('--collapse_samples', type=str, nargs='+', default=False, help='A list of samples for collapsing blocks')
-     parser_dmrfind.add_argument('--sample_category', type=int, nargs='+', default=False, help='A list of categories that each respective sample belongs to; the categories must begin at 0 and increase by 1 for each category added. ex: samples [A,B,C] categories [0,1,2] or categories [0, 1, 0] ')
-     parser_dmrfind.add_argument('--min_cluster', type=int, default=0, help='The minimum number of each sample category that must be present in every block that is output.')                                                                                                                                                   
-     
-     args = parser.parse_args()
-
-     if args.command == "DMRfind":
-         try:
-             #create the region_dict
-             reg_dict = {}
-             reg_list = [args.region[i:i+3] for i in range(0, len(args.region), 3)]
-             for entry in reg_list:
-                 reg_dict[entry[0]] = [int(entry[1]), int(entry[2])]
-         except:
-            exit("Your --region information was entered incorrectly. Enter in the (space separated) chromosome, start, and end after the --region flag")
-        
-         DMRfind(args.mc_type, reg_dict, args.samples, args.path_to_allc, args.num_procs, args.save_result,
-                 args.min_cov, args.keep_temp_files, args.mc_max_dist, args.dmr_max_dist, args.resid_cutoff, args.sig_cutoff, args.num_sims,
-                 args.min_tests, args.seed, args.min_num_dms, args.collapse_samples, 
-                 args.sample_category, args.min_cluster)
-    
-if __name__ == '__main__':
-    parse_args()

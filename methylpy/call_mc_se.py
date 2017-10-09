@@ -14,13 +14,6 @@ import glob
 import cStringIO as cStr
 import bisect
 import gzip
-try:
-    from argparse import ArgumentParser
-except Exception, e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.call_mc requires ArgumentParser from the argparse module")
 
 def run_methylation_pipeline(read_files, libraries, sample,
                              forward_reference, reverse_reference, reference_fasta,
@@ -1359,53 +1352,36 @@ def bam_quality_mch_filter(inputf,
         uch = 0
         mch = 0
         num_ch = 0
-        #mc_state = ["." for ind in range(len(fields[9]))]
         if int(fields[1]) & 16 == 0: # + strand
-            for ind in range(len(fields[9])):
+            for ind,base in enumerate(fields[9]):
                 pos = ind + read_pos
                 if seq[pos] != "C":
                     continue
-                if fields[9][ind] == "C":
+                if base == "C":
                     if seq[pos+1] == "G":
                         continue
-                        #mc_state[ind] = "Z"
-                    #elif seq[pos+2] == "G":
-                        #mc_state[ind] = "X"
                     else:
                         mch += 1
-                        #mc_state[ind] = "H"
-                elif fields[9][ind] == "T":
+                elif base == "T":
                     if seq[pos+1] == "G":
                         continue
-                        #mc_state[ind] = "z"
-                    #elif seq[pos+2] == "G":
-                        #mc_state[ind] = "x"
                     else:
                         uch += 1
-                        #mc_state[ind] = "h"
         else: # - strand
-            for ind in range(len(fields[9])):
+            for ind,base in enumerate(fields[9]):
                 pos = ind + read_pos
                 if seq[pos] != "G":
                     continue
-                if fields[9][ind] == "G":
+                if base == "G":
                     if seq[pos-1] == "C":
                         continue
-                        #mc_state[ind] = "Z"
-                    #elif seq[pos-2] == "C":
-                        #mc_state[ind] = "X"
                     else:
                         mch += 1
-                        #mc_state[ind] = "H"
-                elif fields[9][ind] == "A":
+                elif base == "A":
                     if seq[pos-1] == "C":
                         continue
-                        #mc_state[ind] = "z"
-                    #elif seq[pos-2] == "C":
-                        #mc_state[ind] = "x"
                     else:
                         uch += 1
-                        #mc_state[ind] = "h"
 
         # apply filter
         tot_ch = float(mch+uch)
@@ -1413,7 +1389,6 @@ def bam_quality_mch_filter(inputf,
             continue
         
         line_counts += 1
-        #out += line.rstrip() + "\tXM:Z:" + "".join(mc_state) + "\n"
         out += line
         if line_counts > buffer_line_number:
             out_handle.write(out)
@@ -1432,112 +1407,3 @@ def bam_quality_mch_filter(inputf,
     
     # remove sam
     subprocess.check_call(shlex.split("rm " +outputf+".sam"))
-    
-
-
-def parse_args():
-     # create the top-level parser
-     parser = ArgumentParser(prog='PROG')
-     subparsers = parser.add_subparsers(help='Process all commands', dest='command')
-
-     # create the parser for the "call_mc" command
-     parser_pipeline = subparsers.add_parser('run_methylation_pipeline', help='Use to run the methylation pipeline')
-     parser_pipeline.add_argument('--files', type=str, nargs="+", required=True, help="list of all the fastq files you'd like to run \
-        through the pipeline. Note that globbing is supported here (i.e., you can use * in your paths)")
-     parser_pipeline.add_argument('--libraries', type=str, nargs="+", required=True, help="list of library IDs (in the same order as \
-        the files list) indiciating which libraries each set of fastq files belong to. If you use a glob, you only need to indicate \
-        the library ID for those fastqs once (i.e., the length of files and libraries should be the same)")
-     parser_pipeline.add_argument('--sample', type=str, required=True, help="String indicating the name of the sample you're processing. \
-        It will be included in the output files.")
-     parser_pipeline.add_argument('--forward_ref', type=str, required=True, help="string indicating the path to the forward strand \
-        reference created by build_ref")
-     parser_pipeline.add_argument('--reverse_ref', type=str, required=True, help="string indicating the path to the reverse strand \
-        reference created by build_ref")
-     parser_pipeline.add_argument('--ref_fasta', type=str, required=True, help="string indicating the path to a fasta file containing \
-        the sequences you used for mapping")
-     parser_pipeline.add_argument('--unmethylated_control', type=str, required=True, help="name of the chromosome/region that you want \
-        to use to estimate the non-conversion rate of your sample, or the non-conversion rate you'd like to use. Consequently, control \
-        is either a string, or a decimal. If control is a string then it should be in the following format: 'chrom:start-end'. \
-        If you'd like to specify an entire chromosome simply use 'chrom:'")
-     parser_pipeline.add_argument('--path_to_samtools', type=str, default="", help='Path to samtools installation (default is current dir)')     
-     parser_pipeline.add_argument('--path_to_aligner', type=str, default="", help='Path to bowtie installation (default is current dir)')
-     parser_pipeline.add_argument('--aligner_options', type=str, nargs='+', help="list of strings indicating options you'd like passed to bowtie \
-        (e.g., ['-k 1','-l 2']")
-     parser_pipeline.add_argument('--num_procs', type=int, default=1, help='Number of processors you wish to use to \
-        parallelize this function')
-     parser_pipeline.add_argument('--trim_reads', type=bool, default=True, help='Whether to trim reads using cutadapt (default is True)')
-     parser_pipeline.add_argument('--path_to_cutadapt', type=str, default="", help='Path to cutadapt installation (default is current dir)')
-     parser_pipeline.add_argument('--adapter_seq', type=str, default="AGATCGGAAGAGCACACGTCTG", help="sequence of an adapter that was ligated \
-        to the 3' end. The adapter itself and anything that follows is trimmed.")
-     parser_pipeline.add_argument('--max_adapter_removal', type=int, help="Indicates the maximum number of times to try to remove adapters. \
-        Useful when an adapter gets appended multiple times.")
-     parser_pipeline.add_argument('--overlap_length', type=int, help="Minimum overlap length. If the overlap between the read and the adapter \
-        is shorter than LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.")
-     parser_pipeline.add_argument('--zero_cap', type=bool, help="Flag that causes negative quality values to be set to zero (workaround to avoid \
-        segmentation faults in BWA)")
-     parser_pipeline.add_argument('--error_rate', type=float, help="maximum allowed error rate (no. of errors divided by the length \
-        of the matching region)")
-     parser_pipeline.add_argument('--min_qual_score', type=int, default=10, help="allows you to trim low-quality ends from reads before \
-        adapter removal. The algorithm is the same as the one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from \
-        all indices to the end of the sequence; cut sequence at the index at which the sum is minimal).")
-     parser_pipeline.add_argument('--min_read_len', type=int, default=30, help="indicates the minimum length a read must be to be kept. \
-        Reads that are too short even before adapter removal are also discarded. In colorspace, an initial primer is not counted.")
-     parser_pipeline.add_argument('--sig_cutoff', type=float, default=.01, help="float indicating the adjusted p-value cutoff you wish to \
-        use for determining whether or not a site is methylated")
-     parser_pipeline.add_argument('--min_cov', type=int, default=0, help="integer indicating the minimum number of reads for a site to be tested.")
-     parser_pipeline.add_argument('--binom_test', type=bool, default=False, help="Indicates that you'd like to use a binomial test, rather than the \
-        alternative method outlined here: https://bitbucket.org/schultzmattd/methylpy/wiki/Methylation%20Calling")
-     parser_pipeline.add_argument('--keep_temp_files', type=bool, default=False, help="Boolean indicating that you'd like to keep the intermediate \
-        files generated by this function. This can be useful for debugging, but in general should be left False.")
-     parser_pipeline.add_argument('--bowtie2', type=bool, default=False, help="Specifies whether to use the bowtie2 aligner instead of bowtie")
-     parser_pipeline.add_argument('--sort_mem', type=str, help="Parameter to pass to unix sort with -S/--buffer-size command")
-     parser_pipeline.add_argument('--path_to_output', type=str, default="", help="Path to a directory where you would like the output to be stored. \
-        The default is the same directory as the input fastqs.")
-     parser_pipeline.add_argument('--path_to_picard', type=str, default=False, help="The path to MarkDuplicates jar from picard. Default is false indicating that you don't want to use this jar for duplication removal")
-     parser_pipeline.add_argument('--remove_clonal', type=bool, default=True, help="Remove clonal reads or not")
-
-     
-     #create the parser for the "call_methylated_sites" command
-     parser_call = subparsers.add_parser('call_methylated_sites', help='Use to run the call_methylated_sites function')
-     parser_call.add_argument('inputf', type=str, help='inputf is the path to a bam file that contains mapped bisulfite sequencing reads')
-     parser_call.add_argument('sample', type=str, help="output is the name you'd like for the allc files. The files will be named like so: allc_<sample>_<chrom>.tsv")
-     parser_call.add_argument('reference', type=str, help="reference is the path to a samtools indexed fasta file")
-     parser_call.add_argument('control', type=str, help="control is the name of the chromosome/region that you want to use to \
-        estimate the non-conversion rate of your sample, or the non-conversion rate you'd like to use. Consequently, control \
-        is either a string, or a decimal. If control is a string then it should be in the following format: 'chrom:start-end'. \
-        If you'd like to specify an entire chromosome simply use 'chrom:'")
-     parser_call.add_argument('casava_version', type=float, help="casava_version is a float indicating which version of casava was used to generate the fastq files.")
-     parser_call.add_argument('--sig_cutoff', type=float, default=0.01, help="sig_cutoff is a float indicating the adjusted \
-        p-value cutoff you wish to use for determining whether or not a site is methylated")
-     parser_call.add_argument('--num_procs', type=int, default=1, help="processers is an integer indicating how many processors you'd like to run this function over") 
-     parser_call.add_argument('--min_cov', type=int, default=1, help="min_cov is an integer indicating the minimum number of reads for a site to be tested")
-     parser_call.add_argument('--binom_test', type=bool, default=False, help="Boolean indicating if you want to run binomial tests")
-     parser_call.add_argument('--min_mc', type=int, default=0, help="Minimum number of mCs that must be observed")
-     parser_call.add_argument('--path_to_samtools', type=str, default="", help='Path to samtools installation (default is current dir)')
-     parser_call.add_argument('--sort_mem', type=str, default=False, help="Parameter to pass to unix sort with -S/--buffer-size command")
-     parser_call.add_argument('--bh', type=bool, default=False, help="Boolean flag indicating whether or not you'd like to use the benjamini-hochberg FDR \
-        instead of an FDR calculated from the control reference")
-     parser_call.add_argument('--path_to_files', type=str, default="", help="string indicating the path for the output and the input bam, mpileup, or allc files \
-        for methylation calling.")                                                                                                                                                   
-     
-     args = parser.parse_args()
-
-     if args.command == "run_methylation_pipeline":
-         if not args.aligner_options:
-             args.aligner_options = ["-S","-k 1","-m 1","--chunkmbs 3072","--best","--strata","-o 4","-e 80","-l 20","-n 0"]
-        
-         run_methylation_pipeline(args.files,args.libraries,args.sample,args.forward_ref,args.reverse_ref,args.ref_fasta,
-                                  args.unmethylated_control,args.path_to_samtools,args.path_to_aligner,
-                                  args.aligner_options,args.num_procs,args.trim_reads,
-                                  args.path_to_cutadapt,args.adapter_seq,args.max_adapter_removal,
-                                  args.overlap_length,args.zero_cap,args.error_rate,args.min_qual_score,args.min_read_len,
-                                  args.sig_cutoff,args.min_cov,args.binom_test,args.keep_temp_files,
-                                  args.bowtie2,args.sort_mem,args.path_to_output)
-                                  
-     elif args.command == "call_methylated_sites":
-         call_methylated_sites(args.inputf, args.sample, args.reference, args.control, args.casava_version, args.sig_cutoff,
-                              args.num_procs, args.min_cov, args.binom_test, args.min_mc, args.path_to_samtools, args.sort_mem,
-                              args.bh, args.path_to_files)
-    
-if __name__ == '__main__':
-    parse_args()

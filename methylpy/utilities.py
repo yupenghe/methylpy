@@ -126,17 +126,16 @@ def expand_nucleotide_code(mc_type):
                 "G":["G"],
                 "T":["T"],
                 "A":["A"]}
-
-    for motif in mc_type[:]:
-        motif += "N" * (3 - len(motif))
-        mc_type.extend(["".join(i) for i in
-                        itertools.product(*[iub_dict[nuc] for nuc in motif])])
-
+    #
     if "C" in mc_type:
         mc_type.extend(["CG", "CHG", "CHH","CNN"])
-    if "CG" in mc_type:
-        mc_type.extend(["CGN"])
-    return mc_type
+	if "CG" in mc_type:
+	    mc_type.extend(["CGN"])
+    #       
+    for motif in mc_type[:]:
+	mc_type.extend(["".join(i) for i in
+			itertools.product(*[iub_dict[nuc] for nuc in motif])])
+    return(set(mc_type))
 
 def split_allc_window(num_chunks, inputf, output_prefix, max_dist, jump_size, window_size):
     """
@@ -455,31 +454,31 @@ def split_files_by_position(files,samples,
         #If a pool has not been passed to this function 
         if pool == False:
             pool_new = multiprocessing.Pool(num_procs)
-            for ind in range(len(files)):
+            for input_file,sample in zip(files,samples):
                 line_results.append(pool_new.apply_async(parallel_count_lines,
-                                                     (files[ind],chrom_pointer[samples[ind]],
+                                                     (input_file,chrom_pointer[sample],
                                                       chrom,min_cov,mc_class)))
             pool_new.close()
             pool_new.join()
         #If a pool has been passed to this function make sure it doesn't get closed by this funciton
         else:
-            for ind in range(len(files)):
+            for input_file,sample in zip(files,samples):
                 line_results.append(pool.apply_async(parallel_count_lines,
-                                                     (files[ind],chrom_pointer[samples[ind]],
+                                                     (input_file,chrom_pointer[sample],
                                                       chrom,min_cov,mc_class)))
         lines = [r.get() for r in line_results] #get() call blocks until all are finished so no need for wait()
     else:
         lines = []
-        for ind in range(len(files)):
-            lines.append(parallel_count_lines(files[ind],chrom_pointer[samples[ind]],
+        for input_file,sample in zip(files,samples):
+            lines.append(parallel_count_lines(input_file,chrom_pointer[sample],
                                               chrom,min_cov,mc_class))
     min_entry = min(lines, key=lambda x: x[0])
     min_lines = min(min_entry[0], min_lines)
     min_file = min_entry[1]
     min_sample = 0
-    for ind in range(len(lines)):
-        if files[ind] == min_file:
-            min_sample = samples[ind]
+    for input_file,sample in zip(files,samples):
+        if input_file == min_file:
+            min_sample = sample
             break
     chunk_size = math.ceil(float(min_lines) / chunks)
     if chunk_size == 0:
@@ -516,9 +515,9 @@ def split_files_by_position(files,samples,
         #If a pool has not been passed to this function 
         if pool == False:
             pool_new = multiprocessing.Pool(num_procs)
-            for ind in range(len(samples)):
-                pool_new.apply_async(parallel_split_files_by_position,(files[ind],cutoffs,
-                                                                   chrom_pointer[samples[ind]][chrom],
+            for input_file,sample in zip(files,samples):
+                pool_new.apply_async(parallel_split_files_by_position,(input_file,cutoffs,
+                                                                   chrom_pointer[sample][chrom],
                                                                    chrom,
                                                                    mc_class),
                                  {"min_cov":min_cov, "max_dist":max_dist, "weight_by_dist":weight_by_dist})
@@ -527,18 +526,21 @@ def split_files_by_position(files,samples,
         #If a pool has been passed to this function make sure it doesn't get closed by this funciton
         else:
             results = []
-            for ind in range(len(samples)):
-                results.append(pool.apply_async(parallel_split_files_by_position,(files[ind],cutoffs,
-                                                                                  chrom_pointer[samples[ind]][chrom],
-                                                                                  chrom,
-                                                                                  mc_class),
-                                                {"min_cov":min_cov, "max_dist":max_dist, "weight_by_dist":weight_by_dist}))
+            for input_file,sample in zip(files,samples):
+                results.append(pool.apply_async(parallel_split_files_by_position,
+                                                (input_file,cutoffs,
+                                                 chrom_pointer[sample][chrom],
+                                                 chrom,
+                                                 mc_class),
+                                                {"min_cov":min_cov,
+                                                 "max_dist":max_dist,
+                                                 "weight_by_dist":weight_by_dist}))
             for result in results:
                 result.wait()
     else:
-        for ind in range(len(samples)):
-            parallel_split_files_by_position(files[ind],cutoffs,
-                                             chrom_pointer[samples[ind]][chrom],
+        for input_file,sample in zip(files,samples):
+            parallel_split_files_by_position(input_file,cutoffs,
+                                             chrom_pointer[sample][chrom],
                                              chrom,
                                              mc_class,
                                              min_cov=min_cov,max_dist=max_dist,
@@ -564,13 +566,6 @@ def parallel_split_files_by_position(filen,cutoffs,
     #Just in case there's a header line in the file
     #I assume that if the position field can't be cast as an int
     #it must be a header
-    line = f.readline()
-    fields = line.split("\t")
-    try:
-        int(fields[1])
-        f.seek(0)
-    except:
-        pass
     fields_deque = collections.deque()
     added_values_deque = collections.deque()
     g = open(filen+"_"+chrom+"_"+str(chunk_num),'w')
