@@ -7,7 +7,7 @@ def parse_args():
      # create the top-level parser
      parser = argparse.ArgumentParser(prog="PROG")
 
-     subparsers = parser.add_subparsers(help="Process all commands", dest="command")
+     subparsers = parser.add_subparsers(dest="command")
 
      add_DMRfind_subparser(subparsers)
      add_se_pipeline_subparser(subparsers)
@@ -132,7 +132,7 @@ def add_DMRfind_subparser(subparsers):
      parser_dmrfind = subparsers.add_parser(
           "DMRfind",
           formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-          help="Use to run the DMRfind function")
+          help="Finding differentially methylated regions")
      
      # add options
      parser_dmrfind_req = parser_dmrfind.add_argument_group("required inputs")
@@ -264,7 +264,7 @@ def add_DMRfind_subparser(subparsers):
 def add_se_pipeline_subparser(subparsers):
      parser_se = subparsers.add_parser("single-end-pipeline",
                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                       help="Use to run the methylation pipeline for single-end data")
+                                       help="Methylation pipeline for single-end data")
 
      parser_se_req = parser_se.add_argument_group("required inputs")
           
@@ -514,7 +514,7 @@ def add_se_pipeline_subparser(subparsers):
 def add_pe_pipeline_subparser(subparsers):
      parser_se = subparsers.add_parser("paired-end-pipeline",
                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                       help="Use to run the methylation pipeline for paired-end data")
+                                       help="Methylation pipeline for paired-end data")
 
      parser_se_req = parser_se.add_argument_group("required inputs")
           
