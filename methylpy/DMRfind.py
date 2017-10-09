@@ -784,7 +784,7 @@ def get_methylation_levels_DMRfind(input_tsv_file,
                                    output,
                                    input_allc_files,
                                    samples,
-                                   mc_type=["CGN"],                                
+                                   mc_type=["CGN"],
                                    num_procs=1,
                                    buffer_line_number=100000):
     """
@@ -801,6 +801,8 @@ def get_methylation_levels_DMRfind(input_tsv_file,
     # 1. check whether allc files are stored in a list
     # 2. check whether samples are stored in a list
     # 4. whether samples and allc files have the same length
+    
+    mc_class = expand_nucleotide_code(mc_type)
     
     with open(output,'w') as g:
         # header
@@ -819,7 +821,7 @@ def get_methylation_levels_DMRfind(input_tsv_file,
                     allc_file,
                     sample,
                     output,
-                    mc_type,
+                    mc_class,
                     buffer_line_number)
         else:
             pool = Pool(min(num_procs,len(samples)))
@@ -832,7 +834,7 @@ def get_methylation_levels_DMRfind(input_tsv_file,
                      input_allc_files[ind],
                      samples[ind],
                      output,
-                     mc_type,
+                     mc_class,
                      buffer_line_number)
                 )
             pool.close()
@@ -856,7 +858,7 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
                                          inputf_allc,
                                          sample,
                                          output,
-                                         mc_type = ["CGN"],                                        
+                                         mc_class,
                                          buffer_line_number=100000):
     # open allc file
     if inputf_allc[-3:] == ".gz":
@@ -880,7 +882,6 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
         cur_pointer = allc_file.tell()
 
     # init
-    mc_class = expand_nucleotide_code(mc_type)
     prev_chrom = ""
     prev_end = ""
 

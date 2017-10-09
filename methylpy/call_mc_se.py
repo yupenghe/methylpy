@@ -17,13 +17,13 @@ import gzip
 
 def run_methylation_pipeline(read_files, libraries, sample,
                              forward_reference, reverse_reference, reference_fasta,
-                             unmethylated_control="chrL:",
+                             unmethylated_control=None,
                              path_to_output="", sig_cutoff=0.01,
                              num_procs=1, sort_mem="500M",
-                             num_upstr_bases=1, num_downstr_bases=2,
+                             num_upstr_bases=0, num_downstr_bases=2,
                              generate_allc_file=True,split_allc_files=False,
                              generate_mpileup_file=True, compress_output=True,
-                             binom_test=True, bh=True, min_cov=2,
+                             binom_test=False, min_cov=2,
                              trim_reads=True, path_to_cutadapt="",
                              pbat=False,
                              bowtie2=False, path_to_aligner="", aligner_options=[],
@@ -267,7 +267,6 @@ def run_methylation_pipeline(read_files, libraries, sample,
                               split_allc_files=split_allc_files,
                               min_cov=min_cov,
                               binom_test=binom_test,
-                              bh=bh,
                               sort_mem=sort_mem,
                               path_to_files=path_to_output,
                               path_to_samtools=path_to_samtools,
@@ -1123,7 +1122,7 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
                           split_allc_files=False,
                           buffer_line_number = 100000,
                           min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
-                          sort_mem="500M",bh=True,path_to_files="",min_base_quality=1):
+                          sort_mem="500M",path_to_files="",min_base_quality=1):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads
@@ -1146,9 +1145,6 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
     min_cov is an integer indicating the minimum number of reads for a site to be tested.
     
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    
-    bh is a True/False flag indicating whether or not you'd like to use the benjamini-hochberg FDR
-        instead of an FDR calculated from the control reference
     
     path_to_files is a string indicating the path for the output and the input bam, mpileup, or allc files
         for methylation calling.

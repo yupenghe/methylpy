@@ -36,12 +36,7 @@ def parse_args():
                   keep_temp_files=args.keep_temp_files,
                   min_cluster=args.min_cluster,
                   seed=-1)
-
-     return(0)
-     if args.command == "run_methylation_pipeline":
-         if not args.aligner_options:
-              args.aligner_options = ["-S","-k 1","-m 1","--chunkmbs 3072","--best","--strata","-o 4","-e 80","-l 20","-n 0"]
-              
+     elif args.command == "run_methylation_pipeline":              
          run_methylation_pipeline(args.files,args.libraries,args.sample,args.forward_ref,args.reverse_ref,args.ref_fasta,
                                   args.unmethylated_control,args.path_to_samtools,args.path_to_aligner,
                                   args.aligner_options,args.num_procs,args.trim_reads,
@@ -49,13 +44,11 @@ def parse_args():
                                   args.overlap_length,args.zero_cap,args.error_rate,args.min_qual_score,args.min_read_len,
                                   args.sig_cutoff,args.min_cov,args.binom_test,args.keep_temp_files,
                                   args.bowtie2,args.sort_mem,args.path_to_output)
-         
-     elif args.command == "call_methylated_sites":
-          call_methylated_sites(args.inputf, args.sample, args.reference, args.control, args.casava_version, args.sig_cutoff,
-                                args.num_procs, args.min_cov, args.binom_test, args.min_mc, args.path_to_samtools, args.sort_mem,
-                                args.bh, args.path_to_files)
-
-         
+     
+     #elif args.command == "call_methylated_sites":
+     #     call_methylated_sites(args.inputf, args.sample, args.reference, args.control, args.casava_version, args.sig_cutoff,
+      #                          args.num_procs, args.min_cov, args.binom_test, args.min_mc, args.path_to_samtools, args.sort_mem,
+       #                         , args.path_to_files)
 
 def add_DMRfind_subparser(subparsers):
      # create the parser for the "DMRfind" command
@@ -65,7 +58,7 @@ def add_DMRfind_subparser(subparsers):
           help="Use to run the DMRfind function")
      
      # add options
-     parser_dmrfind_req = parser_dmrfind.add_argument_group("Required inputs")
+     parser_dmrfind_req = parser_dmrfind.add_argument_group("required inputs")
      parser_dmrfind_req.add_argument("--allc-files",
                                      type=str,
                                      nargs="+",
@@ -90,7 +83,7 @@ def add_DMRfind_subparser(subparsers):
                                      required=True,
                                      help="String indicating the prefix for output files")
      
-     parser_dmrfind_opt = parser_dmrfind.add_argument_group("Optional inputs")
+     parser_dmrfind_opt = parser_dmrfind.add_argument_group("optional inputs")
 
      parser_dmrfind_opt.add_argument("--mc-type",
                                      type=str,
@@ -192,12 +185,13 @@ def add_DMRfind_subparser(subparsers):
                                      + "and want to make sure the permutation output is consistent")
      
 def add_se_pipeline_subparser(subparsers):
-    
-     # create the parser for the "call_mc" command
-     parser_pipeline = subparsers.add_parser("run_methylation_pipeline",
-                                             help="Use to run the methylation pipeline")
-     
-     parser_pipeline.add_argument("--files",
+     parser_se = subparsers.add_parser("single_end_pipeline",
+                                       formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                       help="Use to run the methylation pipeline for single-end data")
+
+     parser_se_req = parser_se.add_argument_group("required inputs")
+          
+     parser_se_req.add_argument("--read-files",
                                   type=str,
                                   nargs="+",
                                   required=True,
@@ -205,7 +199,7 @@ def add_se_pipeline_subparser(subparsers):
                                   + "the pipeline. Note that globbing is supported here (i.e., you "
                                   + "can use * in your paths)")
      
-     parser_pipeline.add_argument("--libraries",
+     parser_se_req.add_argument("--libraries",
                                   type=str,
                                   nargs="+",
                                   required=True,
@@ -215,62 +209,230 @@ def add_se_pipeline_subparser(subparsers):
                                   + "those fastqs once (i.e., the length of files and libraries should "
                                   + "be the same)")
      
-     parser_pipeline.add_argument("--sample",
+     parser_se_req.add_argument("--sample",
                                   type=str,
                                   required=True,
                                   help="String indicating the name of the sample you are processing. "
                                   + "It will be included in the output files.")
      
-     parser_pipeline.add_argument("--forward_ref",
-                                  type=str, required=True, help="string indicating the path to the forward strand \
-        reference created by build_ref")
-     parser_pipeline.add_argument("--reverse_ref", type=str, required=True, help="string indicating the path to the reverse strand \
-        reference created by build_ref")
-     parser_pipeline.add_argument("--ref_fasta", type=str, required=True, help="string indicating the path to a fasta file containing \
-        the sequences you used for mapping")
-     parser_pipeline.add_argument("--unmethylated_control", type=str, required=True, help="name of the chromosome/region that you want \
-        to use to estimate the non-conversion rate of your sample, or the non-conversion rate you would like to use. Consequently, control \
-        is either a string, or a decimal. If control is a string then it should be in the following format: \"chrom:start-end\". \
-        If you would like to specify an entire chromosome simply use \"chrom:\"")
-     parser_pipeline.add_argument("--path_to_samtools", type=str, default="", help="Path to samtools installation (default is current dir)")     
-     parser_pipeline.add_argument("--path_to_aligner", type=str, default="", help="Path to bowtie installation (default is current dir)")
-     parser_pipeline.add_argument("--aligner_options", type=str, nargs="+", help="list of strings indicating options you would like passed to bowtie (e.g., [\"-k 1\",\"-l 2\"]")
-     parser_pipeline.add_argument("--num_procs", type=int, default=1, help="Number of processors you wish to use to \
-        parallelize this function")
-     parser_pipeline.add_argument("--trim_reads", type=bool, default=True, help="Whether to trim reads using cutadapt (default is True)")
-     parser_pipeline.add_argument("--path_to_cutadapt", type=str, default="", help="Path to cutadapt installation (default is current dir)")
-     parser_pipeline.add_argument("--adapter_seq", type=str, default="AGATCGGAAGAGCACACGTCTG", help="sequence of an adapter that was ligated \
-        to the 3\' end. The adapter itself and anything that follows is trimmed.")
-     parser_pipeline.add_argument("--max_adapter_removal", type=int, help="Indicates the maximum number of times to try to remove adapters. \
-        Useful when an adapter gets appended multiple times.")
-     parser_pipeline.add_argument("--overlap_length", type=int, help="Minimum overlap length. If the overlap between the read and the adapter \
-        is shorter than LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.")
-     parser_pipeline.add_argument("--zero_cap", type=bool, help="Flag that causes negative quality values to be set to zero (workaround to avoid \
-        segmentation faults in BWA)")
-     parser_pipeline.add_argument("--error_rate", type=float, help="maximum allowed error rate (no. of errors divided by the length \
-        of the matching region)")
-     parser_pipeline.add_argument("--min_qual_score", type=int, default=10, help="allows you to trim low-quality ends from reads before \
-        adapter removal. The algorithm is the same as the one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from \
-        all indices to the end of the sequence; cut sequence at the index at which the sum is minimal).")
-     parser_pipeline.add_argument("--min_read_len", type=int, default=30, help="indicates the minimum length a read must be to be kept. \
-        Reads that are too short even before adapter removal are also discarded. In colorspace, an initial primer is not counted.")
-     parser_pipeline.add_argument("--sig_cutoff", type=float, default=.01, help="float indicating the adjusted p-value cutoff you wish to \
-        use for determining whether or not a site is methylated")
-     parser_pipeline.add_argument("--min_cov", type=int, default=0, help="integer indicating the minimum number of reads for a site to be tested.")
-     parser_pipeline.add_argument("--binom_test", type=bool, default=False, help="Indicates that you would like to use a binomial test, rather than the \
-        alternative method outlined here: https://bitbucket.org/schultzmattd/methylpy/wiki/Methylation%20Calling")
-     parser_pipeline.add_argument("--keep_temp_files", type=bool, default=False, help="Boolean indicating that you would like to keep the intermediate \
-        files generated by this function. This can be useful for debugging, but in general should be left False.")
-     parser_pipeline.add_argument("--bowtie2", type=bool, default=False, help="Specifies whether to use the bowtie2 aligner instead of bowtie")
-     parser_pipeline.add_argument("--sort_mem", type=str, help="Parameter to pass to unix sort with -S/--buffer-size command")
-     parser_pipeline.add_argument("--path_to_output", type=str, default="", help="Path to a directory where you would like the output to be stored. \
-        The default is the same directory as the input fastqs.")
-     parser_pipeline.add_argument("--path_to_picard", type=str, default=False, help="The path to MarkDuplicates jar from picard. Default is false indicating that you don\'t want to use this jar for duplication removal")
-     parser_pipeline.add_argument("--remove_clonal", type=bool, default=True, help="Remove clonal reads or not")
-
+     parser_se_req.add_argument("--forward-ref",
+                                  type=str, required=True, help="string indicating the path to the "
+                                  + "forward strand reference created by build_ref")
      
+     parser_se_req.add_argument("--reverse-ref",
+                                  type=str,
+                                  required=True,
+                                  help="string indicating the path to the reverse strand reference "
+                                  + "created by build_ref")
+     
+     parser_se_req.add_argument("--ref-fasta",
+                                  type=str,
+                                  required=True,
+                                  help="string indicating the path to a fasta file containing the "
+                                  + "sequences you used for mapping")
+     
+     parser_se_opt = parser_se.add_argument_group("optional inputs")
+
+     parser_se_opt.add_argument("--path-to-output",
+                                type=str,
+                                default="",
+                                help="Path to a directory where you would like the output to be stored. "
+                                + "The default is the same directory as the input fastqs.")
+
+     parser_se_opt.add_argument("--pbat",
+                                type=bool,
+                                default=False,
+                                help="Boolean indicating whether to process data in PBAT (Post-Bisulfite "
+                                +"Adaptor Tagging) mode, in which reads will be mapped to opposite strand "
+                                +"of C-T converted genome and the forward strand of G-A converted genome.")
+     
+     parser_se_opt.add_argument("--sig-cutoff",
+                                type=float,
+                                default=.01,
+                                help="float indicating the adjusted p-value cutoff you wish to use for "
+                                + "determining whether or not a site is methylated")
+
+     parser_se_opt.add_argument("--num-procs",
+                                type=int,
+                                default=1,
+                                help="Number of processors you wish to use to parallelize this function")     
+
+     parser_se_opt.add_argument("--sort-mem",
+                                type=str,
+                                default="500M",
+                                help="Parameter to pass to unix sort with -S/--buffer-size command")
+
+     parser_se_opt.add_argument("--num-upstream-bases",
+                                type=int,
+                                default=0,
+                                help="Number of base(s) upstream of each cytosine that you wish to include "
+                                + "in output file. Recommend value 1 for NOMe-seq processing since the "
+                                + "upstream base is required to tell apart cytosine at GC context.")
+
+     parser_se_opt.add_argument("--num-downstream-bases",
+                                type=int,
+                                default=2,
+                                help="Number of base(s) downstream of each cytosine that you wish to include "
+                                + "in output file. Recommend value to be at least 1 to separate cytosines at "
+                                + "different sequence contexts.")
+
+     parser_se_opt.add_argument("--generate-allc-file",
+                                type=bool,
+                                default=True,
+                                help="Boolean indicating whether to generate the final output file that "
+                                +" contains the methylation state of each cytosine. If set to be false, "
+                                +"only alignment file (in BAM format) will be generated.")
+
+     parser_se_opt.add_argument("--split-allc-file",
+                                type=bool,
+                                default=False,
+                                help="Boolean indicating whether to split the final output file by chromosomes. "
+                                +"If set to be true, one sample will contain multiple allc files and each of "
+                                +"them contains the methylation state of all cytosines on one chromosome.")
+
+     parser_se_opt.add_argument("--generate-mpileup-file",
+                                type=bool,
+                                default=True,
+                                help="Boolean indicating whether to generate intermediate mpileup file to save "
+                                +"space. However, skipping mpileup step may cause problem due to the nature of "
+                                +"python. Not skipping this step is recommended.")
+     
+     parser_se_opt.add_argument("--compress-output",
+                                type=bool,
+                                default=True,
+                                help="Boolean indicating whether to compress (by gzip) the final output "
+                                + "(allc file(s)).")     
+
+     parser_se_opt.add_argument("--trim-reads",
+                                type=bool,
+                                default=True,
+                                help="Boolean indicating whether to trim reads using cutadapt.")
+     
+     parser_se_opt.add_argument("--path-to-cutadapt",
+                                type=str,
+                                default="",
+                                help="Path to cutadapt installation (default is current dir)")
+     
+     parser_se_opt.add_argument("--bowtie2",
+                                type=bool,
+                                default=False,
+                                help="Specifies whether to use the bowtie2 aligner instead of bowtie")
+
+     parser_se_opt.add_argument("--path-to-aligner",
+                                type=str,
+                                default="",
+                                help="Path to bowtie installation (default is current dir)")
+     
+     parser_se_opt.add_argument("--aligner-options",
+                                type=str,
+                                nargs="+",                                
+                                help="list of strings indicating options you would like passed "
+                                + "to bowtie (e.g., [\"-k 1\",\"-l 2\"])")
+          
+     parser_se_opt.add_argument("--remove-clonal",
+                                type=bool,
+                                default=True,
+                                help="Boolean indicates whether to remove clonal reads or not")
+     
+     parser_se_opt.add_argument("--path-to-picard",
+                                type=str,
+                                default="",
+                                help="The path to the picard.jar in picard tools. The jar file can "
+                                + "be downloaded from https://broadinstitute.github.io/picard/index.html "
+                                + "(default is current dir)")
+          
+     parser_se_opt.add_argument("--keep-clonal-stats",
+                                type=bool,
+                                default=False,
+                                help="Boolean indicates whether to store the metric file from picard.")
+     
+     parser_se_opt.add_argument("--java-options",
+                                type=str,
+                                default="-Xmx20g",
+                                help="String indicating the option pass the java when running picard.")
+
+     parser_se_opt.add_argument("--path-to-samtools",
+                                type=str,
+                                default="",
+                                help="Path to samtools installation (default is current dir)")
+     
+     parser_se_opt.add_argument("--adapter-seq",
+                                type=str,
+                                default="AGATCGGAAGAGCACACGTCTG",
+                                help="sequence of an adapter that was ligated to the 3\' end. The "
+                                +"adapter itself and anything that follows is trimmed.")
+
+     parser_se_opt.add_argument("--unmethylated-control",
+                                type=str,
+                                default=None,
+                                help="name of the chromosome/region that you want to use to estimate "
+                                + "the non-conversion rate of your sample, or the non-conversion rate "
+                                + "you would like to use. Consequently, control is either a string, or "
+                                + "a decimal. If control is a string then it should be in the following "
+                                + "format: \"chrom:start-end\". If you would like to specify an entire "
+                                + "chromosome simply use \"chrom:\"")
+     
+     parser_se_opt.add_argument("--binom-test",
+                                type=bool,
+                                default=False,
+                                help="Indicates that you would like to perform a binomial test on each cytosine "
+                                +"to delineate cytosines that are significantly methylated than noise due to "
+                                +"the failure of bisulfite conversion.")
+
+     parser_se_opt.add_argument("--min_cov",
+                                type=int,
+                                default=0,
+                                help="Integer indicating the minimum number of reads for a site to be tested.")
+     
+     parser_se_opt.add_argument("--max_adapter_removal",
+                                type=int,
+                                help="Indicates the maximum number of times to try to remove adapters. Useful "
+                                +"when an adapter gets appended multiple times.")
+     
+     parser_se_opt.add_argument("--overlap_length",
+                                type=int,
+                                help="Minimum overlap length. If the overlap between the read and the adapter "
+                                +"is shorter than LENGTH, the read is not modified. This reduces the no. of "
+                                +"bases trimmed purely due to short random adapter matches.")
+     
+     parser_se_opt.add_argument("--zero_cap",
+                                type=bool,
+                                help="Flag that causes negative quality values to be set to zero (workaround "
+                                +"to avoid segmentation faults in BWA)")
+     
+     parser_se_opt.add_argument("--error_rate",
+                                type=float,
+                                help="maximum allowed error rate (no. of errors divided by the length of "
+                                +"the matching region)")
+     
+     parser_se_opt.add_argument("--min_qual_score",
+                                type=int,
+                                default=10,
+                                help="allows you to trim low-quality ends from reads before adapter removal. "
+                                +"The algorithm is the same as the one used by BWA (Subtract CUTOFF from all "
+                                +"qualities; compute partial sums from all indices to the end of the sequence; "
+                                +" cut sequence at the index at which the sum is minimal).")
+     
+     parser_se_opt.add_argument("--min_read_len",
+                                type=int,
+                                default=30,
+                                help="indicates the minimum length a read must be to be kept. Reads that "
+                                +"are too short even before adapter removal are also discarded. In colorspace, "
+                                "an initial primer is not counted.")
+     
+     parser_se_opt.add_argument("--keep_temp_files",
+                                type=bool,
+                                default=False,
+                                help="Boolean indicating that you would like to keep the intermediate files "
+                                +"generated by this function. This can be useful for debugging, but in general "
+                                +"should be left False.")
+
+def add_se_call_mc_subparser(subparsers):
      #create the parser for the "call_methylated_sites" command
-     parser_call = subparsers.add_parser("call_methylated_sites", help="Use to run the call_methylated_sites function")
+     parser_call = subparsers.add_parser("call_methylated_sites",
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                         help="Use to run the call_methylated_sites function")
+     
      parser_call.add_argument("inputf", type=str, help="inputf is the path to a bam file that contains mapped bisulfite sequencing reads")
      parser_call.add_argument("sample", type=str, help="output is the name you would like for the allc files. The files will be named like so: allc_<sample>_<chrom>.tsv")
      parser_call.add_argument("reference", type=str, help="reference is the path to a samtools indexed fasta file")
@@ -287,117 +449,7 @@ def add_se_pipeline_subparser(subparsers):
      parser_call.add_argument("--min_mc", type=int, default=0, help="Minimum number of mCs that must be observed")
      parser_call.add_argument("--path_to_samtools", type=str, default="", help="Path to samtools installation (default is current dir)")
      parser_call.add_argument("--sort_mem", type=str, default=False, help="Parameter to pass to unix sort with -S/--buffer-size command")
-     parser_call.add_argument("--bh", type=bool, default=False, help="Boolean flag indicating whether or not you would like to use the benjamini-hochberg FDR \
-        instead of an FDR calculated from the control reference")
-     parser_call.add_argument("--path_to_files", type=str, default="", help="string indicating the path for the output and the input bam, mpileup, or allc files \
-        for methylation calling.")                                                                                                                                                   
-     
-          
-    
-def add_pe_pipeline_subparser(subparsers):
-     # create the parser for the "call_mc" command
-     parser_pipeline = subparsers.add_parser("run_methylation_pipeline", help="Use to run the methylation pipeline")
-     parser_pipeline.add_argument("--files", type=str, nargs="+", required=True, help="list of all the fastq files you would like to run \
-        through the pipeline. Note that globbing is supported here (i.e., you can use * in your paths)")
-     parser_pipeline.add_argument("--libraries", type=str, nargs="+", required=True, help="list of library IDs (in the same order as \
-        the files list) indiciating which libraries each set of fastq files belong to. If you use a glob, you only need to indicate \
-        the library ID for those fastqs once (i.e., the length of files and libraries should be the same)")
-     parser_pipeline.add_argument("--sample", type=str, required=True, help="String indicating the name of the sample you are processing. \
-        It will be included in the output files.")
-     parser_pipeline.add_argument("--forward_ref", type=str, required=True, help="string indicating the path to the forward strand \
-        reference created by build_ref")
-     parser_pipeline.add_argument("--reverse_ref", type=str, required=True, help="string indicating the path to the reverse strand \
-        reference created by build_ref")
-     parser_pipeline.add_argument("--ref_fasta", type=str, required=True, help="string indicating the path to a fasta file containing \
-        the sequences you used for mapping")
-     parser_pipeline.add_argument("--unmethylated_control", type=str, required=True, help="name of the chromosome/region that you want \
-        to use to estimate the non-conversion rate of your sample, or the non-conversion rate you would like to use. Consequently, control \
-        is either a string, or a decimal. If control is a string then it should be in the following format: \"chrom:start-end\". \
-        If you would like to specify an entire chromosome simply use \"chrom:\"")
-     parser_pipeline.add_argument("--path_to_samtools", type=str, default="", help="Path to samtools installation (default is current dir)")     
-     parser_pipeline.add_argument("--path_to_aligner", type=str, default="", help="Path to bowtie installation (default is current dir)")
-     parser_pipeline.add_argument("--aligner_options", type=str, nargs="+", help="list of strings indicating options you would like passed to bowtie \
-        (e.g., [\"-k 1\",\"-l 2\"]")
-     parser_pipeline.add_argument("--num_procs", type=int, default=1, help="Number of processors you wish to use to \
-        parallelize this function")
-     parser_pipeline.add_argument("--trim_reads", type=bool, default=True, help="Whether to trim reads using cutadapt (default is True)")
-     parser_pipeline.add_argument("--path_to_cutadapt", type=str, default="", help="Path to cutadapt installation (default is current dir)")
-     parser_pipeline.add_argument("--adapter_seq", type=str, default="AGATCGGAAGAGCACACGTCTG", help="sequence of an adapter that was ligated \
-        to the 3\' end. The adapter itself and anything that follows is trimmed.")
-     parser_pipeline.add_argument("--max_adapter_removal", type=int, help="Indicates the maximum number of times to try to remove adapters. \
-        Useful when an adapter gets appended multiple times.")
-     parser_pipeline.add_argument("--overlap_length", type=int, help="Minimum overlap length. If the overlap between the read and the adapter \
-        is shorter than LENGTH, the read is not modified. This reduces the no. of bases trimmed purely due to short random adapter matches.")
-     parser_pipeline.add_argument("--zero_cap", type=bool, help="Flag that causes negative quality values to be set to zero (workaround to avoid \
-        segmentation faults in BWA)")
-     parser_pipeline.add_argument("--error_rate", type=float, help="maximum allowed error rate (no. of errors divided by the length \
-        of the matching region)")
-     parser_pipeline.add_argument("--min_qual_score", type=int, default=10, help="allows you to trim low-quality ends from reads before \
-        adapter removal. The algorithm is the same as the one used by BWA (Subtract CUTOFF from all qualities; compute partial sums from \
-        all indices to the end of the sequence; cut sequence at the index at which the sum is minimal).")
-     parser_pipeline.add_argument("--min_read_len", type=int, default=30, help="indicates the minimum length a read must be to be kept. \
-        Reads that are too short even before adapter removal are also discarded. In colorspace, an initial primer is not counted.")
-     parser_pipeline.add_argument("--sig_cutoff", type=float, default=.01, help="float indicating the adjusted p-value cutoff you wish to \
-        use for determining whether or not a site is methylated")
-     parser_pipeline.add_argument("--min_cov", type=int, default=0, help="integer indicating the minimum number of reads for a site to be tested.")
-     parser_pipeline.add_argument("--binom_test", type=bool, default=False, help="Indicates that you would like to use a binomial test, rather than the \
-        alternative method outlined here: https://bitbucket.org/schultzmattd/methylpy/wiki/Methylation%20Calling")
-     parser_pipeline.add_argument("--keep_temp_files", type=bool, default=False, help="Boolean indicating that you would like to keep the intermediate \
-        files generated by this function. This can be useful for debugging, but in general should be left False.")
-     parser_pipeline.add_argument("--save_space", type=bool, default=True, help="indicates whether or not you would like to perform read collapsing \
-        right after mapping or once all the libraries have been mapped. If you wait until after everything has been mapped, the collapsing can be \
-        parallelized. Otherwise the collapsing will have to be done serially. The trade-off is that you must keep all the mapped files around, rather \
-        than deleting them as they are processed, which can take up a considerable amount of space. It\'s safest to set this to True.")
-     parser_pipeline.add_argument("--bowtie2", type=bool, default=False, help="Specifies whether to use the bowtie2 aligner instead of bowtie")
-     parser_pipeline.add_argument("--sort_mem", type=str, help="Parameter to pass to unix sort with -S/--buffer-size command")
-     parser_pipeline.add_argument("--path_to_output", type=str, default="", help="Path to a directory where you would like the output to be stored. \
-        The default is the same directory as the input fastqs.")
-     parser_pipeline.add_argument("--path_to_picard", type=str, default=False, help="The path to picard.jar. Default is false indicating that you don\'t want to use this jar for duplication removal")
-     parser_pipeline.add_argument("--remove_clonal", type=bool, default=True, help="Remove clonal reads or not")
 
-     
-     #create the parser for the "call_methylated_sites" command
-     parser_call = subparsers.add_parser("call_methylated_sites", help="Use to run the call_methylated_sites function")
-     parser_call.add_argument("inputf", type=str, help="inputf is the path to a bam file that contains mapped bisulfite sequencing reads")
-     parser_call.add_argument("sample", type=str, help="output is the name you would like for the allc files. The files will be named like so: allc_<sample>_<chrom>.tsv")
-     parser_call.add_argument("reference", type=str, help="reference is the path to a samtools indexed fasta file")
-     parser_call.add_argument("control", type=str, help="control is the name of the chromosome/region that you want to use to \
-        estimate the non-conversion rate of your sample, or the non-conversion rate you would like to use. Consequently, control \
-        is either a string, or a decimal. If control is a string then it should be in the following format: \"chrom:start-end\". \
-        If you would like to specify an entire chromosome simply use \"chrom:\"")
-     parser_call.add_argument("casava_version", type=float, help="casava_version is a float indicating which version of casava was used to generate the fastq files.")
-     parser_call.add_argument("--sig_cutoff", type=float, default=0.01, help="sig_cutoff is a float indicating the adjusted \
-        p-value cutoff you wish to use for determining whether or not a site is methylated")
-     parser_call.add_argument("--num_procs", type=int, default=1, help="processers is an integer indicating how many processors you would like to run this function over") 
-     parser_call.add_argument("--min_cov", type=int, default=1, help="min_cov is an integer indicating the minimum number of reads for a site to be tested")
-     parser_call.add_argument("--binom_test", type=bool, default=False, help="Boolean indicating if you want to run binomial tests")
-     parser_call.add_argument("--min_mc", type=int, default=0, help="Minimum number of mCs that must be observed")
-     parser_call.add_argument("--path_to_samtools", type=str, default="", help="Path to samtools installation (default is current dir)")
-     parser_call.add_argument("--sort_mem", type=str, default=False, help="Parameter to pass to unix sort with -S/--buffer-size command")
-     parser_call.add_argument("--bh", type=bool, default=False, help="Boolean flag indicating whether or not you would like to use the benjamini-hochberg FDR \
-        instead of an FDR calculated from the control reference")
-     parser_call.add_argument("--path_to_files", type=str, default="", help="string indicating the path for the output and the input bam, mpileup, or allc files \
-        for methylation calling.")                                                                                                                                                   
-     
-     args = parser.parse_args()
 
-     if args.command == "run_methylation_pipeline":
-         if not args.aligner_options:
-              args.aligner_options = ["-S","-k 1","-m 1","--chunkmbs 3072","--best","--strata","-o 4","-e 80","-l 20","-n 0"]
-              
-         run_methylation_pipeline_pe(args.files,args.libraries,args.sample,args.forward_ref,args.reverse_ref,args.ref_fasta,
-                                     args.unmethylated_control,args.path_to_samtools,args.path_to_aligner,
-                                     args.aligner_options,args.num_procs,args.trim_reads,
-                                     args.path_to_cutadapt,args.adapter_seq,args.max_adapter_removal,
-                                     args.overlap_length,args.zero_cap,args.error_rate,args.min_qual_score,args.min_read_len,
-                                     args.sig_cutoff,args.min_cov,args.binom_test,args.keep_temp_files,
-                                     args.save_space,
-                                     args.bowtie2,args.sort_mem,args.path_to_output)
-         
-     elif args.command == "call_methylated_sites":
-          call_methylated_sites(args.inputf, args.sample, args.reference, args.control, args.casava_version, args.sig_cutoff,
-                                args.num_procs, args.min_cov, args.binom_test, args.min_mc, args.path_to_samtools, args.sort_mem,
-                                args.bh, args.path_to_files)
-          
 if __name__ == "__main__":
      parse_args()
