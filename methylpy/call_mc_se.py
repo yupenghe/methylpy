@@ -21,12 +21,12 @@ def run_methylation_pipeline(read_files, libraries, sample,
                              path_to_output="", sig_cutoff=0.01,
                              num_procs=1, sort_mem="500M",
                              num_upstr_bases=0, num_downstr_bases=2,
-                             generate_allc_file=True,split_allc_files=False,
+                             generate_allc_file=True,split_allc_file=False,
                              generate_mpileup_file=True, compress_output=True,
                              binom_test=False, min_cov=2,
                              trim_reads=True, path_to_cutadapt="",
                              pbat=False,
-                             bowtie2=False, path_to_aligner="", aligner_options=[],
+                             bowtie2=False, path_to_aligner="", aligner_options=None,
                              remove_clonal=True,keep_clonal_stats=False,
                              path_to_picard="",java_options="-Xmx20g",
                              path_to_samtools="",
@@ -135,8 +135,10 @@ def run_methylation_pipeline(read_files, libraries, sample,
     """
 
     #Default bowtie option
-    if len(aligner_options) == 0:
-        if not bowtie2:
+    if aligner_options is None:
+        if bowtie2:
+            aligner_options = []            
+        else:
             aligner_options = ["-S", "-k 1", "-m 1", "--chunkmbs 3072",
                                "--best", "--strata", "-o 4", "-e 80",
                                "-l 20", "-n 0"]
@@ -247,13 +249,12 @@ def run_methylation_pipeline(read_files, libraries, sample,
         else:
             subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads.bam"))
 
-    print_checkpoint("Begin calling mCs")
-    if remove_clonal == True:
-        output_bam_file = path_to_output+sample+"_processed_reads_no_clonal.bam"
-    else:
-        output_bam_file = path_to_output+sample+"_processed_reads.bam"
-
     if generate_allc_file:
+        print_checkpoint("Begin calling mCs")
+        if remove_clonal == True:
+            output_bam_file = path_to_output+sample+"_processed_reads_no_clonal.bam"
+        else:
+            output_bam_file = path_to_output+sample+"_processed_reads.bam"
         call_methylated_sites(output_bam_file,
                               sample,
                               reference_fasta,
@@ -264,7 +265,7 @@ def run_methylation_pipeline(read_files, libraries, sample,
                               num_downstr_bases=num_downstr_bases,
                               generate_mpileup_file=generate_mpileup_file,
                               compress_output=compress_output,
-                              split_allc_files=split_allc_files,
+                              split_allc_file=split_allc_file,
                               min_cov=min_cov,
                               binom_test=binom_test,
                               sort_mem=sort_mem,
@@ -1119,7 +1120,7 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
                           num_upstr_bases=0,num_downstr_bases=2,
                           generate_mpileup_file=True,
                           compress_output=True,
-                          split_allc_files=False,
+                          split_allc_file=False,
                           buffer_line_number = 100000,
                           min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
                           sort_mem="500M",path_to_files="",min_base_quality=1):
@@ -1256,7 +1257,7 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
         subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output.tsv"))
 
     
-    if not split_allc_files:
+    if not split_allc_file:
         return 0
     
     # Split allc files

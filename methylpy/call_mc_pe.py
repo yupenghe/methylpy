@@ -36,12 +36,11 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
                                 num_procs=1, sort_mem="500M",
                                 num_upstr_bases=0,
                                 num_downstr_bases=2,
-                                generate_mpileup_file=True,
-                                compress_output=True,
-                                split_allc_files=False,
+                                generate_allc_file=True,split_allc_file=False,
+                                generate_mpileup_file=True,compress_output=True,
                                 binom_test=True, min_cov=2,
                                 trim_reads=True, path_to_cutadapt="",
-                                bowtie2=True, path_to_aligner="", aligner_options=[],
+                                bowtie2=True, path_to_aligner="", aligner_options=None,
                                 pbat=False,
                                 remove_clonal=True, keep_clonal_stats=False,
                                 path_to_picard="",java_options="-Xmx20g",
@@ -172,7 +171,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
     """
 
     #Default bowtie option
-    if len(aligner_options) == 0:
+    if aligner_options is None:
         if bowtie2:
             aligner_options = ["-X 1000", "-k 2", "--no-discordant", "--no-mixed"]
         else:
@@ -293,29 +292,29 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
             subprocess.check_call(shlex.split("mv "+library_files[0]+" "+path_to_output+sample+"_processed_reads.bam"))
 
     #Calling methylated sites
-    print_checkpoint("Begin calling mCs")
-    if remove_clonal == True:
-        output_bam_file = path_to_output+sample+"_processed_reads_no_clonal.bam"
-    else:
-        output_bam_file = path_to_output+sample+"_processed_reads.bam"
-
-    call_methylated_sites_pe(output_bam_file,
-                             sample,
-                             reference_fasta,
-                             unmethylated_control,
-                             sig_cutoff=sig_cutoff,
-                             num_procs=num_procs,
-                             num_upstr_bases=num_upstr_bases,
-                             num_downstr_bases=num_downstr_bases,
-                             generate_mpileup_file=generate_mpileup_file,
-                             compress_output=compress_output,
-                             split_allc_files=split_allc_files,
-                             min_cov=min_cov,
-                             binom_test=binom_test,
-                             sort_mem=sort_mem,
-                             path_to_files=path_to_output,
-                             path_to_samtools=path_to_samtools,
-                             min_base_quality=min_base_quality)
+    if generate_allc_file:
+        print_checkpoint("Begin calling mCs")
+        if remove_clonal == True:
+            output_bam_file = path_to_output+sample+"_processed_reads_no_clonal.bam"
+        else:
+            output_bam_file = path_to_output+sample+"_processed_reads.bam"            
+        call_methylated_sites_pe(output_bam_file,
+                                 sample,
+                                 reference_fasta,
+                                 unmethylated_control,
+                                 sig_cutoff=sig_cutoff,
+                                 num_procs=num_procs,
+                                 num_upstr_bases=num_upstr_bases,
+                                 num_downstr_bases=num_downstr_bases,
+                                 generate_mpileup_file=generate_mpileup_file,
+                                 compress_output=compress_output,
+                                 split_allc_file=split_allc_file,
+                                 min_cov=min_cov,
+                                 binom_test=binom_test,
+                                 sort_mem=sort_mem,
+                                 path_to_files=path_to_output,
+                                 path_to_samtools=path_to_samtools,
+                                 min_base_quality=min_base_quality)
     print_checkpoint("Done")
 
 def run_mapping_pe(current_library, library_read1_files, library_read2_files,
@@ -1032,7 +1031,7 @@ def flip_read2_strand(input_file,output_file,path_to_samtools=""):
 def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
                              num_upstr_bases=0,num_downstr_bases=2,
                              generate_mpileup_file=True,compress_output=True,
-                             split_allc_files=False,
+                             split_allc_file=False,
                              min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",
                              path_to_files="",min_base_quality=1):
 
@@ -1085,7 +1084,7 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff
                           num_downstr_bases=num_downstr_bases,
                           generate_mpileup_file=generate_mpileup_file,
                           compress_output=compress_output,
-                          split_allc_files=split_allc_files,
+                          split_allc_file=split_allc_file,
                           min_cov = min_cov,
                           binom_test = binom_test,
                           min_mc = min_mc,
