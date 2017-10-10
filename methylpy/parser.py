@@ -297,7 +297,7 @@ def add_DMRfind_subparser(subparsers):
                                      help="A list of samples for collapsing blocks")
      
      parser_dmrfind_opt.add_argument("--keep-temp-files",
-                                     type=bool,
+                                     type=str2bool,
                                      default=False,
                                      help="Boolean; keep intermediate files?")
      
@@ -370,7 +370,7 @@ def add_se_pipeline_subparser(subparsers):
                                 + "The default is the same directory as the input fastqs.")
 
      parser_se_opt.add_argument("--pbat",
-                                type=bool,
+                                type=str2bool,
                                 default=False,
                                 help="Boolean indicating whether to process data in PBAT (Post-Bisulfite "
                                 +"Adaptor Tagging) mode, in which reads will be mapped to opposite strand "
@@ -401,34 +401,34 @@ def add_se_pipeline_subparser(subparsers):
                                 + "different sequence contexts.")
 
      parser_se_opt.add_argument("--generate-allc-file",
-                                type=bool,
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicating whether to generate the final output file that "
                                 +" contains the methylation state of each cytosine. If set to be false, "
                                 +"only alignment file (in BAM format) will be generated.")
 
      parser_se_opt.add_argument("--split-allc-file",
-                                type=bool,
+                                type=str2bool,
                                 default=False,
                                 help="Boolean indicating whether to split the final output file by chromosomes. "
                                 +"If set to be true, one sample will contain multiple allc files and each of "
                                 +"them contains the methylation state of all cytosines on one chromosome.")
 
      parser_se_opt.add_argument("--generate-mpileup-file",
-                                type=bool,
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicating whether to generate intermediate mpileup file to save "
                                 +"space. However, skipping mpileup step may cause problem due to the nature of "
                                 +"python. Not skipping this step is recommended.")
      
      parser_se_opt.add_argument("--compress-output",
-                                type=bool,
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicating whether to compress (by gzip) the final output "
                                 + "(allc file(s)).")     
 
      parser_se_opt.add_argument("--trim-reads",
-                                type=bool,
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicating whether to trim reads using cutadapt.")
      
@@ -438,7 +438,7 @@ def add_se_pipeline_subparser(subparsers):
                                 help="Path to cutadapt installation (default is current dir)")
      
      parser_se_opt.add_argument("--bowtie2",
-                                type=bool,
+                                type=str2bool,
                                 default=True,
                                 help="Specifies whether to use the bowtie2 aligner instead of bowtie")
 
@@ -454,7 +454,7 @@ def add_se_pipeline_subparser(subparsers):
                                 + "to bowtie (e.g., [\"-k 1\",\"-l 2\"])")
           
      parser_se_opt.add_argument("--remove-clonal",
-                                type=bool,
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicates whether to remove clonal reads or not")
      
@@ -466,7 +466,7 @@ def add_se_pipeline_subparser(subparsers):
                                 + "(default is current dir)")
           
      parser_se_opt.add_argument("--keep-clonal-stats",
-                                type=bool,
+                                type=str2bool,
                                 default=False,
                                 help="Boolean indicates whether to store the metric file from picard.")
      
@@ -497,7 +497,7 @@ def add_se_pipeline_subparser(subparsers):
                                 + "chromosome simply use \"chrom:\"")
      
      parser_se_opt.add_argument("--binom-test",
-                                type=bool,
+                                type=str2bool,
                                 default=False,
                                 help="Indicates that you would like to perform a binomial test on each cytosine "
                                 +"to delineate cytosines that are significantly methylated than noise due to "
@@ -526,7 +526,7 @@ def add_se_pipeline_subparser(subparsers):
                                 +"bases trimmed purely due to short random adapter matches.")
      
      parser_se_opt.add_argument("--zero_cap",
-                                type=bool,
+                                type=str2bool,
                                 help="Flag that causes negative quality values to be set to zero (workaround "
                                 +"to avoid segmentation faults in BWA)")
      
@@ -558,20 +558,20 @@ def add_se_pipeline_subparser(subparsers):
                                 +"methylation calling).")
      
      parser_se_opt.add_argument("--keep_temp_files",
-                                type=bool,
+                                type=str2bool,
                                 default=False,
                                 help="Boolean indicating that you would like to keep the intermediate files "
                                 +"generated by this function. This can be useful for debugging, but in general "
                                 +"should be left False.")
 
 def add_pe_pipeline_subparser(subparsers):
-     parser_se = subparsers.add_parser("paired-end-pipeline",
+     parser_pe = subparsers.add_parser("paired-end-pipeline",
                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                        help="Methylation pipeline for paired-end data")
 
-     parser_se_req = parser_se.add_argument_group("required inputs")
+     parser_pe_req = parser_pe.add_argument_group("required inputs")
           
-     parser_se_req.add_argument("--read1-files",
+     parser_pe_req.add_argument("--read1-files",
                                   type=str,
                                   nargs="+",
                                   required=True,
@@ -579,7 +579,7 @@ def add_pe_pipeline_subparser(subparsers):
                                   + "the pipeline. Note that globbing is supported here (i.e., you "
                                   + "can use * in your paths)")
      
-     parser_se_req.add_argument("--read2-files",
+     parser_pe_req.add_argument("--read2-files",
                                   type=str,
                                   nargs="+",
                                   required=True,
@@ -587,7 +587,7 @@ def add_pe_pipeline_subparser(subparsers):
                                   + "the pipeline. Note that globbing is supported here (i.e., you "
                                   + "can use * in your paths)")
      
-     parser_se_req.add_argument("--libraries",
+     parser_pe_req.add_argument("--libraries",
                                   type=str,
                                   nargs="+",
                                   required=True,
@@ -597,160 +597,160 @@ def add_pe_pipeline_subparser(subparsers):
                                   + "those fastqs once (i.e., the length of files and libraries should "
                                   + "be the same)")
      
-     parser_se_req.add_argument("--sample",
+     parser_pe_req.add_argument("--sample",
                                   type=str,
                                   required=True,
                                   help="String indicating the name of the sample you are processing. "
                                   + "It will be included in the output files.")
      
-     parser_se_req.add_argument("--forward-ref",
+     parser_pe_req.add_argument("--forward-ref",
                                   type=str, required=True, help="string indicating the path to the "
                                   + "forward strand reference created by build_ref")
      
-     parser_se_req.add_argument("--reverse-ref",
+     parser_pe_req.add_argument("--reverse-ref",
                                   type=str,
                                   required=True,
                                   help="string indicating the path to the reverse strand reference "
                                   + "created by build_ref")
      
-     parser_se_req.add_argument("--ref-fasta",
+     parser_pe_req.add_argument("--ref-fasta",
                                   type=str,
                                   required=True,
                                   help="string indicating the path to a fasta file containing the "
                                   + "sequences you used for mapping")
      
-     parser_se_opt = parser_se.add_argument_group("optional inputs")
+     parser_pe_opt = parser_pe.add_argument_group("optional inputs")
 
-     parser_se_opt.add_argument("--path-to-output",
+     parser_pe_opt.add_argument("--path-to-output",
                                 type=str,
                                 default="",
                                 help="Path to a directory where you would like the output to be stored. "
                                 + "The default is the same directory as the input fastqs.")
 
-     parser_se_opt.add_argument("--pbat",
-                                type=bool,
+     parser_pe_opt.add_argument("--pbat",
+                                type=str2bool,
                                 default=False,
                                 help="Boolean indicating whether to process data in PBAT (Post-Bisulfite "
                                 +"Adaptor Tagging) mode, in which reads will be mapped to opposite strand "
                                 +"of C-T converted genome and the forward strand of G-A converted genome.")
 
-     parser_se_opt.add_argument("--num-procs",
+     parser_pe_opt.add_argument("--num-procs",
                                 type=int,
                                 default=1,
                                 help="Number of processors you wish to use to parallelize this function")     
 
-     parser_se_opt.add_argument("--sort-mem",
+     parser_pe_opt.add_argument("--sort-mem",
                                 type=str,
                                 default="500M",
                                 help="Parameter to pass to unix sort with -S/--buffer-size command")
 
-     parser_se_opt.add_argument("--num-upstream-bases",
+     parser_pe_opt.add_argument("--num-upstream-bases",
                                 type=int,
                                 default=0,
                                 help="Number of base(s) upstream of each cytosine that you wish to include "
                                 + "in output file. Recommend value 1 for NOMe-seq processing since the "
                                 + "upstream base is required to tell apart cytosine at GC context.")
 
-     parser_se_opt.add_argument("--num-downstream-bases",
+     parser_pe_opt.add_argument("--num-downstream-bases",
                                 type=int,
                                 default=2,
                                 help="Number of base(s) downstream of each cytosine that you wish to include "
                                 + "in output file. Recommend value to be at least 1 to separate cytosines at "
                                 + "different sequence contexts.")
 
-     parser_se_opt.add_argument("--generate-allc-file",
-                                type=bool,
+     parser_pe_opt.add_argument("--generate-allc-file",
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicating whether to generate the final output file that "
                                 +" contains the methylation state of each cytosine. If set to be false, "
                                 +"only alignment file (in BAM format) will be generated.")
 
-     parser_se_opt.add_argument("--split-allc-file",
-                                type=bool,
+     parser_pe_opt.add_argument("--split-allc-file",
+                                type=str2bool,
                                 default=False,
                                 help="Boolean indicating whether to split the final output file by chromosomes. "
                                 +"If set to be true, one sample will contain multiple allc files and each of "
                                 +"them contains the methylation state of all cytosines on one chromosome.")
 
-     parser_se_opt.add_argument("--generate-mpileup-file",
-                                type=bool,
+     parser_pe_opt.add_argument("--generate-mpileup-file",
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicating whether to generate intermediate mpileup file to save "
                                 +"space. However, skipping mpileup step may cause problem due to the nature of "
                                 +"python. Not skipping this step is recommended.")
      
-     parser_se_opt.add_argument("--compress-output",
-                                type=bool,
-                                default=True,
+     parser_pe_opt.add_argument("--compress-output",
+                                type=str2bool,
+                                default=False,
                                 help="Boolean indicating whether to compress (by gzip) the final output "
                                 + "(allc file(s)).")     
 
-     parser_se_opt.add_argument("--trim-reads",
-                                type=bool,
+     parser_pe_opt.add_argument("--trim-reads",
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicating whether to trim reads using cutadapt.")
      
-     parser_se_opt.add_argument("--path-to-cutadapt",
+     parser_pe_opt.add_argument("--path-to-cutadapt",
                                 type=str,
                                 default="",
                                 help="Path to cutadapt installation (default is current dir)")
      
-     parser_se_opt.add_argument("--bowtie2",
-                                type=bool,
+     parser_pe_opt.add_argument("--bowtie2",
+                                type=str2bool,
                                 default=True,
                                 help="Specifies whether to use the bowtie2 aligner instead of bowtie")
 
-     parser_se_opt.add_argument("--path-to-aligner",
+     parser_pe_opt.add_argument("--path-to-aligner",
                                 type=str,
                                 default="",
                                 help="Path to bowtie installation (default is current dir)")
      
-     parser_se_opt.add_argument("--aligner-options",
+     parser_pe_opt.add_argument("--aligner-options",
                                 type=str,
                                 nargs="+",
                                 help="list of strings indicating options you would like passed "
                                 + "to bowtie (e.g., [\"-k 1\",\"-l 2\"])")
           
-     parser_se_opt.add_argument("--remove-clonal",
-                                type=bool,
+     parser_pe_opt.add_argument("--remove-clonal",
+                                type=str2bool,
                                 default=True,
                                 help="Boolean indicates whether to remove clonal reads or not")
      
-     parser_se_opt.add_argument("--path-to-picard",
+     parser_pe_opt.add_argument("--path-to-picard",
                                 type=str,
                                 default="",
                                 help="The path to the picard.jar in picard tools. The jar file can "
                                 + "be downloaded from https://broadinstitute.github.io/picard/index.html "
                                 + "(default is current dir)")
           
-     parser_se_opt.add_argument("--keep-clonal-stats",
-                                type=bool,
+     parser_pe_opt.add_argument("--keep-clonal-stats",
+                                type=str2bool,
                                 default=False,
                                 help="Boolean indicates whether to store the metric file from picard.")
      
-     parser_se_opt.add_argument("--java-options",
+     parser_pe_opt.add_argument("--java-options",
                                 type=str,
                                 default="-Xmx20g",
                                 help="String indicating the option pass the java when running picard.")
 
-     parser_se_opt.add_argument("--path-to-samtools",
+     parser_pe_opt.add_argument("--path-to-samtools",
                                 type=str,
                                 default="",
                                 help="Path to samtools installation (default is current dir)")
      
-     parser_se_opt.add_argument("--adapter-seq-read1",
+     parser_pe_opt.add_argument("--adapter-seq-read1",
                                 type=str,
                                 default="AGATCGGAAGAGCACACGTCTGAAC",
                                 help="sequence of an adapter that was ligated to the 3\' end of read 1. The "
                                 +"adapter itself and anything that follows is trimmed.")
      
-     parser_se_opt.add_argument("--adapter-seq-read2",
+     parser_pe_opt.add_argument("--adapter-seq-read2",
                                 type=str,
                                 default="AGATCGGAAGAGCGTCGTGTAGGGA",
                                 help="sequence of an adapter that was ligated to the 3\' end of read 2. The "
                                 +"adapter itself and anything that follows is trimmed.")
 
-     parser_se_opt.add_argument("--unmethylated-control",
+     parser_pe_opt.add_argument("--unmethylated-control",
                                 type=str,
                                 default=None,
                                 help="name of the chromosome/region that you want to use to estimate "
@@ -760,46 +760,46 @@ def add_pe_pipeline_subparser(subparsers):
                                 + "format: \"chrom:start-end\". If you would like to specify an entire "
                                 + "chromosome simply use \"chrom:\"")
      
-     parser_se_opt.add_argument("--binom-test",
-                                type=bool,
+     parser_pe_opt.add_argument("--binom-test",
+                                type=str2bool,
                                 default=False,
                                 help="Indicates that you would like to perform a binomial test on each cytosine "
                                 +"to delineate cytosines that are significantly methylated than noise due to "
                                 +"the failure of bisulfite conversion.")
      
-     parser_se_opt.add_argument("--sig-cutoff",
+     parser_pe_opt.add_argument("--sig-cutoff",
                                 type=float,
                                 default=.01,
                                 help="float indicating the adjusted p-value cutoff you wish to use for "
                                 + "determining whether or not a site is methylated")
 
-     parser_se_opt.add_argument("--min_cov",
+     parser_pe_opt.add_argument("--min_cov",
                                 type=int,
                                 default=0,
                                 help="Integer indicating the minimum number of reads for a site to be tested.")
      
-     parser_se_opt.add_argument("--max_adapter_removal",
+     parser_pe_opt.add_argument("--max_adapter_removal",
                                 type=int,
                                 help="Indicates the maximum number of times to try to remove adapters. Useful "
                                 +"when an adapter gets appended multiple times.")
      
-     parser_se_opt.add_argument("--overlap_length",
+     parser_pe_opt.add_argument("--overlap_length",
                                 type=int,
                                 help="Minimum overlap length. If the overlap between the read and the adapter "
                                 +"is shorter than LENGTH, the read is not modified. This reduces the no. of "
                                 +"bases trimmed purely due to short random adapter matches.")
      
-     parser_se_opt.add_argument("--zero_cap",
-                                type=bool,
+     parser_pe_opt.add_argument("--zero_cap",
+                                type=str2bool,
                                 help="Flag that causes negative quality values to be set to zero (workaround "
                                 +"to avoid segmentation faults in BWA)")
      
-     parser_se_opt.add_argument("--error_rate",
+     parser_pe_opt.add_argument("--error_rate",
                                 type=float,
                                 help="maximum allowed error rate (no. of errors divided by the length of "
                                 +"the matching region)")
      
-     parser_se_opt.add_argument("--min_qual_score",
+     parser_pe_opt.add_argument("--min_qual_score",
                                 type=int,
                                 default=10,
                                 help="allows you to trim low-quality ends from reads before adapter removal. "
@@ -807,22 +807,22 @@ def add_pe_pipeline_subparser(subparsers):
                                 +"qualities; compute partial sums from all indices to the end of the sequence; "
                                 +" cut sequence at the index at which the sum is minimal).")
      
-     parser_se_opt.add_argument("--min_read_len",
+     parser_pe_opt.add_argument("--min_read_len",
                                 type=int,
                                 default=30,
                                 help="indicates the minimum length a read must be to be kept. Reads that "
                                 +"are too short even before adapter removal are also discarded. In colorspace, "
                                 "an initial primer is not counted.")
 
-     parser_se_opt.add_argument("--min-base-quality",
+     parser_pe_opt.add_argument("--min-base-quality",
                                 type=int,
                                 default=1,
                                 help="Integer indicating the minimum PHRED quality score for a base to be "
                                 +"included in the mpileup file (and subsequently to be considered for "
                                 +"methylation calling).")
      
-     parser_se_opt.add_argument("--keep_temp_files",
-                                type=bool,
+     parser_pe_opt.add_argument("--keep_temp_files",
+                                type=str2bool,
                                 default=False,
                                 help="Boolean indicating that you would like to keep the intermediate files "
                                 +"generated by this function. This can be useful for debugging, but in general "
@@ -850,7 +850,7 @@ def add_build_ref_subparser(subparsers):
      
      parser_build_opt = parser_build.add_argument_group("optional inputs")
      parser_build_opt.add_argument("--bowtie2",
-                                   type=bool,
+                                   type=str2bool,
                                    default=True,
                                    help="Boolean indicating whether to create reference for bowtie2 instead "
                                    +"of for bowtie.")
@@ -861,12 +861,12 @@ def add_build_ref_subparser(subparsers):
                                    help="The number of bytes that will be read in from the reference at once.")
 
      parser_build_opt.add_argument("--parallel",
-                                   type=bool,
+                                   type=str2bool,
                                    default=False,
                                    help="Boolean indicating whether to use 2 cores for processing.")
 
      parser_build_opt.add_argument("--offrate",
-                                   type=bool,
+                                   type=str2bool,
                                    default=False,
                                    help="offrate refers to the Bowtie parameter, reference the bowtie "
                                    +"manual to see more detail.")
@@ -944,7 +944,7 @@ def add_call_mc_subparser(subparsers):
                               + "sequences you used for mapping")
 
      call_mc_req.add_argument("--paired-end",
-                              type=bool,
+                              type=str2bool,
                               required=True,
                               default=False,
                               help="Boolean indicating whether the input BAM file is from paired-end "
@@ -978,28 +978,28 @@ def add_call_mc_subparser(subparsers):
                               + "different sequence contexts.")
 
      call_mc_opt.add_argument("--generate-allc-file",
-                              type=bool,
+                              type=str2bool,
                               default=True,
                               help="Boolean indicating whether to generate the final output file that "
                               +" contains the methylation state of each cytosine. If set to be false, "
                               +"only alignment file (in BAM format) will be generated.")
 
      call_mc_opt.add_argument("--split-allc-file",
-                              type=bool,
+                              type=str2bool,
                               default=False,
                               help="Boolean indicating whether to split the final output file by chromosomes. "
                               +"If set to be true, one sample will contain multiple allc files and each of "
                               +"them contains the methylation state of all cytosines on one chromosome.")
 
      call_mc_opt.add_argument("--generate-mpileup-file",
-                              type=bool,
+                              type=str2bool,
                               default=True,
                               help="Boolean indicating whether to generate intermediate mpileup file to save "
                               +"space. However, skipping mpileup step may cause problem due to the nature of "
                               +"python. Not skipping this step is recommended.")
      
      call_mc_opt.add_argument("--compress-output",
-                              type=bool,
+                              type=str2bool,
                               default=True,
                               help="Boolean indicating whether to compress (by gzip) the final output "
                               + "(allc file(s)).")     
@@ -1020,7 +1020,7 @@ def add_call_mc_subparser(subparsers):
                               + "chromosome simply use \"chrom:\"")
      
      call_mc_opt.add_argument("--binom-test",
-                              type=bool,
+                              type=str2bool,
                               default=False,
                               help="Indicates that you would like to perform a binomial test on each cytosine "
                               +"to delineate cytosines that are significantly methylated than noise due to "
@@ -1049,6 +1049,17 @@ def add_call_mc_subparser(subparsers):
                               help="Integer indicating the minimum PHRED quality score for a base to be "
                               +"included in the mpileup file (and subsequently to be considered for "
                               +"methylation calling).")
-     
+
+def str2bool(v):
+     ## adapted from the answer by Maxim at
+     ## https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+     if v.lower() in ('yes', 'true', 't', 'y', '1'):
+          return(True)
+     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+          return(False)
+     else:
+          raise argparse.ArgumentTypeError('Boolean value expected.')
+
+              
 if __name__ == "__main__":
      parse_args()
