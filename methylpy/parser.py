@@ -1,23 +1,29 @@
 import argparse
-from methylpy.DMRfind import DMRfind
-from methylpy.call_mc_se import run_methylation_pipeline
-from methylpy.call_mc_pe import run_methylation_pipeline_pe
 
 def parse_args():
      # create the top-level parser
-     parser = argparse.ArgumentParser(prog="PROG")
-
+     parser = argparse.ArgumentParser()
      subparsers = parser.add_subparsers(dest="command")
-
+     
+     add_build_ref_subparser(subparsers)
      add_DMRfind_subparser(subparsers)
      add_se_pipeline_subparser(subparsers)
      add_pe_pipeline_subparser(subparsers)
-     #add_DMRfind_parser(parser)
-     #add_DMRfind_parser(parser)
+     add_bam_filter_subparser(subparsers)
+     add_call_mc_subparser(subparsers)
 
      args = parser.parse_args()
-          
-     if args.command == "DMRfind":
+     if args.command == "build-reference":
+          from methylpy.call_mc_se import build_ref
+          build_ref(input_files=args.input_files,
+                    output=args.output_prefix,
+                    buffsize=args.buffsize,
+                    parallel=args.parallel,
+                    bowtie2=args.bowtie2,
+                    offrate=args.offrate)
+               
+     elif args.command == "DMRfind":
+          from methylpy.DMRfind import DMRfind
           DMRfind(allc_files = args.allc_files,
                   samples=args.samples,
                   mc_type=args.mc_type,
@@ -39,6 +45,7 @@ def parse_args():
                   seed=-1)
 
      elif args.command == "single-end-pipeline":
+          from methylpy.call_mc_se import run_methylation_pipeline
           run_methylation_pipeline(read_files=args.read_files,
                                    libraries=args.libraries,
                                    sample=args.sample,
@@ -80,6 +87,7 @@ def parse_args():
                                    keep_temp_files=args.keep_temp_files)
      
      elif args.command == "paired-end-pipeline":
+          from methylpy.call_mc_pe import run_methylation_pipeline_pe
           run_methylation_pipeline_pe(read1_files=args.read1_files,
                                       read2_files=args.read2_files,
                                       libraries=args.libraries,
@@ -121,11 +129,56 @@ def parse_args():
                                       min_read_len=args.min_read_len,
                                       min_base_quality=args.min_base_quality,
                                       keep_temp_files=args.keep_temp_files)
-          
-     #elif args.command == "call_methylated_sites":
-     #     call_methylated_sites(args.inputf, args.sample, args.reference, args.control, args.casava_version, args.sig_cutoff,
-      #                          args.num_procs, args.min_cov, args.binom_test, args.min_mc, args.path_to_samtools, args.sort_mem,
-       #                         , args.path_to_files)
+
+     elif args.command == "bam-quality-filter":          
+          from methylpy.call_mc_se import bam_quality_mch_filter
+          bam_quality_mch_filter(inputf=args.input_file,
+                                 outputf=args.output_file,
+                                 reference_fasta=args.ref_fasta,
+                                 quality_cutoff=args.quality_cutoff,
+                                 min_ch=args.min_num_ch,
+                                 max_mch_level=args.max_mch_level,
+                                 buffer_line_number=args.buffer_line_number,
+                                 path_to_samtools=args.path_to_samtools)
+     elif args.command == "call-methylation-state":
+          if args.paired_end:
+               from call_mc_pe import call_methylated_sites_pe
+               call_methylated_sites_pe(inputf=args.input_file,
+                                        sample=args.sample,
+                                        reference_fasta=args.ref_fasta,
+                                        control=args.unmethylated_control,
+                                        sig_cutoff=args.sig_cutoff,
+                                        num_procs=args.num_procs,                                     
+                                        num_upstr_bases=args.num_upstream_bases,
+                                        num_downstr_bases=args.num_downstream_bases,
+                                        split_allc_file=args.split_allc_file,
+                                        generate_mpileup_file=args.generate_mpileup_file,
+                                        compress_output=args.compress_output,
+                                        min_cov=args.min_cov,
+                                        binom_test=args.binom_test,
+                                        min_mc=args.min_mc,
+                                        path_to_samtools=args.path_to_samtools,
+                                        path_to_files=args.path_to_output,
+                                        min_base_quality=args.min_base_quality)
+          else:
+               from call_mc_se import call_methylated_sites
+               call_methylated_sites(inputf=args.input_file,
+                                     sample=args.sample,
+                                     reference_fasta=args.ref_fasta,
+                                     control=args.unmethylated_control,
+                                     sig_cutoff=args.sig_cutoff,
+                                     num_procs=args.num_procs,                                     
+                                     num_upstr_bases=args.num_upstream_bases,
+                                     num_downstr_bases=args.num_downstream_bases,
+                                     split_allc_file=args.split_allc_file,
+                                     generate_mpileup_file=args.generate_mpileup_file,
+                                     compress_output=args.compress_output,
+                                     min_cov=args.min_cov,
+                                     binom_test=args.binom_test,
+                                     min_mc=args.min_mc,
+                                     path_to_samtools=args.path_to_samtools,
+                                     path_to_files=args.path_to_output,
+                                     min_base_quality=args.min_base_quality)
 
 def add_DMRfind_subparser(subparsers):
      # create the parser for the "DMRfind" command
@@ -775,29 +828,227 @@ def add_pe_pipeline_subparser(subparsers):
                                 +"generated by this function. This can be useful for debugging, but in general "
                                 +"should be left False.")
 
-def add_se_call_mc_subparser(subparsers):
-     #create the parser for the "call_methylated_sites" command
-     parser_call = subparsers.add_parser("call_methylated_sites",
-                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                         help="Use to run the call_methylated_sites function")
+def add_build_ref_subparser(subparsers):
+     # create the parser for the "DMRfind" command
+     parser_build = subparsers.add_parser(
+          "build-reference",
+          formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+          help="Building reference for bisulfite sequencing data")
      
-     parser_call.add_argument("inputf", type=str, help="inputf is the path to a bam file that contains mapped bisulfite sequencing reads")
-     parser_call.add_argument("sample", type=str, help="output is the name you would like for the allc files. The files will be named like so: allc_<sample>_<chrom>.tsv")
-     parser_call.add_argument("reference", type=str, help="reference is the path to a samtools indexed fasta file")
-     parser_call.add_argument("control", type=str, help="control is the name of the chromosome/region that you want to use to \
-        estimate the non-conversion rate of your sample, or the non-conversion rate you would like to use. Consequently, control \
-        is either a string, or a decimal. If control is a string then it should be in the following format: \"chrom:start-end\". \
-        If you would like to specify an entire chromosome simply use \"chrom:\"")
-     parser_call.add_argument("casava_version", type=float, help="casava_version is a float indicating which version of casava was used to generate the fastq files.")
-     parser_call.add_argument("--sig_cutoff", type=float, default=0.01, help="sig_cutoff is a float indicating the adjusted \
-        p-value cutoff you wish to use for determining whether or not a site is methylated")
-     parser_call.add_argument("--num_procs", type=int, default=1, help="processers is an integer indicating how many processors you would like to run this function over") 
-     parser_call.add_argument("--min_cov", type=int, default=1, help="min_cov is an integer indicating the minimum number of reads for a site to be tested")
-     parser_call.add_argument("--binom_test", type=bool, default=False, help="Boolean indicating if you want to run binomial tests")
-     parser_call.add_argument("--min_mc", type=int, default=0, help="Minimum number of mCs that must be observed")
-     parser_call.add_argument("--path_to_samtools", type=str, default="", help="Path to samtools installation (default is current dir)")
-     parser_call.add_argument("--sort_mem", type=str, default=False, help="Parameter to pass to unix sort with -S/--buffer-size command")
+     # add options
+     parser_build_req = parser_build.add_argument_group("required inputs")
+     parser_build_req.add_argument("--input-files",
+                                   type=str,
+                                   nargs="+",
+                                   required=True,
+                                   help="List of genome fasta files to build a reference from.")
 
+     parser_build_req.add_argument("--output-prefix",
+                                   type=str,
+                                   required=True,
+                                   help="the prefix of the two output reference files that will be created.")
+     
+     parser_build_opt = parser_build.add_argument_group("optional inputs")
+     parser_build_opt.add_argument("--bowtie2",
+                                   type=bool,
+                                   default=True,
+                                   help="Boolean indicating whether to create reference for bowtie2 instead "
+                                   +"of for bowtie.")
 
+     parser_build_opt.add_argument("--buffsize",
+                                   type=int,
+                                   default=100,
+                                   help="The number of bytes that will be read in from the reference at once.")
+
+     parser_build_opt.add_argument("--parallel",
+                                   type=bool,
+                                   default=False,
+                                   help="Boolean indicating whether to use 2 cores for processing.")
+
+     parser_build_opt.add_argument("--offrate",
+                                   type=bool,
+                                   default=False,
+                                   help="offrate refers to the Bowtie parameter, reference the bowtie "
+                                   +"manual to see more detail.")
+
+def add_bam_filter_subparser(subparsers):
+     parser_filter = subparsers.add_parser(
+          "bam-quality-filter",
+          formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+          help="Filter out single-end reads by mapping quality and mCH level")
+     
+     # add options
+     parser_filter_req = parser_filter.add_argument_group("required inputs")
+     parser_filter_req.add_argument("--input-file",
+                                    type=str,
+                                    required=True,
+                                    help="BAM file to filter.")
+     
+     parser_filter_req.add_argument("--output-file",
+                                    type=str,
+                                    required=True,
+                                    help="Name of output file")
+
+     parser_filter_req.add_argument("--ref-fasta",
+                                    type=str,
+                                    required=True,
+                                    help="string indicating the path to a fasta file containing the "
+                                    +"sequences you used for mapping")
+     
+     parser_filter_opt = parser_filter.add_argument_group("optional inputs")
+     parser_filter_opt.add_argument("--quality-cutoff",
+                                    type=int,
+                                    default=30,
+                                    help="Minimum MAPQ for reads to be included.")
+
+     parser_filter_opt.add_argument("--min-num-ch",
+                                    type=int,
+                                    default=30,
+                                    help="Minimum number of CH sites for mCH level filter to be applied.")
+
+     parser_filter_opt.add_argument("--max-mch-level",
+                                    type=float,
+                                    default=0.7,
+                                    help="Maximum mCH level for reads to be included.")
+
+     parser_filter_opt.add_argument("--path-to-samtools",
+                                type=str,
+                                default="",
+                                help="Path to samtools installation (default is current dir)")
+     
+     parser_filter_opt.add_argument("--buffer-line-number",
+                                type=int,
+                                default=100000,
+                                help="size of buffer for reads to be written on hard drive.")
+
+def add_call_mc_subparser(subparsers):
+     call_mc = subparsers.add_parser("call-methylation-state",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     help="Call cytosine methylation state from BAM file")
+
+     call_mc_req = call_mc.add_argument_group("required inputs")     
+     call_mc_req.add_argument("--input-file",
+                              type=str,
+                              help="bam file that contains mapped bisulfite sequencing reads.")
+     
+     call_mc_req.add_argument("--sample",
+                              type=str,
+                              required=True,
+                              help="String indicating the name of the sample you are processing. "
+                              + "It will be included in the output files.")
+
+     call_mc_req.add_argument("--ref-fasta",
+                              type=str,
+                              required=True,
+                              help="string indicating the path to a fasta file containing the "
+                              + "sequences you used for mapping")
+
+     call_mc_req.add_argument("--paired-end",
+                              type=bool,
+                              required=True,
+                              default=False,
+                              help="Boolean indicating whether the input BAM file is from paired-end "
+                              +"data.")
+     
+     call_mc_opt = call_mc.add_argument_group("optional inputs")
+
+     call_mc_opt.add_argument("--path-to-output",
+                              type=str,
+                              default="",
+                              help="Path to a directory where you would like the output to be stored. "
+                              + "The default is the same directory as the input fastqs.")
+
+     call_mc_opt.add_argument("--num-procs",
+                              type=int,
+                              default=1,
+                              help="Number of processors you wish to use to parallelize this function")     
+
+     call_mc_opt.add_argument("--num-upstream-bases",
+                              type=int,
+                              default=0,
+                              help="Number of base(s) upstream of each cytosine that you wish to include "
+                              + "in output file. Recommend value 1 for NOMe-seq processing since the "
+                              + "upstream base is required to tell apart cytosine at GC context.")
+
+     call_mc_opt.add_argument("--num-downstream-bases",
+                              type=int,
+                              default=2,
+                              help="Number of base(s) downstream of each cytosine that you wish to include "
+                              + "in output file. Recommend value to be at least 1 to separate cytosines at "
+                              + "different sequence contexts.")
+
+     call_mc_opt.add_argument("--generate-allc-file",
+                              type=bool,
+                              default=True,
+                              help="Boolean indicating whether to generate the final output file that "
+                              +" contains the methylation state of each cytosine. If set to be false, "
+                              +"only alignment file (in BAM format) will be generated.")
+
+     call_mc_opt.add_argument("--split-allc-file",
+                              type=bool,
+                              default=False,
+                              help="Boolean indicating whether to split the final output file by chromosomes. "
+                              +"If set to be true, one sample will contain multiple allc files and each of "
+                              +"them contains the methylation state of all cytosines on one chromosome.")
+
+     call_mc_opt.add_argument("--generate-mpileup-file",
+                              type=bool,
+                              default=True,
+                              help="Boolean indicating whether to generate intermediate mpileup file to save "
+                              +"space. However, skipping mpileup step may cause problem due to the nature of "
+                              +"python. Not skipping this step is recommended.")
+     
+     call_mc_opt.add_argument("--compress-output",
+                              type=bool,
+                              default=True,
+                              help="Boolean indicating whether to compress (by gzip) the final output "
+                              + "(allc file(s)).")     
+
+     call_mc_opt.add_argument("--path-to-samtools",
+                              type=str,
+                              default="",
+                              help="Path to samtools installation (default is current dir)")
+
+     call_mc_opt.add_argument("--unmethylated-control",
+                              type=str,
+                              default=None,
+                              help="name of the chromosome/region that you want to use to estimate "
+                              + "the non-conversion rate of your sample, or the non-conversion rate "
+                              + "you would like to use. Consequently, control is either a string, or "
+                              + "a decimal. If control is a string then it should be in the following "
+                              + "format: \"chrom:start-end\". If you would like to specify an entire "
+                              + "chromosome simply use \"chrom:\"")
+     
+     call_mc_opt.add_argument("--binom-test",
+                              type=bool,
+                              default=False,
+                              help="Indicates that you would like to perform a binomial test on each cytosine "
+                              +"to delineate cytosines that are significantly methylated than noise due to "
+                              +"the failure of bisulfite conversion.")
+     
+     call_mc_opt.add_argument("--sig-cutoff",
+                              type=float,
+                              default=.01,
+                              help="float indicating the adjusted p-value cutoff you wish to use for "
+                              + "determining whether or not a site is methylated")
+
+     call_mc_opt.add_argument("--min_cov",
+                              type=int,
+                              default=0,
+                              help="Integer indicating the minimum number of reads for a site to be tested.")
+     
+     call_mc_opt.add_argument("--min_mc",
+                              type=int,
+                              default=0,
+                              help="Minimum number of mCs that must be observed for cytosine to be called as "
+                              +"methylated.")
+     
+     call_mc_opt.add_argument("--min-base-quality",
+                              type=int,
+                              default=1,
+                              help="Integer indicating the minimum PHRED quality score for a base to be "
+                              +"included in the mpileup file (and subsequently to be considered for "
+                              +"methylation calling).")
+     
 if __name__ == "__main__":
      parse_args()

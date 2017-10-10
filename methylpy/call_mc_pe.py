@@ -311,7 +311,6 @@ def run_methylation_pipeline_pe(read1_files, read2_files, libraries, sample,
                                  split_allc_file=split_allc_file,
                                  min_cov=min_cov,
                                  binom_test=binom_test,
-                                 sort_mem=sort_mem,
                                  path_to_files=path_to_output,
                                  path_to_samtools=path_to_samtools,
                                  min_base_quality=min_base_quality)
@@ -1032,7 +1031,8 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff
                              num_upstr_bases=0,num_downstr_bases=2,
                              generate_mpileup_file=True,compress_output=True,
                              split_allc_file=False,
-                             min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",sort_mem="500M",
+                             buffer_line_number = 100000,
+                             min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
                              path_to_files="",min_base_quality=1):
 
     """
@@ -1054,8 +1054,6 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff
     num_procs is an integer indicating how many num_procs you'd like to run this function over
     
     min_cov is an integer indicating the minimum number of reads for a site to be tested.
-    
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     
     path_to_files is a string indicating the path for the output and the input bam, mpileup, or allc files
         for methylation calling.
@@ -1085,11 +1083,11 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff
                           generate_mpileup_file=generate_mpileup_file,
                           compress_output=compress_output,
                           split_allc_file=split_allc_file,
+                          buffer_line_number = buffer_line_number,
                           min_cov = min_cov,
                           binom_test = binom_test,
                           min_mc = min_mc,
                           path_to_samtools = path_to_samtools,
-                          sort_mem = sort_mem,
                           path_to_files = path_to_files,
                           min_base_quality = min_base_quality)
 
