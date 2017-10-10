@@ -85,19 +85,11 @@ Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylp
 
 #### Building converted genome reference
 
-```
-methylpy build-reference -h
-```
+`methylpy build-reference -h`
 
 #### Processing bisulfite sequencing and NOMe-seq data 
-For single-end data
-```
-methylpy single-end-pipeline -h
-```
-For paired-end data
-```
-methylpy paired-end-pipeline -h
-```
+For single-end data, `methylpy single-end-pipeline -h`
+For paired-end data, `methylpy paired-end-pipeline -h`
 
 Output file(s) are (compressed) tab-separated text file(s) in allc format. "allc" stands
 for all cytosine (C). Each row in an allc file corresponds to one cytosine in the genome. 
@@ -113,22 +105,14 @@ An allc file contain 7 columns and no header:
 |6|cov|21|read coverage|
 |7|methylyate|1|indicator of significant methylation|
 
-
-
 #### Quality filter for bisulfite sequencing reads
 Sometimes, 
-```
-methylpy bam-quality-filter -h
-```
+`methylpy bam-quality-filter -h`
 
 #### Extracting methylation state from BAM file
 This module allows users to get 
-```
-methylpy call-methylation-state -h
-```
+`methylpy call-methylation-state -h`
 
 # Using methylpy for calling DMRs
 Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
-```
-methylpy DMRfind -h
-```
+`methylpy DMRfind -h`

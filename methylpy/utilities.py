@@ -1,123 +1,16 @@
-'''
-Created on Dec 16, 2011
-
-@author: Matt
-'''
-
 import sys
 import pdb
 import math
 import shlex
-
-try:
-    import numpy as np
-except:
-    sys.exit("methylpy.utilities requires the numpy module")
-
-try:
-    import subprocess
-except:
-    sys.exit("methylpy.utilities requires the subprocess module")    
-
-try:
-    import time
-except:
-    sys.exit("methylpy.utilities requires the time module")
-try:
-    import operator
-except:
-    sys.exit("methylpy.utilities requires the operator module")
-try:
-    import itertools
-except:
-    sys.exit("methylpy.utilities requires the itertools module")
-try:
-    import multiprocessing
-except:
-    sys.exit("methylpy.utilities requires the multiprocessing module")
-try:
-    import bz2
-except Exception,e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    sys.exit("methylpy.DMRfind requires the bz2 module")
-
-try:
-    import gzip
-except Exception,e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    sys.exit("methylpy.utilities requires the gzip module")
-try:
-    import collections
-except Exception,e:
-    exc_type, exc_obj, exc_tb = sys.exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    sys.exit("methylpy.utilities requires the collections module") 
-def browser_file(collapsed, uncollapsed):
-    """
-    NOT FINISHED
-    Create genome browser files for each sample from collapsed and uncollapsed files.
-    format: chr, start, stop, methylation level
-    """
-    #Make dictionary of all samples and where they are methylated
-    methyl_coords = {}
-    f = open(collapsed, 'r')
-    f.readline()    
-    for line in f:
-        line = line.strip()
-        line = line.split('\t')
-        if len(line) < 5: #if there's no samples, continue
-            continue
-        methyl_coords[(line[0], line[1], line[2])] = {} #[chr, start, stop]
-        methylated_samples = line[4].split(",") #list of methylated samples
-        if methylated_samples!=['']:
-            for sample in methylated_samples:
-                methyl_coords[(line[0], line[1], line[2])][sample] = None                       
-    f.close()
-    #Find methylation level for each location in a sample's list
-    f2 = open(uncollapsed, 'r')
-    
-    fields = {} #mapping of header values to field number
-    header = f2.readline()
-    header = header.strip().split('\t')
-    for value in header:
-        fields[value] = header.index(value)
-    
-    for line in f2:
-        line = line.strip()
-        line = line.split("\t")
-        #create list of blocks that contained this position
-        coord_keys = [x for x in methyl_coords.keys() if x[0]==line[0] and line[1]>=x[1] and line[1]<=x[2]]
-        for key in coord_keys:
-            samples = methyl_coords[key].keys() #all the methylated samples that were in this region
-            for sample in samples:
-                if not methyl_coords[key][sample]:
-                    methyl_coords[key][sample] = [0, 0]
-                pdb.set_trace()
-                methyl_coords[key][sample][0] += int(line[fields["mc_" + sample]]) 
-                methyl_coords[key][sample][1] += int(line[fields["h_" + sample]])
-    f2.close()
-    
-    #Write output to files
-    file_handles = {}
-    for coord in methyl_coords:
-        for sample in methyl_coords[coord]:
-            if sample not in file_handles:
-                file_handles[sample] = open("_".join([sample, "browserfile.bed"]), 'w')
-                file_handles[sample].write("chr\tstart\tstop\tmethyl_level\n")
-            try:
-                methyl_level = float(methyl_coords[coord][sample][0]) / methyl_coords[coord][sample][1]
-            except:
-                methyl_level = "NA"
-            line = "\t".join([str(coord[0]), str(coord[1]), str(coord[2]), str(methyl_level), "\n"])
-            file_handles[sample].write(line)
-    
-    for filen in file_handles:
-        file_handles[filen].close()
+import numpy as np
+import subprocess
+import time
+import operator
+import itertools
+import multiprocessing
+import bz2
+import gzip
+import collections
 
 def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],
@@ -169,7 +62,7 @@ def split_allc_window(num_chunks, inputf, output_prefix, max_dist, jump_size, wi
     g = open(output_prefix+str(chunk_num),'w')
     
     #start with whole window loaded into queue
-    for i in xrange(0, window_size):
+    for i in range(0, window_size):
         line = f.readline()
         line = line.strip().split('\t')
         line_queue.append(line)
@@ -181,7 +74,7 @@ def split_allc_window(num_chunks, inputf, output_prefix, max_dist, jump_size, wi
             break
         mc = 0
         h = 0
-        for line in filter(lambda x: x!="NA", line_queue): #filter out NA's to calc mc & h
+        for line in [x for x in line_queue if x!="NA"]: #filter out NA's to calc mc & h
             if math.fabs(int(line[1]) - int(center[1])) <= max_dist: #if it meets distance req
                 mc += int(line[4])
                 h += int(line[5])
@@ -195,7 +88,7 @@ def split_allc_window(num_chunks, inputf, output_prefix, max_dist, jump_size, wi
         print_count+=1
         
         #shift window by amount specified by jump_size
-        for i in xrange(0, jump_size):
+        for i in range(0, jump_size):
             line = f.readline()
             if not line: #very last window will have missing lines, fill in with "NA"
                 line_queue.pop(0)
@@ -248,14 +141,14 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
     This function mimics the unix split utility.
     """
     if not isinstance(input_files, list):
-        if isinstance(input_files, basestring):
+        if isinstance(input_files, str):
             input_files = [input_files]
         else:
             sys.exit("input_files must be a list of strings")
     file_handles = {}
-    for index in xrange(0,num_chunks):
+    for index in range(0,num_chunks):
         file_handles[index]=open(output_prefix+str(index),'w')
-    cycle = itertools.cycle(range(0,num_chunks))
+    cycle = itertools.cycle(list(range(0,num_chunks)))
     total_reads=0
     for inputf in input_files:
         if inputf[-3:] == ".gz":
@@ -266,7 +159,7 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
             f = open(inputf,'r')
                 
         while True:
-            current_file = cycle.next()
+            current_file = next(cycle)
             # processing read id
             # remove any string after the first space character
             line = f.readline()
@@ -275,15 +168,15 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
             line = line.rstrip()
             file_handles[current_file].write(line.split(" ")[0]+"\n")
             total_reads += 1
-            for index in xrange(0,3):
+            for index in range(0,3):
                 line = f.readline()
                 file_handles[current_file].write(line)
         f.close()
 
-    for index in xrange(0,num_chunks):
+    for index in range(0,num_chunks):
         file_handles[index].close()
 
-    return total_reads
+    return(total_reads)
 
 def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
     """
@@ -292,17 +185,17 @@ def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
 
     def reverse_complement(dna):
         complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
-        return "".join([complement[base] for base in dna[::-1]])
+        return("".join([complement[base] for base in dna[::-1]]))
 
     if not isinstance(input_files, list):
-        if isinstance(input_files, basestring):
+        if isinstance(input_files, str):
             input_files = [input_files]
         else:
             sys.exit("input_files must be a list of strings")
     file_handles = {}
-    for index in xrange(0,num_chunks):
+    for index in range(0,num_chunks):
         file_handles[index]=open(output_prefix+str(index),'w')
-    cycle = itertools.cycle(range(0,num_chunks))
+    cycle = itertools.cycle(list(range(0,num_chunks)))
     total_reads=0
     for inputf in input_files:
         if inputf[-3:] == ".gz":
@@ -313,7 +206,7 @@ def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
             f = open(inputf,'r')
                 
         while True:
-            current_file = cycle.next()
+            current_file = next(cycle)
             # processing read id
             # remove any string after the first space character
             line = f.readline()
@@ -337,10 +230,10 @@ def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
 
         f.close()
 
-    for index in xrange(0,num_chunks):
+    for index in range(0,num_chunks):
         file_handles[index].close()
 
-    return total_reads
+    return(total_reads)
 
 def split_mpileup_file(num_chunks,inputf,output_prefix):
     """
@@ -417,7 +310,7 @@ def parallel_count_lines(filename,
         if fields[3] in mc_class and int(fields[5]) >= min_cov:
             num_lines += 1
     
-    return (num_lines, filename)
+    return((num_lines, filename))
     
 def split_files_by_position(files,samples,
                             chunks,mc_class,
@@ -441,7 +334,7 @@ def split_files_by_position(files,samples,
     #file contains the same range (but not necessarily the same number) of positions (e.g., from chr1:1000-2000)
     #num_lines = subprocess.check_output("wc -l "+files[0],shell=True).split(" ")[0]
     if not isinstance(files, list):
-        if isinstance(files, basestring):
+        if isinstance(files, str):
             files = [files]
         else:
             sys.exit("files must be a list")
@@ -598,7 +491,7 @@ def parallel_split_files_by_position(filen,cutoffs,
                 else:
                     g.write("\t".join(fields[0:4])+"\t"+str(added_values[0])+"\t"+str(added_values[1])+"\t"+fields[6]+"\n")
             if len(fields_deque) > 1:
-                for index in xrange(0,len(added_values_deque)-1):
+                for index in range(0,len(added_values_deque)-1):
                     if weight_by_dist:
                         weighting_factor = float(max_dist - abs(int(fields_deque[index][1])-
                                                                 int(fields_deque[-1][1])))/max_dist
@@ -623,9 +516,9 @@ def print_checkpoint(message):
     """
     Print message and current time
     """
-    print message
+    print(message)
     tabs = message.count("\t")
-    print ("\t" * tabs) + time.asctime(time.localtime(time.time())) + "\n"
+    print(("\t" * tabs) + time.asctime(time.localtime(time.time())) + "\n")
     sys.stdout.flush()
 
 

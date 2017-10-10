@@ -11,7 +11,7 @@ import shlex
 import itertools
 import re
 import glob
-import cStringIO as cStr
+import io as cStr
 import bisect
 import gzip
 
@@ -379,9 +379,9 @@ def run_mapping(current_library, library_files, sample,
 
     if trim_reads:
         print_checkpoint("Begin trimming reads for "+file_name)
-        quality_trim([file_path+"_split_"+str(i) for i in xrange(0, num_procs)],
+        quality_trim([file_path+"_split_"+str(i) for i in range(0, num_procs)],
                      output=[file_path+"_split_trimmed_"+str(i)
-                             for i in xrange(0, num_procs)],
+                             for i in range(0, num_procs)],
                      adapter_seq=adapter_seq,
                      error_rate=error_rate,
                      quality_base = quality_base,
@@ -395,43 +395,43 @@ def run_mapping(current_library, library_files, sample,
                      path_to_cutadapt=path_to_cutadapt)
 
         subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_split_"+str(i)
-                                                          for i in xrange(0,num_procs)])))
+                                                          for i in range(0,num_procs)])))
 
         print_checkpoint("Begin converting reads for "+file_name)
         if num_procs > 1:
             pool = multiprocessing.Pool(num_procs)
-            for inputf, output in zip([file_path+"_split_trimmed_"+str(i) for i in xrange(0, num_procs)],
+            for inputf, output in zip([file_path+"_split_trimmed_"+str(i) for i in range(0, num_procs)],
                                      [file_path+"_split_trimmed_converted_"+str(i)
-                                      for i in xrange(0, num_procs)]):
+                                      for i in range(0, num_procs)]):
                 pool.apply_async(convert_reads,(inputf,output))
             pool.close()
             pool.join()
         else:
-            for inputf, output in zip([file_path+"_split_trimmed_"+str(i) for i in xrange(0, num_procs)],
+            for inputf, output in zip([file_path+"_split_trimmed_"+str(i) for i in range(0, num_procs)],
                                      [file_path+"_split_trimmed_converted_"+str(i)
-                                      for i in xrange(0, num_procs)]):
+                                      for i in range(0, num_procs)]):
                                           convert_reads(inputf,output)
         subprocess.check_call(shlex.split("rm "+
                                           " ".join([file_path+"_split_trimmed_"+str(i)
-                                                    for i in xrange(0,num_procs)])))
-        input_fastq = [file_path+"_split_trimmed_converted_"+str(i) for i in xrange(0, num_procs)]
+                                                    for i in range(0,num_procs)])))
+        input_fastq = [file_path+"_split_trimmed_converted_"+str(i) for i in range(0, num_procs)]
     else:
         print_checkpoint("No trimming on reads")
         print_checkpoint("Begin converting reads for "+file_name)
         if num_procs > 1:
             pool = multiprocessing.Pool(num_procs)
-            for inputf, output in zip([file_path+"_split_"+str(i) for i in xrange(0, num_procs)],
-                                     [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]):
+            for inputf, output in zip([file_path+"_split_"+str(i) for i in range(0, num_procs)],
+                                     [file_path+"_split_converted_"+str(i) for i in range(0, num_procs)]):
                 pool.apply_async(convert_reads, (inputf, output))
             pool.close()
             pool.join()
         else:
-            for inputf, output in zip([file_path+"_split_"+str(i) for i in xrange(0, num_procs)],
-                                     [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]):
+            for inputf, output in zip([file_path+"_split_"+str(i) for i in range(0, num_procs)],
+                                     [file_path+"_split_converted_"+str(i) for i in range(0, num_procs)]):
                 convert_reads(inputf, output)
         subprocess.check_call(shlex.split("rm "+" ".join([file_path+"_split_"+str(i)
-                                                          for i in xrange(0, num_procs)])))
-        input_fastq = [file_path+"_split_converted_"+str(i) for i in xrange(0, num_procs)]
+                                                          for i in range(0, num_procs)])))
+        input_fastq = [file_path+"_split_converted_"+str(i) for i in range(0, num_procs)]
 
     print_checkpoint("Begin Running Bowtie for "+current_library)
     total_unique = run_bowtie(current_library,
@@ -484,11 +484,11 @@ def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bo
     offrate refers to the Bowtie parameter, reference the bowtie manual to see more detail
     """
     if not isinstance(input_files, list):
-        if isinstance(input_files, basestring):
+        if isinstance(input_files, str):
             input_files = [input_files]
         else:
             sys.exit("input_files must be a list of strings")
-    print input_files
+    print(input_files)
     #outf = Convert all C to T. outr = convert all G to A  
     with open(output+"_f.fasta", 'w') as outf, open(output+"_r.fasta", 'w') as outr:
         for filen in input_files:
@@ -799,22 +799,22 @@ def run_bowtie(current_library,library_read_files,
     ## Clear temporary files
     if num_procs > 1:
         pool = multiprocessing.Pool(num_procs)
-        for file_num in xrange(0,num_procs):
+        for file_num in range(0,num_procs):
             pool.apply_async(subprocess.check_call,(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)),))
         pool.close()
         pool.join()
     else:
-        for file_num in xrange(0,num_procs):
+        for file_num in range(0,num_procs):
             subprocess.check_call(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)))
 
     print_checkpoint("Finding multimappers")
 
     total_unique = merge_sorted_multimap(current_library,
-                                         [prefix+"_sorted_"+str(file_num) for file_num in xrange(0,num_procs)],
+                                         [prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)],
                                          prefix,
                                          reference_fasta,
                                          path_to_samtools="")
-    subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num) for file_num in xrange(0,num_procs)])))
+    subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)])))
     return total_unique
  
 def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=False):
@@ -840,8 +840,8 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
     sam_header = []
     file_handles = {}
     f = open(inputf,'r')
-    cycle = itertools.cycle(range(0,num_procs))
-    for file_num in xrange(0,num_procs):
+    cycle = itertools.cycle(list(range(0,num_procs)))
+    for file_num in range(0,num_procs):
         if append == False:
             file_handles[file_num]=open(output+"_sorted_"+str(file_num),'w')
         else:
@@ -862,11 +862,11 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
             elif (int(fields[1]) & 16) == 0:
                 strand = "+"
             seq = decode_c_positions(fields[9],header[-1],strand)
-            file_handles[cycle.next()].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
+            file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
     f.close()
     if keep_temp_files == False:
         subprocess.check_call(shlex.split("rm "+inputf))
-    for file_num in xrange(0,num_procs):
+    for file_num in range(0,num_procs):
         file_handles[file_num].close()
     
 def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_samtools=""):
@@ -890,7 +890,7 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
     try:
         f = open(reference_fasta+".fai",'r')
     except:
-        print "Reference fasta not indexed. Indexing."
+        print("Reference fasta not indexed. Indexing.")
         try:
             subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
             f = open(reference_fasta+".fai",'r')
@@ -914,7 +914,7 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
         lines[filen]=file_handles[filen].readline()
         fields[filen] = lines[filen].split("\t")[0]
     while True:
-        all_fields = [field for field in fields.values() if field != ""]
+        all_fields = [field for field in list(fields.values()) if field != ""]
         if len(all_fields) == 0:
             break
         min_field = min(all_fields)
@@ -1010,12 +1010,12 @@ def quality_trim(inputf, output = None, quality_base = None, min_qual_score = No
         devnull.close()
                  
     if not isinstance(inputf, list):
-        if isinstance(inputf, basestring):
+        if isinstance(inputf, str):
             inputf = [inputf]
         else:
             sys.exit("input must be a list of strings")
     if not isinstance(output, list):
-        if isinstance(output, basestring):
+        if isinstance(output, str):
             output = [output]
         else:
             sys.exit("output must be a list of strings")
@@ -1112,7 +1112,7 @@ def fasta_iter(fasta_name,query_chrom):
         if header != query_chrom:
             continue
         # join all sequence lines to one.
-        seq = "".join(s.strip() for s in faiter.next())
+        seq = "".join(s.strip() for s in next(faiter))
         return seq
 
 def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,

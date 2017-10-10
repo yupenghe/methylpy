@@ -1,76 +1,12 @@
-'''
-Created on Dec 16, 2011
-
-@author: Matt
-'''
-try:
-    from sys import exc_info, exit
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires exec_info and exit from the sys module")
-try:
-    from pdb import set_trace
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires set_trace from the pdb module")
-try:
-    from subprocess import check_call,check_output
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires check_call and check_output from the subprocess module")
-
-try:
-    from shlex import split
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires split from the shlex module")
-try:
-    from glob import glob
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires the glob from the glob module")
-try:
-    from math import ceil, log10
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires ceil and log10 from the math module")
-
-try:
-    from multiprocessing import Pool
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires pool from the multiprocessing module")
-
-try:
-    from methylpy.utilities import print_checkpoint,expand_nucleotide_code,split_files_by_position
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires print_checkpoint, expand_nucleotide_code, and split_files_by_position from the methylpy.utilities module")
-
-try:
-    from scipy.stats import scoreatpercentile
-except Exception,e:
-    exc_type, exc_obj, exc_tb = exc_info()
-    print(exc_type, exc_tb.tb_lineno)
-    print e
-    exit("methylpy.DMRfind requires scipy.stats module")
-
+from sys import exc_info, exit
+from pdb import set_trace
+from subprocess import check_call,check_output
+from shlex import split
+from glob import glob
+from math import ceil, log10
+from multiprocessing import Pool
+from methylpy.utilities import print_checkpoint,expand_nucleotide_code,split_files_by_position
+from scipy.stats import scoreatpercentile
 import subprocess
 import shlex
 import gzip
@@ -142,7 +78,7 @@ def DMRfind(allc_files, samples,
     if not isinstance(allc_files, list):
         exit("mc_type must be a list of string(s)")
     if not isinstance(mc_type, list):
-        if isinstance(mc_type, basestring):
+        if isinstance(mc_type, str):
             mc_type = [mc_type]
         else:
             exit("mc_type must be a list of string(s)")
@@ -168,7 +104,7 @@ def DMRfind(allc_files, samples,
         exit("In DMRfind, min_cov must be an integer")
     if isinstance(chroms,list) == False:
         exit("chroms must be a list of string(s)")
-    chroms = map(str,chroms)
+    chroms = list(map(str,chroms))
         
     if collapse_samples != False:
         if not isinstance(collapse_samples, list):
@@ -226,12 +162,12 @@ def DMRfind(allc_files, samples,
                                     pool=pool,max_dist=mc_max_dist)
             print_checkpoint("Running rms tests for chromosome "+str(chrom))
             if num_procs > 1:
-                for chunk in xrange(0,num_procs):
+                for chunk in range(0,num_procs):
                     filenames = []
                     for allc_file in allc_files:
                         filenames.extend(glob(allc_file+"_"+chrom+"_"+str(chunk)))
                     if len(filenames) == 0:
-                        print "Nothing to run for chunk "+str(chunk)
+                        print("Nothing to run for chunk "+str(chunk))
                         continue
                     pool.apply_async(run_rms_tests,
                                      (filenames,
@@ -246,7 +182,7 @@ def DMRfind(allc_files, samples,
                 for allc_file in allc_files:
                     filenames.extend(glob(allc_file+"_"+chrom+"_0"))
                 if len(filenames) == 0:
-                    print "Nothing to run for chunk "+str(chunk)
+                    print("Nothing to run for chunk "+str(chunk))
                     continue
                 run_rms_tests(filenames,output_prefix+"_rms_results_for_"+str(chrom)+"_chunk_0.tsv",
                               samples,min_cov=min_cov,num_sims=num_sims,num_sig_tests=num_sig_tests,
@@ -255,10 +191,10 @@ def DMRfind(allc_files, samples,
             pool.close()
             pool.join()
 
-    except Exception,e:
+    except Exception as e:
         exc_type, exc_obj, exc_tb = exc_info()
         print(exc_type, exc_tb.tb_lineno)
-        print e
+        print(e)
         try:
             pool.terminate()
             pool.join()
@@ -279,7 +215,7 @@ def DMRfind(allc_files, samples,
     g.write(header)
     for chr_key in sorted(chroms):
         chrom = str(chr_key).replace("chr","")
-        for chunk in xrange(0,num_procs):
+        for chunk in range(0,num_procs):
             try:
                 with open(output_prefix+"_rms_results_for_"+chrom+"_chunk_"+str(chunk)+".tsv",'r') as f:
                     for line in f:
@@ -409,7 +345,7 @@ def run_rms_tests(files,output,samples,min_cov = 0,num_sims="10000",num_sig_test
         with open(output, 'r'):
             check_call(split("sort -k 2n,2n -o "+output+" "+output))
     except IOError:
-        print "No results in "+output
+        print("No results in "+output)
     if keep_temp_files == False:
         check_call(split("rm "+" ".join(files)))
 
@@ -438,14 +374,14 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
     precision = int(ceil(log10(num_sims)))
     last_pvalue = 0
     sorted_pvalues = [(1,num_sims)]
-    for numerator in xrange(2,num_sig_tests+1):
+    for numerator in range(2,num_sig_tests+1):
         pvalue = round(float(numerator) / num_sims,precision)
         expected_value=(pvalue-last_pvalue)*total_tests
         table[(numerator,num_sims)]=[expected_value,0]
         if pvalue not in sorted_pvalues:
             sorted_pvalues.append((numerator,num_sims))
         last_pvalue = pvalue
-    for denominator in reversed(xrange(num_sig_tests,num_sims)):
+    for denominator in reversed(list(range(num_sig_tests,num_sims))):
         pvalue = round(float(num_sig_tests) / denominator,precision)
         expected_value=(pvalue-last_pvalue)*total_tests
         table[(num_sig_tests,denominator)]=[expected_value,0]
@@ -465,7 +401,7 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
     m0_estim_diff = 10000
     iter = 0
     while iter < max_iterations and m0_estim_diff > convergence_diff:
-        print "m0 estimate for iteration "+str(iter)+": "+str(m0_estim)
+        print("m0 estimate for iteration "+str(iter)+": "+str(m0_estim))
         difference = 0
         for pvalue in sorted_pvalues:
             if table[pvalue][1] < table[pvalue][0]:
@@ -483,9 +419,9 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
             table[pvalue][0]=expected_value
             last_pvalue = pvalue_frac
     if iter == 1 or (iter == max_iterations and m0_estim_diff > convergence_diff):
-        print "Histogram FDR correction did not converge. Switching to Benjamini-Hochberg."
+        print("Histogram FDR correction did not converge. Switching to Benjamini-Hochberg.")
         return benjamini_hochberg_correction_DMRfind(rms_results,target_fdr)
-    print "m0 estimate for iteration "+str(iter)+": "+str(m0_estim)
+    print("m0 estimate for iteration "+str(iter)+": "+str(m0_estim))
     #get the number of tests that would be declared significant at each p-value
     #and figure out the FDR
     
@@ -504,8 +440,8 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
             best_fdr = fdr
             pvalue_cutoff = pvalue
             diff = abs(target_fdr - fdr)
-    print "Difference between best and last m0 estimate: "+str(m0_estim_diff)
-    print "The closest p-value cutoff for your desired FDR is "+str(float(pvalue_cutoff[0])/pvalue_cutoff[1])+" which corresponds to an FDR of "+str(best_fdr)
+    print("Difference between best and last m0 estimate: "+str(m0_estim_diff))
+    print("The closest p-value cutoff for your desired FDR is "+str(float(pvalue_cutoff[0])/pvalue_cutoff[1])+" which corresponds to an FDR of "+str(best_fdr))
     return float(pvalue_cutoff[0])/pvalue_cutoff[1]
 
 def get_resid_cutoff(resid_cutoff, pvalue_cutoff, num_samples, rms_file):
@@ -534,7 +470,7 @@ def get_resid_cutoff(resid_cutoff, pvalue_cutoff, num_samples, rms_file):
                 residuals.append(float(resid))
     f.close()
     if len(residuals) == 0:
-        print "There are no null residuals to calculate resid_cutoff. Using 2 as the cutoff."
+        print("There are no null residuals to calculate resid_cutoff. Using 2 as the cutoff.")
         return 2
     return scoreatpercentile(residuals, resid_cutoff)
     
@@ -573,7 +509,7 @@ def benjamini_hochberg_correction_DMRfind(filen,sig_cutoff):
             
         test_num += 1
     f.close()
-    print "The closest p-value cutoff for your desired FDR is "+str(best_pvalue)+" which corresponds to an FDR of "+str(best_fdr)
+    print("The closest p-value cutoff for your desired FDR is "+str(best_pvalue)+" which corresponds to an FDR of "+str(best_fdr))
     print_checkpoint("Sorting "+filen+" by position")
     check_call(split("sort -k 1n,1n -k 2n,2n "+filen+" -o "+filen))
     return float(best_pvalue)
@@ -590,7 +526,7 @@ def check_clusters(category_dict, min_cluster, block):
     #This is to ensure that if a sample category has fewer than min_cluster samples
     #in total (regardless of hyper/hypo status) that it won't get left out.
     total_category = [0] * len(set(category_dict.values()))
-    for category_number in category_dict.values():
+    for category_number in list(category_dict.values()):
         total_category[category_number] += 1
     #create a list of counters for hypermethylated and hypomethylated sites
 
@@ -602,10 +538,10 @@ def check_clusters(category_dict, min_cluster, block):
     unmeth_list = block[5].split(",")
     
     #check if there are no samples in a certain list
-    if filter(None, meth_list):
+    if [_f for _f in meth_list if _f]:
         for sample in meth_list: 
             meth_count[category_dict[sample]] += 1 #increment the counter
-    if filter(None, unmeth_list):
+    if [_f for _f in unmeth_list if _f]:
         for sample in unmeth_list:
             unmeth_count[category_dict[sample]] += 1
     
@@ -650,7 +586,7 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
         exit("max_dist must be an integer or something that can be cast as an integer")
     
     if collapse_samples and sample_category:
-        category_dict = dict(zip(collapse_samples, sample_category))
+        category_dict = dict(list(zip(collapse_samples, sample_category)))
     elif sample_category:
         exit("In order to use sample_category, you must specify a corresponding list of samples in collapse_samples!")
     
@@ -761,10 +697,10 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
                      
             line = f.readline()
             line = line.rstrip()
-        except Exception, e:
+        except Exception as e:
             exc_type, exc_obj, exc_tb = exc_info()
             print(exc_type, exc_tb.tb_lineno)
-            print e
+            print(e)
             set_trace()
         
     f.close()
@@ -827,7 +763,7 @@ def get_methylation_levels_DMRfind(input_tsv_file,
             pool = Pool(min(num_procs,len(samples)))
             results = {}
             #for allc_file,sample in zip(input_allc_files,samples):
-            for ind in xrange(len(samples)):
+            for ind in range(len(samples)):
                 pool.apply_async(
                     get_methylation_level_DMRfind_worker,
                     (input_tsv_file,
