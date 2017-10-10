@@ -8,7 +8,7 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * methylpy has major changes compared to previous version. Please double check whether your code is compatible.
 
 ## What can methylpy do?
-Processing bisulfite sequencing data and NOMe-seq data
+#### Processing bisulfite sequencing data and NOMe-seq data
 * fast and flexible pipeline for both single-end and paired-end data
 * all the way from raw reads (fastq) to methylation state and/or open chromatin readouts
 * also support getting readouts from alignment (BAM file)
@@ -16,7 +16,7 @@ Processing bisulfite sequencing data and NOMe-seq data
 * accept compressed input and generate compressed output
 * support post-bisulfite adaptor tagging (PBAT) data
 
-Calling differentially methylated regions (DMRs)
+#### Calling differentially methylated regions (DMRs)
 * DMR calling at single cytosine level
 * support comparison across 2 or more samples/groups
 * conservative and accurate
@@ -66,4 +66,32 @@ g++ -O3 -l gsl -l gslcblas -o run_rms_tests.out rms.cpp
 g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
 
 ## Using methylpy
+#### Building converted genome reference
+```
+methylpy build-reference -h
+```
 
+#### Processing bisulfite sequencing and NOMe-seq data 
+For single-end data
+```
+methylpy single-end-pipeline -h
+```
+For paired-end data
+```
+methylpy paired-end-pipeline -h
+```
+
+#### Quality filter for bisulfite sequencing reads
+```
+methylpy bam-quality-filter -h
+```
+
+#### Extracting methylation state from BAM file
+```
+methylpy call-methylation-state -h
+```
+
+#### Calling differential methylated regions (DMRs)
+```
+methylpy DMRfind -h
+```
