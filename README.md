@@ -22,6 +22,11 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * conservative and accurate
 * useful feature for dealing with low-coverage data by combining data of adjacent cytosines
 
+## Index
+* [Installation](#installation)
+* [Using methylpy for data processing](#using-methylpy-for-data-processing)
+* [Using methylpy for calling DMRs](#using-methylpy-for-calling-dmrs)
+
 ## Installation
 #### step 1 - download methylpy and set up environment variable
 Enter the directory where you would like to install methylpy and run
@@ -91,7 +96,7 @@ methylpy bam-quality-filter -h
 methylpy call-methylation-state -h
 ```
 
-## Using methylpy for finding differential methylated regions (DMRs)
+## Using methylpy for calling DMRs
 ```
 methylpy DMRfind -h
 ```
