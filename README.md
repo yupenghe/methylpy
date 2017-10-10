@@ -107,11 +107,11 @@ An allc file contain 7 columns and no header:
 |:----:|:-----:|:-----:|:---:|
 |1|chromosome|12|with no "chr"|
 |2|position|18283342|1-based|
-|3|strand|+||
-|4|sequence context|CGT||
-|5|mc|count of reads supporting methylation|
-|6|cov|coverage|
-|7|methylyate|1|indicating significant methylation|
+|3|strand|+|either + or -|
+|4|sequence context|CGT|can be more than 3 bases|
+|5|mc|18|count of reads supporting methylation|
+|6|cov|21|read coverage|
+|7|methylyate|1|indicator of significant methylation|
 
 
 
