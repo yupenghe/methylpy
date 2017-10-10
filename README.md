@@ -65,7 +65,7 @@ g++ -O3 -l gsl -l gslcblas -o run_rms_tests.out rms.cpp
 * Ubuntu 16.04
 g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
 
-## Using methylpy
+## Using methylpy for data processing
 #### Building converted genome reference
 ```
 methylpy build-reference -h
@@ -91,7 +91,7 @@ methylpy bam-quality-filter -h
 methylpy call-methylation-state -h
 ```
 
-#### Calling differential methylated regions (DMRs)
+## Using methylpy for finding differential methylated regions (DMRs)
 ```
 methylpy DMRfind -h
 ```
