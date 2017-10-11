@@ -98,8 +98,7 @@ Build bowtie/bowtie2 index for converted genome. Run `methylpy build-reference -
 to get more information. An example of building mm10 mouse reference index:
 
 ```
-/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
-    build-reference \
+methylpy build-reference \
 	--input-files mm10_bt2/mm10.fa \
 	--output-prefix mm10_bt2/mm10 \
 	--bowtie2 True
@@ -114,8 +113,7 @@ one base upstream cytosine as part of cytosine sequence context, which can be
 used to tease out GC sites.
 
 ```
-/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
-    single-end-pipeline \
+methylpy single-end-pipeline \
 	--read-files raw/mESC_R1.fastq.gz \
 	--sample mESC \
     --forward-ref mm10_bt2/mm10_f \
@@ -130,8 +128,7 @@ An command example for processing paired-end data.
 Run `methylpy paired-end-pipeline -h` to get more information. 
 
 ```
-/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
-    paired-end-pipeline \
+methylpy paired-end-pipeline \
     --read1-files raw/mESC_R1.fastq.gz \
     --read2-files raw/mESC_R2.fastq.gz \
     --sample mESC \
@@ -166,8 +163,7 @@ Below is the code of an example of calling DMRs for CG methylation between two s
 `AD_HT` and `AD_IT` on chromosome 1 through 5 using 8 processors.
 
 ```
-/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
-	DMRfind \
+methylpy DMRfind \
 	--allc-files allc/allc_AD_HT.tsv.gz allc/allc_AD_IT.tsv.gz \
 	--samples AD_HT AD_IT \
 	--mc-type "CGN" \
@@ -186,8 +182,7 @@ to get help information. Below is an example of running this function. Please ma
 `--paired-end True` or use `--paired-end False` for BAM file from single-end data.
 
 ```
-/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
-    call-methylation-state \
+methylpy call-methylation-state \
 	--input-file mESC_processed_reads_no_clonal.bam \
 	--paired-end True \
 	--sample mESC \
@@ -205,8 +200,7 @@ For example, below command can be used to filter out reads with less than 30 MAP
 enough (at least 3) CH sites.
 
 ```
-/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
-    bam-quality-filter \
+methylpy bam-quality-filter \
 	--input-file mESC_processed_reads_no_clonal.bam \
 	--output-file mESC_processed_reads_no_clonal.filtered.bam \
 	--ref-fasta mm10_bt2/mm10.fa \
