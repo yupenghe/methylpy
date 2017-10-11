@@ -225,7 +225,7 @@ def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
             # qual
             line = f.readline()
             line = line.rstrip()
-            file_handles[current_file].write(reversed(line)+"\n")
+            file_handles[current_file].write(line[::-1]+"\n")
 
         f.close()
 
