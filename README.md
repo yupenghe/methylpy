@@ -23,15 +23,15 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * useful feature for dealing with low-coverage data by combining data of adjacent cytosines
 
 # What you want to do
-* [Installing methylpy](#installing-methylpy)
-* [Using methylpy for data processing](#using-methylpy-for-data-processing)
-* [Using methylpy for calling DMRs](#using-methylpy-for-calling-dmrs)
+* [Install methylpy](#install-methylpy)
+* [Use methylpy for data processing](#use-methylpy-for-data-processing)
+* [Use methylpy for calling DMRs](#use-methylpy-for-calling-dmrs)
 * [Optional steps for data processing](#optional-steps-for-data-processing)
 
 run `methylpy -h` to get a list of functions.
 
-# Installing methylpy
-#### step 1 - download methylpy and set up environment variable
+# Install methylpy
+#### Step 1 - Download methylpy and set up environment variable
 Enter the directory where you would like to install methylpy and run
 ```
 git clone https://github.com/yupenghe/methylpy.git
@@ -50,7 +50,7 @@ If the below command gives no error, the setup is successful.
 methylpy
 ```
 
-#### step 2 - install dependencies
+#### Step 2 - Install dependencies
 methylpy is written in python2 so obviously python2 needs to be installed.
 methylpy also depends on two python modules, [numpy](http://www.numpy.org/) 
 and [scipy](https://www.scipy.org/).
@@ -66,7 +66,7 @@ Lastly, if paths to cutadapt, bowtie/bowtie2 and samtools are included in `PATH`
 methylpy can run these tools directly. Otherwise, the paths have to be passed to methylpy as augments. 
 Path to Picard needs to be passed to methylpy as a parameter to run PCR duplicate removal.
 
-#### optional step - compile rms.cpp
+#### Optional step - Compile rms.cpp
 DMR finding requires an executable `methylpy/methylpy/run_rms_tests.out`, which was compiled from
 C++ code `methylpy/methylpy/rms.cpp`. In most cases, the precompiled file can be used directly. To
 test this, simply run execute `methylpy/methylpy/run_rms_tests.out`. If help page shows, recompiling
@@ -83,17 +83,18 @@ cd methylpy/methylpy/
 g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
 ```
 
-# Using methylpy for data processing
-Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
+# Use methylpy for data processing
+Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md)
+for more details.
 
-#### step 1 - Building converted genome reference
-
+#### Step 1 - Build converted genome reference
 `methylpy build-reference -h`
 
-#### step 2 - processing bisulfite sequencing and NOMe-seq data 
+#### Step 2 - Process bisulfite sequencing and NOMe-seq data 
 For single-end data, `methylpy single-end-pipeline -h`
 For paired-end data, `methylpy paired-end-pipeline -h`
 
+#### Output format
 Output file(s) are (compressed) tab-separated text file(s) in allc format. "allc" stands
 for all cytosine (C). Each row in an allc file corresponds to one cytosine in the genome. 
 An allc file contain 7 columns and no header:
@@ -109,14 +110,14 @@ An allc file contain 7 columns and no header:
 |7|methylyate|1|indicator of significant methylation|
 
 # Using methylpy for calling DMRs
-Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
 `methylpy DMRfind -h`
+Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
 
 # Optional steps for data processing
 #### Quality filter for bisulfite sequencing reads
 Sometimes, 
 `methylpy bam-quality-filter -h`
 
-#### Extracting methylation state from BAM file
+#### Extract cytosine methylation state from BAM file
 This module allows users to get 
 `methylpy call-methylation-state -h`
