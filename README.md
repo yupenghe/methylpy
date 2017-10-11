@@ -88,7 +88,8 @@ Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylp
 for more details.
 
 #### Step 1 - Build converted genome reference
-`methylpy build-reference -h`
+Build bowtie/bowtie2 index for converted genome. Run `methylpy build-reference -h`
+to get more information. An example of building mm10 mouse reference index:
 
 ```
 /gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
@@ -99,11 +100,17 @@ for more details.
 ```
 
 #### Step 2 - Process bisulfite sequencing and NOMe-seq data 
-For single-end data, `methylpy single-end-pipeline -h`
+Function `single-end-pipeline` is For processing single-end data. Run 
+`methylpy single-end-pipeline -h` to get help information. Below code
+is an example of using methylpy to process single-end bisulfite sequencing
+data. For processing NOMe-seq data, please use `num_upstr_bases=1` to include
+one base upstream cytosine as part of cytosine sequence context, which can be
+used to tease out GC sites.
+
 ```
 /gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
     single-end-pipeline \
-    --read-files raw/mESC_R1.fastq.gz \
+	--read-files raw/mESC_R1.fastq.gz \
 	--sample mESC \
     --forward-ref mm10_bt2/mm10_f \
     --reverse-ref mm10_bt2/mm10_r \
@@ -112,7 +119,9 @@ For single-end data, `methylpy single-end-pipeline -h`
     --remove-clonal True \
     --path-to-picard="picard/"
 ```
-For paired-end data, `methylpy paired-end-pipeline -h`
+
+An command example for processing paired-end data.
+Run `methylpy paired-end-pipeline -h` to get more information. 
 
 ```
 /gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
@@ -145,11 +154,15 @@ An allc file contain 7 columns and no header:
 
 # Using methylpy for calling DMRs
 This function will take a list of compressed/uncompressed allc files (output files from methylpy pipeline) as input
-and look for DMRs. Help information of this function is available via running `methylpy DMRfind -h`.
+and look for DMRs. Help information of this function is available via running `methylpy DMRfind -h`. 
+
+Below is the code of an example of calling DMRs for CG methylation between two samples, 
+`AD_HT` and `AD_IT` on chromosome 1 through 5 using 8 processors.
+
 ```
 /gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
 	DMRfind \
-	--allc-files allc/allc_AD_HT.tsv allc/allc_AD_IT.tsv \
+	--allc-files allc/allc_AD_HT.tsv.gz allc/allc_AD_IT.tsv.gz \
 	--samples AD_HT AD_IT \
 	--mc-type "CGN" \
 	--chroms 1 2 3 4 5 \
