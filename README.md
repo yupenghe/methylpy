@@ -4,8 +4,10 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * (single-cell)  NOMe-seq data
 
 # Note
-* Currently, methylpy only supports python2.7 but support for python3 is coming.
-* methylpy has major changes compared to previous version. Please double check whether your code is compatible.
+* [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) is being written
+* Current version methylpy has major difference compared to previous version.
+Please checkout this document and [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md)
+for details.
 
 # What can methylpy do?
 #### Processing bisulfite sequencing data and NOMe-seq data
@@ -59,7 +61,8 @@ The easiest way to resolve these dependencies is to install [anaconda](https://w
 
 In addition, some features of methylpy depend on several publicly available tools
 * [cutadapt](http://cutadapt.readthedocs.io/en/stable/installation.html) (>=1.12) for raw read trimming
-* [bowtie](http://bowtie-bio.sourceforge.net/index.shtml) and/or [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
+* [bowtie](http://bowtie-bio.sourceforge.net/index.shtml) and/or 
+[bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
 * [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment results manipulation
 * [Picard](https://broadinstitute.github.io/picard/index.html) (>=2.10.8) for removal of PCR duplicates
 
