@@ -21,15 +21,14 @@ def expand_nucleotide_code(mc_type):
                 "A":["A"]}
     
     mc_class = list(mc_type) # copy
-    #
     if "C" in mc_type:
-        mc_class.extend(["CG", "CHG", "CHH","CNN"])
-	if "CG" in mc_type:
-	    mc_class.extend(["CGN"])
-    #       
+        mc_class.extend(["CGN", "CHG", "CHH","CNN"])
+    elif "CG" in mc_type:
+	mc_class.extend(["CGN"])
+
     for motif in mc_type:
-	mc_class.extend(["".join(i) for i in
-			itertools.product(*[iub_dict[nuc] for nuc in motif])])
+        mc_class.extend(["".join(i) for i in
+                         itertools.product(*[iub_dict[nuc] for nuc in motif])])
     return(set(mc_class))
 
 def split_allc_window(num_chunks, inputf, output_prefix, max_dist, jump_size, window_size):
