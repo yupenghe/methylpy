@@ -184,7 +184,7 @@ def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
 
     def reverse_complement(dna):
         complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
-        return("".join([complement[base] for base in dna[::-1]]))
+        return("".join([complement[base] for base in reversed(dna)]))
 
     if not isinstance(input_files, list):
         if isinstance(input_files, str):
@@ -225,7 +225,7 @@ def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
             # qual
             line = f.readline()
             line = line.rstrip()
-            file_handles[current_file].write(line[::-1]+"\n")
+            file_handles[current_file].write(reversed(line)+"\n")
 
         f.close()
 
