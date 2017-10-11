@@ -213,5 +213,9 @@ enough (at least 3) CH sites.
 # Cite methylpy
 If you use methylpy, please cite
 ```
-Matthew D. Schultz, Yupeng He, John W.Whitaker, Manoj Hariharan, Eran A. Mukamel, Danny Leung, Nisha Rajagopal, Joseph R. Nery, Mark A. Urich, Huaming Chen, Shin Lin, Yiing Lin, Bing Ren, Terrence J. Sejnowski, Wei Wang, Joseph R. Ecker. Human Body Epigenome Maps Reveal Noncanonical DNA Methylation Variation. Nature. 523(7559):212-216, 2015 Jul.
+Matthew D. Schultz, Yupeng He, John W.Whitaker, Manoj Hariharan, Eran A. Mukamel,
+Danny Leung, Nisha Rajagopal, Joseph R. Nery, Mark A. Urich, Huaming Chen, Shin Lin, 
+Yiing Lin, Bing Ren, Terrence J. Sejnowski, Wei Wang, Joseph R. Ecker. 
+Human Body Epigenome Maps Reveal Noncanonical DNA Methylation Variation.
+Nature. 523(7559):212-216, 2015 Jul.
 ```
