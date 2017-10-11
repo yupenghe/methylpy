@@ -24,7 +24,7 @@ def expand_nucleotide_code(mc_type):
     if "C" in mc_type:
         mc_class.extend(["CGN", "CHG", "CHH","CNN"])
     elif "CG" in mc_type:
-	mc_class.extend(["CGN"])
+        mc_class.extend(["CGN"])
 
     for motif in mc_type:
         mc_class.extend(["".join(i) for i in
