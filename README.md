@@ -90,18 +90,25 @@ for more details.
 #### Step 1 - Build converted genome reference
 `methylpy build-reference -h`
 
+```
+/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
+    build-reference \
+	--input-files mm10_bt2/mm10.fa \
+	--output-prefix mm10_bt2/mm10 \
+	--bowtie2 True
+```
+
 #### Step 2 - Process bisulfite sequencing and NOMe-seq data 
 For single-end data, `methylpy single-end-pipeline -h`
 ```
 /gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
     single-end-pipeline \
-    --read-files raw/160919_H1_NOME_3_AD006_R1_trimmed.top10k.fastq.gz \
-	--sample H1_NOMe \
-    --forward-ref hg19_bt2/hg19_f \
-    --reverse-ref hg19_bt2/hg19_r \
-    --ref-fasta hg19_bt2/hg19.fa \
+    --read-files raw/mESC_R1.fastq.gz \
+	--sample mESC \
+    --forward-ref mm10_bt2/mm10_f \
+    --reverse-ref mm10_bt2/mm10_r \
+    --ref-fasta mm10_bt2/mm10.fa \
     --num-procs 8 \
-    --pbat True \
     --remove-clonal True \
     --path-to-picard="picard/"
 ```
@@ -110,18 +117,15 @@ For paired-end data, `methylpy paired-end-pipeline -h`
 ```
 /gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
     paired-end-pipeline \
-    --read1-files raw/160919_H1_NOME_3_AD006_R1_trimmed.top10k.fastq.gz \
-    --read2-files raw/160919_H1_NOME_3_AD006_R2_trimmed.top10k.fastq.gz \
-    --libraries libA \
-    --sample H1_NOMe \
-    --forward-ref hg19_bt2/hg19_f \
-    --reverse-ref hg19_bt2/hg19_r \
-    --ref-fasta hg19_bt2/hg19.fa \
+    --read1-files raw/mESC_R1.fastq.gz \
+    --read2-files raw/mESC_R2.fastq.gz \
+    --sample mESC \
+    --forward-ref mm10_bt2/mm10_f \
+    --reverse-ref mm10_bt2/mm10_r \
+    --ref-fasta mm10_bt2/mm10.fa \
     --num-procs 8 \
-    --pbat True \
     --remove-clonal True \
-    --path-to-picard="picard/" \
-    --compress-output False
+    --path-to-picard="picard/"
 ```
 
 #### Output format
@@ -143,15 +147,51 @@ An allc file contain 7 columns and no header:
 This function will take a list of compressed/uncompressed allc files (output files from methylpy pipeline) as input
 and look for DMRs. Help information of this function is available via running `methylpy DMRfind -h`.
 ```
-/gale/netapp/home/yupeng/methylpy_github/bin/methylpy DMRfind --allc-files allc/allc_AD_HT.tsv allc/allc_AD_IT.tsv --samples AD_HT AD_IT --mc-type "CGN" --chroms 1 2 3 4 5 --num-procs 8 --output-prefix DMR_HT_IT
+/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
+	DMRfind \
+	--allc-files allc/allc_AD_HT.tsv allc/allc_AD_IT.tsv \
+	--samples AD_HT AD_IT \
+	--mc-type "CGN" \
+	--chroms 1 2 3 4 5 \
+	--num-procs 8 \
+	--output-prefix DMR_HT_IT
 ```
 Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
 
 # Optional steps for data processing
-#### Quality filter for bisulfite sequencing reads
-Sometimes, 
-`methylpy bam-quality-filter -h`
-
 #### Extract cytosine methylation state from BAM file
-This module allows users to get 
-`methylpy call-methylation-state -h`
+This function allows users to get cytosine methylation state (allc file) from alignment file (BAM file).
+It is part of the data processing pipeline which is especially useful for getting the allc file from
+alignment file from other methylation data pipelines like bismark. Run `methylpy call-methylation-state -h`
+to get help information. Below is an example of running this function.
+
+```
+/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
+    call-methylation-state \
+	--input-file mESC_processed_reads_no_clonal.bam \
+	--paired-end True \
+	--sample mESC \
+	--ref-fasta mm10_bt2/mm10.fa \
+	--num-procs 8
+```
+
+#### Quality filter for bisulfite sequencing reads
+Sometimes, we want to filter out reads that cannot be mapped confidently or are likely from 
+under-converted DNA fragments. This can be done using the `bam-quality-filter` function.
+See `methylpy bam-quality-filter -h` for parameter inforamtion. 
+
+For example, below command can be used to filter out reads with less than 30 MAPQ score
+(poor alignment) and with mCH level greater than 0.7 (under-conversion) if the reads contain
+enough (at least 3) CH sites.
+
+```
+/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
+    bam-quality-filter \
+	--input-file mESC_processed_reads_no_clonal.bam \
+	--output-file mESC_processed_reads_no_clonal.filtered.bam \
+	--ref-fasta mm10_bt2/mm10.fa \
+	--quality-cutoff 30 \
+	--min-num-ch 3 \
+	--max-mch-level 0.7 \
+	--buffer-line-number 100
+```
