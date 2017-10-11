@@ -5,9 +5,11 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 
 # Note
 * [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) is being written
+* In new version, allc files for one sample are no longer split and the current allc format does not support header. Command `cat allc_SAMPLENAME_*.tsv |grep chr -v > allc_SAMPLENAME.tsv` can be used to change the older version of allc to the new version.
 * Current version methylpy has major difference compared to previous version.
 Please checkout this document and [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md)
 for details.
+
 
 # What can methylpy do?
 #### Processing bisulfite sequencing data and NOMe-seq data
@@ -180,7 +182,8 @@ Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylp
 This function allows users to get cytosine methylation state (allc file) from alignment file (BAM file).
 It is part of the data processing pipeline which is especially useful for getting the allc file from
 alignment file from other methylation data pipelines like bismark. Run `methylpy call-methylation-state -h`
-to get help information. Below is an example of running this function.
+to get help information. Below is an example of running this function. Please make sure to remove 
+`--paired-end True` or use `--paired-end False` for BAM file from single-end data.
 
 ```
 /gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
