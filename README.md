@@ -27,6 +27,7 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * [Using methylpy for data processing](#using-methylpy-for-data-processing)
 * [Using methylpy for calling DMRs](#using-methylpy-for-calling-dmrs)
 * [Optional steps for data processing](#optional-steps-for-data-processing)
+
 run `methylpy -h` to get a list of functions.
 
 # Installing methylpy
