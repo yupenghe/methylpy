@@ -23,11 +23,11 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * useful feature for dealing with low-coverage data by combining data of adjacent cytosines
 
 # What you want to do
-* [Installating methylpy](#installing-methylpy)
+* [Installing methylpy](#installing-methylpy)
 * [Using methylpy for data processing](#using-methylpy-for-data-processing)
 * [Using methylpy for calling DMRs](#using-methylpy-for-calling-dmrs)
 
-# Installating methylpy
+# Installing methylpy
 #### step 1 - download methylpy and set up environment variable
 Enter the directory where you would like to install methylpy and run
 ```

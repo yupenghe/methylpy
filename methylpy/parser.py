@@ -47,11 +47,11 @@ def parse_args():
      elif args.command == "single-end-pipeline":
           from methylpy.call_mc_se import run_methylation_pipeline
           run_methylation_pipeline(read_files=args.read_files,
-                                   libraries=args.libraries,
                                    sample=args.sample,
                                    forward_reference=args.forward_ref,
                                    reverse_reference=args.reverse_ref,
                                    reference_fasta=args.ref_fasta,
+                                   libraries=args.libraries,                                   
                                    path_to_output=args.path_to_output,
                                    pbat=args.pbat,
                                    num_procs=args.num_procs,
@@ -90,11 +90,11 @@ def parse_args():
           from methylpy.call_mc_pe import run_methylation_pipeline_pe
           run_methylation_pipeline_pe(read1_files=args.read1_files,
                                       read2_files=args.read2_files,
-                                      libraries=args.libraries,
                                       sample=args.sample,
                                       forward_reference=args.forward_ref,
                                       reverse_reference=args.reverse_ref,
                                       reference_fasta=args.ref_fasta,
+                                      libraries=args.libraries,
                                       path_to_output=args.path_to_output,
                                       pbat=args.pbat,
                                       num_procs=args.num_procs,
@@ -329,16 +329,6 @@ def add_se_pipeline_subparser(subparsers):
                                   + "the pipeline. Note that globbing is supported here (i.e., you "
                                   + "can use * in your paths)")
      
-     parser_se_req.add_argument("--libraries",
-                                  type=str,
-                                  nargs="+",
-                                  required=True,
-                                  help="list of library IDs (in the same order as the files list) "
-                                  + "indiciating which libraries each set of fastq files belong to. "
-                                  + "If you use a glob, you only need to indicate the library ID for "
-                                  + "those fastqs once (i.e., the length of files and libraries should "
-                                  + "be the same)")
-     
      parser_se_req.add_argument("--sample",
                                   type=str,
                                   required=True,
@@ -363,6 +353,16 @@ def add_se_pipeline_subparser(subparsers):
      
      parser_se_opt = parser_se.add_argument_group("optional inputs")
 
+     parser_se_opt.add_argument("--libraries",
+                                type=str,
+                                nargs="+",
+                                default=["libA"],
+                                help="list of library IDs (in the same order as the files list) "
+                                + "indiciating which libraries each set of fastq files belong to. "
+                                + "If you use a glob, you only need to indicate the library ID for "
+                                + "those fastqs once (i.e., the length of files and libraries should "
+                                + "be the same)")
+     
      parser_se_opt.add_argument("--path-to-output",
                                 type=str,
                                 default="",
@@ -587,16 +587,6 @@ def add_pe_pipeline_subparser(subparsers):
                                   + "the pipeline. Note that globbing is supported here (i.e., you "
                                   + "can use * in your paths)")
      
-     parser_pe_req.add_argument("--libraries",
-                                  type=str,
-                                  nargs="+",
-                                  required=True,
-                                  help="list of library IDs (in the same order as the files list) "
-                                  + "indiciating which libraries each set of fastq files belong to. "
-                                  + "If you use a glob, you only need to indicate the library ID for "
-                                  + "those fastqs once (i.e., the length of files and libraries should "
-                                  + "be the same)")
-     
      parser_pe_req.add_argument("--sample",
                                   type=str,
                                   required=True,
@@ -621,6 +611,16 @@ def add_pe_pipeline_subparser(subparsers):
      
      parser_pe_opt = parser_pe.add_argument_group("optional inputs")
 
+     parser_pe_opt.add_argument("--libraries",
+                                type=str,
+                                nargs="+",
+                                default=["libA"],
+                                help="list of library IDs (in the same order as the files list) "
+                                + "indiciating which libraries each set of fastq files belong to. "
+                                + "If you use a glob, you only need to indicate the library ID for "
+                                + "those fastqs once (i.e., the length of files and libraries should "
+                                + "be the same)")
+     
      parser_pe_opt.add_argument("--path-to-output",
                                 type=str,
                                 default="",
