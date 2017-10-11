@@ -54,7 +54,7 @@ methylpy
 ```
 
 #### Step 2 - Install dependencies
-methylpy is written in python2 so obviously python2 needs to be installed.
+methylpy is written in python so obviously python2/3 needs to be installed.
 methylpy also depends on two python modules, [numpy](http://www.numpy.org/) 
 and [scipy](https://www.scipy.org/).
 The easiest way to resolve these dependencies is to install [anaconda](https://www.anaconda.com/download/)
