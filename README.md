@@ -27,6 +27,7 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * [Use methylpy for data processing](#use-methylpy-for-data-processing)
 * [Use methylpy for calling DMRs](#use-methylpy-for-calling-dmrs)
 * [Optional steps for data processing](#optional-steps-for-data-processing)
+* [Cite methylpy](#cite-methylpy)
 
 run `methylpy -h` to get a list of functions.
 
@@ -207,4 +208,14 @@ enough (at least 3) CH sites.
 	--min-num-ch 3 \
 	--max-mch-level 0.7 \
 	--buffer-line-number 100
+```
+
+# Cite methylpy
+If you use methylpy, please cite
+```
+Matthew D. Schultz, Yupeng He, John W.Whitaker, Manoj Hariharan, Eran A. Mukamel,
+Danny Leung, Nisha Rajagopal, Joseph R. Nery, Mark A. Urich, Huaming Chen,
+Shin Lin, Yiing Lin, Bing Ren, Terrence J. Sejnowski, Wei Wang, Joseph R. Ecker.
+Human Body Epigenome Maps Reveal Noncanonical DNA Methylation Variation. 
+Nature. 523(7559):212-216, 2015 Jul.
 ```
