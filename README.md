@@ -92,7 +92,37 @@ for more details.
 
 #### Step 2 - Process bisulfite sequencing and NOMe-seq data 
 For single-end data, `methylpy single-end-pipeline -h`
+```
+/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
+    single-end-pipeline \
+    --read-files raw/160919_H1_NOME_3_AD006_R1_trimmed.top10k.fastq.gz \
+	--sample H1_NOMe \
+    --forward-ref hg19_bt2/hg19_f \
+    --reverse-ref hg19_bt2/hg19_r \
+    --ref-fasta hg19_bt2/hg19.fa \
+    --num-procs 8 \
+    --pbat True \
+    --remove-clonal True \
+    --path-to-picard="picard/"
+```
 For paired-end data, `methylpy paired-end-pipeline -h`
+
+```
+/gale/netapp/home/yupeng/methylpy_github/bin/methylpy \
+    paired-end-pipeline \
+    --read1-files raw/160919_H1_NOME_3_AD006_R1_trimmed.top10k.fastq.gz \
+    --read2-files raw/160919_H1_NOME_3_AD006_R2_trimmed.top10k.fastq.gz \
+    --libraries libA \
+    --sample H1_NOMe \
+    --forward-ref hg19_bt2/hg19_f \
+    --reverse-ref hg19_bt2/hg19_r \
+    --ref-fasta hg19_bt2/hg19.fa \
+    --num-procs 8 \
+    --pbat True \
+    --remove-clonal True \
+    --path-to-picard="picard/" \
+    --compress-output False
+```
 
 #### Output format
 Output file(s) are (compressed) tab-separated text file(s) in allc format. "allc" stands
@@ -110,7 +140,11 @@ An allc file contain 7 columns and no header:
 |7|methylyate|1|indicator of significant methylation|
 
 # Using methylpy for calling DMRs
-`methylpy DMRfind -h`
+This function will take a list of compressed/uncompressed allc files (output files from methylpy pipeline) as input
+and look for DMRs. Help information of this function is available via running `methylpy DMRfind -h`.
+```
+/gale/netapp/home/yupeng/methylpy_github/bin/methylpy DMRfind --allc-files allc/allc_AD_HT.tsv allc/allc_AD_IT.tsv --samples AD_HT AD_IT --mc-type "CGN" --chroms 1 2 3 4 5 --num-procs 8 --output-prefix DMR_HT_IT
+```
 Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
 
 # Optional steps for data processing
