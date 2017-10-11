@@ -26,6 +26,8 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * [Installing methylpy](#installing-methylpy)
 * [Using methylpy for data processing](#using-methylpy-for-data-processing)
 * [Using methylpy for calling DMRs](#using-methylpy-for-calling-dmrs)
+* [Optional steps for data processing](#optional-steps-for-data-processing)
+run `methylpy -h` to get a list of functions.
 
 # Installing methylpy
 #### step 1 - download methylpy and set up environment variable
@@ -83,11 +85,11 @@ g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
 # Using methylpy for data processing
 Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
 
-#### Building converted genome reference
+#### step 1 - Building converted genome reference
 
 `methylpy build-reference -h`
 
-#### Processing bisulfite sequencing and NOMe-seq data 
+#### step 2 - processing bisulfite sequencing and NOMe-seq data 
 For single-end data, `methylpy single-end-pipeline -h`
 For paired-end data, `methylpy paired-end-pipeline -h`
 
@@ -105,6 +107,11 @@ An allc file contain 7 columns and no header:
 |6|cov|21|read coverage|
 |7|methylyate|1|indicator of significant methylation|
 
+# Using methylpy for calling DMRs
+Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
+`methylpy DMRfind -h`
+
+# Optional steps for data processing
 #### Quality filter for bisulfite sequencing reads
 Sometimes, 
 `methylpy bam-quality-filter -h`
@@ -112,7 +119,3 @@ Sometimes,
 #### Extracting methylation state from BAM file
 This module allows users to get 
 `methylpy call-methylation-state -h`
-
-# Using methylpy for calling DMRs
-Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
-`methylpy DMRfind -h`
