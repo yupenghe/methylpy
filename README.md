@@ -28,7 +28,7 @@ for details.
 * [Install methylpy](#install-methylpy)
 * [Use methylpy for data processing](#use-methylpy-for-data-processing)
 * [Use methylpy for calling DMRs](#use-methylpy-for-calling-dmrs)
-* [Optional steps for data processing](#optional-steps-for-data-processing)
+* [Optional functions for data processing](#optional-functions-for-data-processing)
 * [Cite methylpy](#cite-methylpy)
 
 run `methylpy -h` to get a list of functions.
@@ -175,7 +175,7 @@ Below is the code of an example of calling DMRs for CG methylation between two s
 ```
 Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
 
-# Optional steps for data processing
+# Optional functions for data processing
 #### Extract cytosine methylation state from BAM file
 This function allows users to get cytosine methylation state (allc file) from alignment file (BAM file).
 It is part of the data processing pipeline which is especially useful for getting the allc file from
