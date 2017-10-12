@@ -23,7 +23,7 @@ def run_methylation_pipeline(read_files, sample,
                              path_to_output="", sig_cutoff=0.01,
                              num_procs=1, sort_mem="500M",
                              num_upstr_bases=0, num_downstr_bases=2,
-                             generate_allc_file=True,split_allc_file=False,
+                             generate_allc_file=True,
                              generate_mpileup_file=True, compress_output=True,
                              binom_test=False, min_cov=2,
                              trim_reads=True, path_to_cutadapt="",
@@ -276,7 +276,6 @@ def run_methylation_pipeline(read_files, sample,
                               num_downstr_bases=num_downstr_bases,
                               generate_mpileup_file=generate_mpileup_file,
                               compress_output=compress_output,
-                              split_allc_file=split_allc_file,
                               min_cov=min_cov,
                               binom_test=binom_test,
                               sort_mem=sort_mem,
@@ -1132,7 +1131,6 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                           num_upstr_bases=0,num_downstr_bases=2,
                           generate_mpileup_file=True,
                           compress_output=True,
-                          split_allc_file=False,
                           buffer_line_number = 100000,
                           min_cov=1,binom_test=True,min_mc=0,
                           path_to_samtools="",
@@ -1283,22 +1281,8 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                               sig_cutoff=sig_cutoff,
                               num_procs=num_procs,
                               sort_mem=sort_mem,
-                              split_allc_file=split_allc_file,
                               compress_output=compress_output,
                               buffer_line_number=buffer_line_number)
-    elif split_allc_file:
-        # Split allc files only (no binomial test)
-        if compress_output:
-            output_file = path_to_files+"allc_"+sample+".tsv.gz",
-        else:
-            output_file = path_to_files+"allc_"+sample+".tsv",
-        do_split_allc_file(output_file,
-                           sample,
-                           path_to_files,
-                           compress_output=compress_output,
-                           buffer_line_number=buffer_line_number)
-    if split_allc_file:
-        subprocess.check_call(shlex.split("rm -f "+output_file,'w'))
     return(0)
 
 def do_split_allc_file(allc_file,
@@ -1356,7 +1340,6 @@ def perform_binomial_test(allc_file,
                           sig_cutoff=0.01,
                           num_procs=1,
                           sort_mem="500M",
-                          split_allc_file=False,
                           compress_output=True,
                           buffer_line_number=100000):
     """
@@ -1389,6 +1372,7 @@ def perform_binomial_test(allc_file,
                 mc_class_counts[mc_class] = mc_class_counts.get(mc_class,0) + result_mc_class_counts[mc_class]
         pool.close()
         pool.join()
+        subprocess.check_call(shlex.split("rm "+" ".join(input_files)))
     else:
         output_files = [path_to_output+"allc_"+sample+".tsv_binom_results.tsv"]
         output_file = output_files[0]
@@ -1404,28 +1388,15 @@ def perform_binomial_test(allc_file,
         mc_class_counts=mc_class_counts,
         sig_cutoff=sig_cutoff)
 
-    if split_allc_file:
-        if compress_output:
-            subprocess.check_call(shlex.split("rm "+" ".join(input_files)))
-        output_prefix = path_to_output+"allc_"+sample
-        filter_files_by_pvalue_split(input_files=output_files,
-                                     output_prefix=output_prefix,
-                                     best_pvalues=p_value_cutoff,
-                                     num_procs=num_procs,
-                                     sort_mem=sort_mem,
-                                     compress_output=compress_output)
-    elif not split_allc_file:
-        output_file = path_to_output+"allc_"+sample+".tsv"
-        if compress_output:
-            output_file += ".gz"
-        filter_files_by_pvalue_combined(input_files=output_files,
-                                        output_file=output_file,
-                                        best_pvalues=p_value_cutoff,
-                                        num_procs=num_procs,
-                                        sort_mem=sort_mem,
-                                        compress_output=compress_output)
-        if num_procs > 1: # remove split allc files
-            subprocess.check_call(shlex.split("rm "+" ".join(input_files)))
+    output_file = path_to_output+"allc_"+sample+".tsv"
+    if compress_output:
+        output_file += ".gz"
+    filter_files_by_pvalue_combined(input_files=output_files,
+                                    output_file=output_file,
+                                    best_pvalues=p_value_cutoff,
+                                    num_procs=num_procs,
+                                    sort_mem=sort_mem,
+                                    compress_output=compress_output)
     # remove _binom_results.tsv files
     subprocess.check_call(shlex.split("rm "+" ".join(output_files)))
 

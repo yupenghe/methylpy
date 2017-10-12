@@ -59,7 +59,6 @@ def parse_args():
                                    num_upstr_bases=args.num_upstream_bases,
                                    num_downstr_bases=args.num_downstream_bases,
                                    generate_allc_file=args.generate_allc_file,
-                                   split_allc_file=args.split_allc_file,
                                    generate_mpileup_file=args.generate_mpileup_file,
                                    compress_output=args.compress_output,
                                    trim_reads=args.trim_reads,
@@ -102,7 +101,6 @@ def parse_args():
                                       num_upstr_bases=args.num_upstream_bases,
                                       num_downstr_bases=args.num_downstream_bases,
                                       generate_allc_file=args.generate_allc_file,
-                                      split_allc_file=args.split_allc_file,
                                       generate_mpileup_file=args.generate_mpileup_file,
                                       compress_output=args.compress_output,
                                       trim_reads=args.trim_reads,
@@ -151,7 +149,6 @@ def parse_args():
                                         num_procs=args.num_procs,                                     
                                         num_upstr_bases=args.num_upstream_bases,
                                         num_downstr_bases=args.num_downstream_bases,
-                                        split_allc_file=args.split_allc_file,
                                         generate_mpileup_file=args.generate_mpileup_file,
                                         compress_output=args.compress_output,
                                         min_cov=args.min_cov,
@@ -170,7 +167,6 @@ def parse_args():
                                      num_procs=args.num_procs,                                     
                                      num_upstr_bases=args.num_upstream_bases,
                                      num_downstr_bases=args.num_downstream_bases,
-                                     split_allc_file=args.split_allc_file,
                                      generate_mpileup_file=args.generate_mpileup_file,
                                      compress_output=args.compress_output,
                                      min_cov=args.min_cov,
@@ -406,13 +402,6 @@ def add_se_pipeline_subparser(subparsers):
                                 help="Boolean indicating whether to generate the final output file that "
                                 +" contains the methylation state of each cytosine. If set to be false, "
                                 +"only alignment file (in BAM format) will be generated.")
-
-     parser_se_opt.add_argument("--split-allc-file",
-                                type=str2bool,
-                                default=False,
-                                help="Boolean indicating whether to split the final output file by chromosomes. "
-                                +"If set to be true, one sample will contain multiple allc files and each of "
-                                +"them contains the methylation state of all cytosines on one chromosome.")
 
      parser_se_opt.add_argument("--generate-mpileup-file",
                                 type=str2bool,
@@ -664,13 +653,6 @@ def add_pe_pipeline_subparser(subparsers):
                                 help="Boolean indicating whether to generate the final output file that "
                                 +" contains the methylation state of each cytosine. If set to be false, "
                                 +"only alignment file (in BAM format) will be generated.")
-
-     parser_pe_opt.add_argument("--split-allc-file",
-                                type=str2bool,
-                                default=False,
-                                help="Boolean indicating whether to split the final output file by chromosomes. "
-                                +"If set to be true, one sample will contain multiple allc files and each of "
-                                +"them contains the methylation state of all cytosines on one chromosome.")
 
      parser_pe_opt.add_argument("--generate-mpileup-file",
                                 type=str2bool,
@@ -983,13 +965,6 @@ def add_call_mc_subparser(subparsers):
                               help="Boolean indicating whether to generate the final output file that "
                               +" contains the methylation state of each cytosine. If set to be false, "
                               +"only alignment file (in BAM format) will be generated.")
-
-     call_mc_opt.add_argument("--split-allc-file",
-                              type=str2bool,
-                              default=False,
-                              help="Boolean indicating whether to split the final output file by chromosomes. "
-                              +"If set to be true, one sample will contain multiple allc files and each of "
-                              +"them contains the methylation state of all cytosines on one chromosome.")
 
      call_mc_opt.add_argument("--generate-mpileup-file",
                               type=str2bool,
