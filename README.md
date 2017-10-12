@@ -129,15 +129,15 @@ Run `methylpy paired-end-pipeline -h` to get more information.
 
 ```
 methylpy paired-end-pipeline \
-    --read1-files raw/mESC_R1.fastq.gz \
-    --read2-files raw/mESC_R2.fastq.gz \
-    --sample mESC \
-    --forward-ref mm10_bt2/mm10_f \
-    --reverse-ref mm10_bt2/mm10_r \
-    --ref-fasta mm10_bt2/mm10.fa \
-    --num-procs 8 \
-    --remove-clonal True \
-    --path-to-picard="picard/"
+	--read1-files raw/mESC_R1.fastq.gz \
+	--read2-files raw/mESC_R2.fastq.gz \
+	--sample mESC \
+	--forward-ref mm10_bt2/mm10_f \
+	--reverse-ref mm10_bt2/mm10_r \
+	--ref-fasta mm10_bt2/mm10.fa \
+	--num-procs 8 \
+	--remove-clonal True \
+	--path-to-picard="picard/"
 ```
 
 #### Output format
