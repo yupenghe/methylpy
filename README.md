@@ -116,12 +116,12 @@ used to tease out GC sites.
 methylpy single-end-pipeline \
 	--read-files raw/mESC_R1.fastq.gz \
 	--sample mESC \
-    --forward-ref mm10_bt2/mm10_f \
-    --reverse-ref mm10_bt2/mm10_r \
-    --ref-fasta mm10_bt2/mm10.fa \
-    --num-procs 8 \
-    --remove-clonal True \
-    --path-to-picard="picard/"
+	--forward-ref mm10_bt2/mm10_f \
+	--reverse-ref mm10_bt2/mm10_r \
+	--ref-fasta mm10_bt2/mm10.fa \
+	--num-procs 8 \
+	--remove-clonal True \
+	--path-to-picard="picard/"
 ```
 
 An command example for processing paired-end data.
