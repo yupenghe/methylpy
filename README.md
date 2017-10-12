@@ -28,8 +28,8 @@ for details.
 
 # What you want to do
 * [Install methylpy](#install-methylpy)
-* [Use methylpy for data processing](#use-methylpy-for-data-processing)
-* [Use methylpy for calling DMRs](#use-methylpy-for-calling-dmrs)
+* [Process data](#process-data)
+* [Call DMRs](#call-dmrs)
 * [Additional functions for data processing](#additional-functions-for-data-processing)
 * [Cite methylpy](#cite-methylpy)
 
@@ -89,7 +89,7 @@ cd methylpy/methylpy/
 g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
 ```
 
-# Use methylpy for data processing
+# Process data
 Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md)
 for more details.
 
@@ -155,7 +155,7 @@ An allc file contain 7 columns and no header:
 |6|cov|21|read coverage|
 |7|methylyate|1|indicator of significant methylation|
 
-# Using methylpy for calling DMRs
+# Call DMRs
 This function will take a list of compressed/uncompressed allc files (output files from methylpy pipeline) as input
 and look for DMRs. Help information of this function is available via running `methylpy DMRfind -h`. 
 
@@ -173,7 +173,7 @@ methylpy DMRfind \
 ```
 Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
 
-# Addition functions for data processing
+# Additional functions for data processing
 #### Extract cytosine methylation state from BAM file
 This function allows users to get cytosine methylation state (allc file) from alignment file (BAM file).
 It is part of the data processing pipeline which is especially useful for getting the allc file from
