@@ -153,7 +153,7 @@ An allc file contain 7 columns and no header:
 |4|sequence context|CGT|can be more than 3 bases|
 |5|mc|18|count of reads supporting methylation|
 |6|cov|21|read coverage|
-|7|methylyate|1|indicator of significant methylation|
+|7|methylated|1|indicator of significant methylation|
 
 # Call DMRs
 This function will take a list of compressed/uncompressed allc files (output files from methylpy pipeline) as input
