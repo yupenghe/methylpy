@@ -1655,13 +1655,13 @@ def filter_files_by_pvalue_split(input_files,output_prefix,
         for input_file in input_files:
             subprocess.check_call(
                 shlex.split("sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file))
-    output_handle = {}
+    output_handles = {}
     for input_file in input_files:
         f = open(input_file,'r')
         for line in f:
             line = line.rstrip()
             fields = line.split("\t")
-            if not output_handle.get(fields[0],False):
+            if not output_handles.get(fields[0],False):
                 if compress_output:
                     output_handles[fields[0]] = gzip.open(output_prefix+"_"+fields[0]+".tsv.gz",'w')
                 else:
@@ -1671,7 +1671,6 @@ def filter_files_by_pvalue_split(input_files,output_prefix,
             else:
                 output_handles[fields[0]].write("\t".join(fields[:6])+"\t0\n")
         f.close()
-        g.close()        
     for chrom in output_handles:
         output_handles[chrom].close()
     
