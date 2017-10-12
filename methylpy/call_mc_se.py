@@ -6,6 +6,7 @@ from scipy.stats.mstats import mquantiles
 from methylpy.utilities import print_checkpoint, print_error
 from methylpy.utilities import split_fastq_file
 from methylpy.utilities import split_fastq_file_pbat
+from methylpy.utilities import open_allc_file
 import pdb
 import shlex
 import itertools
@@ -14,7 +15,6 @@ import glob
 import io as cStr
 import bisect
 import gzip
-from collections import defaultdict
 
 def run_methylation_pipeline(read_files, sample,
                              forward_reference, reverse_reference, reference_fasta,
@@ -269,7 +269,7 @@ def run_methylation_pipeline(read_files, sample,
         call_methylated_sites(output_bam_file,
                               sample,
                               reference_fasta,
-                              unmethylated_control,
+                              unmethylated_control=unmethylated_control,
                               sig_cutoff=sig_cutoff,
                               num_procs=num_procs,
                               num_upstr_bases=num_upstr_bases,
@@ -279,6 +279,7 @@ def run_methylation_pipeline(read_files, sample,
                               split_allc_file=split_allc_file,
                               min_cov=min_cov,
                               binom_test=binom_test,
+                              sort_mem=sort_mem,
                               path_to_files=path_to_output,
                               path_to_samtools=path_to_samtools,
                               min_base_quality=min_base_quality)
@@ -499,7 +500,6 @@ def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bo
             input_files = [input_files]
         else:
             sys.exit("input_files must be a list of strings")
-    print(input_files)
     #outf = Convert all C to T. outr = convert all G to A  
     with open(output+"_f.fasta", 'w') as outf, open(output+"_r.fasta", 'w') as outr:
         for filen in input_files:
@@ -1126,13 +1126,17 @@ def fasta_iter(fasta_name,query_chrom):
         seq = "".join(s.strip() for s in next(faiter))
         return seq
 
-def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
+def call_methylated_sites(inputf, sample, reference_fasta,
+                          unmethylated_control=None,
+                          sig_cutoff=.01,num_procs = 1,
                           num_upstr_bases=0,num_downstr_bases=2,
                           generate_mpileup_file=True,
                           compress_output=True,
                           split_allc_file=False,
                           buffer_line_number = 100000,
-                          min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
+                          min_cov=1,binom_test=True,min_mc=0,
+                          path_to_samtools="",
+                          sort_mem="500M",
                           path_to_files="",min_base_quality=1):
 
     """
@@ -1160,6 +1164,10 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
         mpileup file (and subsequently to be considered for methylation calling)
     """
+
+    if binom_test and unmethylated_control is None:
+        print_error("Please specify unmethylated_control if you would like to do binomial test!\n")
+
     #Figure out all the correct quality options based on the offset or CASAVA version given
     # quality_version >= 1.8:
     quality_base = 33
@@ -1167,7 +1175,6 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
         path_to_files+="/"
     if len(path_to_samtools)!=0:
         path_to_samtools+="/"
-
 
     try:
         num_procs = int(num_procs)
@@ -1201,8 +1208,10 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
     ## Output
     if compress_output:
         output_filehandler = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'w')
+        output_file = path_to_files+"allc_"+sample+".tsv.gz"
     else:
         output_filehandler = open(path_to_files+"allc_"+sample+".tsv",'w')
+        output_file = path_to_files+"allc_"+sample+".tsv"
         
     complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
     cur_chrom = ""
@@ -1264,15 +1273,47 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
     if generate_mpileup_file:
         subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output.tsv"))
 
-    
-    if not split_allc_file:
-        return 0
-    
-    # Split allc files
-    if compress_output:
-        fhandle = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'r')
-    else:
-        fhandle = open(path_to_files+"allc_"+sample+".tsv",'r')
+    if binom_test:
+        print_checkpoint('Perform binomial test')
+        perform_binomial_test(allc_file=output_file,
+                              sample=sample,
+                              path_to_output=path_to_files,
+                              unmethylated_control=unmethylated_control,
+                              min_cov=min_cov,
+                              sig_cutoff=sig_cutoff,
+                              num_procs=num_procs,
+                              sort_mem=sort_mem,
+                              split_allc_file=split_allc_file,
+                              compress_output=compress_output,
+                              buffer_line_number=buffer_line_number)
+    elif split_allc_file:
+        # Split allc files only (no binomial test)
+        if compress_output:
+            output_file = path_to_files+"allc_"+sample+".tsv.gz",
+        else:
+            output_file = path_to_files+"allc_"+sample+".tsv",
+        do_split_allc_file(output_file,
+                           sample,
+                           path_to_files,
+                           compress_output=compress_output,
+                           buffer_line_number=buffer_line_number)
+    if split_allc_file:
+        subprocess.check_call(shlex.split("rm -f "+output_file,'w'))
+    return(0)
+
+def do_split_allc_file(allc_file,
+                       sample,
+                       path_to_output = "",
+                       compress_output=True,
+                       buffer_line_number=100000):
+    """
+    """
+    if len(path_to_output)!=0:
+        path_to_outut+="/"
+
+    fhandle = open_allc_file(allc_file)
+
+    output_files = []
     cur_chrom = ""
     out = ""
     line_counts = 0
@@ -1287,26 +1328,400 @@ def call_methylated_sites(inputf, sample, reference_fasta, control,sig_cutoff=.0
                 output_handle.close()
             cur_chrom = fields[0]
             if compress_output:
-                output_handle = gzip.open(path_to_files+"allc_"+sample+"_"+cur_chrom+".tsv.gz",'w')
+                output_handle = gzip.open(path_to_output+"allc_"+sample+"_"+cur_chrom+".tsv.gz",'w')
+                output_files.append(path_to_output+"allc_"+sample+"_"+cur_chrom+".tsv")
             else:
-                output_handle = open(path_to_files+"allc_"+sample+"_"+cur_chrom+".tsv",'w')
-        else:
-            # data
-            line_counts += 1
-            out += line
+                output_handle = open(path_to_output+"allc_"+sample+"_"+cur_chrom+".tsv",'w')
+                output_files.append(path_to_output+"allc_"+sample+"_"+cur_chrom+".tsv")
+        # data
+        line_counts += 1
+        out += line
+        if line_counts >= buffer_line_number:
+            output_handle.write(out)
+            line_counts = 0
+            out = ""
 
     if line_counts > 0:
         output_handle.write(out)
         line_counts = 0
         out = ""
     output_handle.close()
+    return(output_files)
 
-    if compress_output:
-        subprocess.check_call(shlex.split("rm -f "+path_to_files+"allc_"+sample+".tsv.gz",'w'))
+def perform_binomial_test(allc_file,
+                          sample,
+                          path_to_output,
+                          unmethylated_control,
+                          min_cov=2,
+                          sig_cutoff=0.01,
+                          num_procs=1,
+                          sort_mem="500M",
+                          split_allc_file=False,
+                          compress_output=True,
+                          buffer_line_number=100000):
+    """
+    """
+    if len(path_to_output)!=0:
+        path_to_outut+="/"
+
+    # calculate non-conversion rate
+    non_conversion = calculate_non_conversion_rate(unmethylated_control,
+                                                   allc_file)                                              
+    # binomial test
+    if num_procs > 1:
+        # split allc file by chromosome
+        input_files = do_split_allc_file(allc_file,
+                                         sample,
+                                         path_to_output,
+                                         compress_output=False,
+                                         buffer_line_number=buffer_line_number)
+        output_files = [input_file+"_binom_results.tsv" for input_file in input_files]
+        pool=multiprocessing.Pool(num_procs)
+        results = []
+        for input_file,output_file in zip(input_files,output_files):
+            results.append(pool.apply_async(allc_run_binom_tests,
+                                            (input_file,output_file,non_conversion),
+                                            {"min_cov":min_cov,"sort_mem":sort_mem}))
+        mc_class_counts = {}
+        for result in results:
+            result_mc_class_counts = result.get()
+            for mc_class in result_mc_class_counts:
+                mc_class_counts[mc_class] = mc_class_counts.get(mc_class,0) + result_mc_class_counts[mc_class]
+        pool.close()
+        pool.join()
     else:
-        subprocess.check_call(shlex.split("rm -f "+path_to_files+"allc_"+sample+".tsv",'w'))
+        output_files = [path_to_output+"allc_"+sample+".tsv_binom_results.tsv"]
+        output_file = output_files[0]
+        mc_class_counts = allc_run_binom_tests(filen=allc_file,
+                                               output_file=output_file,
+                                               non_conversion=non_conversion,
+                                               min_cov=min_cov,
+                                               sort_mem=sort_mem)
 
-    return 0
+    # FDR correction
+    p_value_cutoff = benjamini_hochberg_correction_call_methylated_sites(
+        files=output_files,
+        mc_class_counts=mc_class_counts,
+        sig_cutoff=sig_cutoff)
+
+    if split_allc_file:
+        if compress_output:
+            subprocess.check_call(shlex.split("rm "+" ".join(input_files)))
+        output_prefix = path_to_output+"allc_"+sample
+        filter_files_by_pvalue_split(input_files=output_files,
+                                     output_prefix=output_prefix,
+                                     best_pvalues=p_value_cutoff,
+                                     num_procs=num_procs,
+                                     sort_mem=sort_mem,
+                                     compress_output=compress_output)
+    elif not split_allc_file:
+        output_file = path_to_output+"allc_"+sample+".tsv"
+        if compress_output:
+            output_file += ".gz"
+        filter_files_by_pvalue_combined(input_files=output_files,
+                                        output_file=output_file,
+                                        best_pvalues=p_value_cutoff,
+                                        num_procs=num_procs,
+                                        sort_mem=sort_mem,
+                                        compress_output=compress_output)
+        if num_procs > 1: # remove split allc files
+            subprocess.check_call(shlex.split("rm "+" ".join(input_files)))
+    # remove _binom_results.tsv files
+    subprocess.check_call(shlex.split("rm "+" ".join(output_files)))
+
+def calculate_non_conversion_rate(unmethylated_control,
+                                  allc_file):
+    """
+    """
+    # Parse unmethylated_control
+    try:
+        non_conversion = float(unmethylated_control)
+        if non_conversion < 0 or non_conversion > 1:
+            print_error("Invalid unmethylated_control! "
+                        +"It should be either a string, or a decimal between 0 and 1!\n")
+        else:
+            return(non_conversion)
+    except:
+        if isinstance(unmethylated_control,str):
+            fields = [field for field in
+                      re.split("[\:\-]",unmethylated_control)
+                      if len(field) > 0]
+            um_chrom,um_start,um_end = None,None,None
+            if len(fields) == 0:
+                print_error("Invalid unmethylated_control! "
+                            +"It should be either a string, or a decimal between 0 and 1!\n")
+            # decode
+            fields[0] = fields[0].replace("chr","")
+            if len(fields) == 1: # chrom only
+                um_chrom = fields[0]
+            elif len(fields) == 2: # chrom and start
+                um_chrom,um_start = fields
+            else:
+                um_chrom,um_start,um_end = fields[:3]
+            # further parsing
+            try:
+                if not (um_start is None):
+                    um_start = int(um_start)
+                    if not (um_end is None):
+                        um_end = int(um_end)
+            except:
+                print_error("Invalid unmethylated_control! "
+                            +"It should be either a string, or a decimal between 0 and 1!\n")
+
+    # scan allc file to set up a table for fast look-up of lines belong
+    # to different chromosomes
+    f = open_allc_file(allc_file)
+    chrom_pointer = {}
+    cur_chrom = ""
+    cur_pointer = 0
+    while True:
+        line = f.readline()
+        if not line: break
+        fields = line.split("\t")
+        if fields[0] != cur_chrom:
+            chrom_pointer[fields[0]] = cur_pointer
+            cur_chrom = fields[0]
+        cur_pointer = f.tell()
+
+    if um_chrom not in chrom_pointer:
+        print_error("The chromosome specified in unmethylated_control is not in the output allc file!\n")
+    f.seek(chrom_pointer[um_chrom])
+    
+    # calculate non-conversion rate
+    mc, h = 0, 0
+    for line in f:
+        line = line.rstrip("\n")
+        fields = line.split("\t")
+        if fields[0] != um_chrom:
+            break
+        if not (um_end is None) and int(fields[1]) > um_end:
+            break
+        if not (um_start is None) and int(fields[1]) < um_start:
+            continue
+        mc += int(fields[4])
+        h += int(fields[5])
+
+    non_conversion = None
+    if h > 0:
+            return(float(mc) / float(h))
+    else:
+        print_error("The chromosome and range specified in unmethylated_control "
+                    +"is not in the output allc file!\n")
+
+def benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,sig_cutoff):
+    """
+    This function is similar to the one defined here:
+    http://stats.stackexchange.com/questions/870/multiple-hypothesis-testing-correction-with-benjamini-hochberg-p-values-or-q-va
+    But takes advantage of the fact that the elements provided to it are in a sorted file.
+    This way, it doesn't have to load much into memory.
+    This link:
+    http://brainder.org/2011/09/05/fdr-corrected-fdr-adjusted-p-values/
+    was also helpful as the monotonicity correction from stats.stackexchange is not correct.
+    
+    file is a string indicating the path to an allc file (generated by run_binom_tests).
+    
+    mc_class_counts is a dictionary indicating the total number of statistical tests performed for each mc context
+    
+    sig_cutoff is the FDR cutoff you'd like to use to indicate if a site is significant.
+    """
+    #A dict of file_names to file handles for the benjamini hochberg correction step
+    input_files = {}
+    input_lines = {}
+    input_fields ={}
+    input_pvalues={}
+    test_num={}
+    prev_bh_value = {}
+    best_fdr = {}
+    best_pvalue = {}
+    
+    output_files = {}
+    for filen in files:
+        input_files[filen]=open(filen,'r')
+        input_lines[filen] = input_files[filen].readline().rstrip()
+        input_fields[filen] = input_lines[filen].split("\t")
+        try:
+            input_pvalues[filen] = float(input_fields[filen][6])
+        except:
+            #Dummy value that will never be the minimum
+            input_pvalues[filen] = 2.0
+    min_pvalue = min(input_pvalues,key=input_pvalues.get)
+    #pdb.set_trace()
+    while [i for i in input_pvalues if input_pvalues[i]!=2.0]:
+        fields = input_fields[min_pvalue]
+        bh_value = float(fields[6]) * mc_class_counts[fields[3]] / (test_num.get(fields[3],1) + 1)
+        # Sometimes this correction can give values greater than 1,
+        # so we set those values at 1
+        bh_value = min(bh_value, 1.0)
+        prev_bh_value[fields[3]] = bh_value
+        #if bh_value <= sig_cutoff and bh_value >= best_fdr:
+        if bh_value <= sig_cutoff:
+            best_fdr[fields[3]] = bh_value
+            best_pvalue[fields[3]] = float(fields[6])
+        
+        test_num[fields[3]] = test_num.get(fields[3],1) + 1
+        input_lines[min_pvalue]=input_files[min_pvalue].readline().rstrip()
+        input_fields[min_pvalue]=input_lines[min_pvalue].split("\t")
+        try:
+            input_pvalues[min_pvalue]=float(input_fields[min_pvalue][6])
+        except:
+            #Dummy value that will never be the minimum
+            input_pvalues[min_pvalue]=2.0
+        min_pvalue = min(input_pvalues,key=input_pvalues.get)
+    for mc_class in best_pvalue:
+        print("The closest p-value cutoff for "
+              +mc_class+" at your desired FDR is "+
+              str(best_pvalue[mc_class])+
+              " which corresponds to an FDR of "+
+              str(best_fdr.get(mc_class,1)))
+    for filen in files:
+        input_files[filen].close()
+    return best_pvalue
+
+def allc_run_binom_tests(filen,output_file,non_conversion,min_cov=1,sort_mem="500M"):
+    """
+    This function is used to recall methylated sites. This is faster than
+    going through the original mpileup files.
+    file is a string containing the path to an mpileup file
+    
+    non_conversion is a float indicating the estimated non-conversion rate and sequencing
+        error
+        
+    min_cov is the minimum number of reads a site must have to be tested
+    
+    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
+    """
+    if sort_mem:
+        if sort_mem.find("-S") == -1:
+            sort_mem = " -S " + sort_mem
+    else:
+        sort_mem = ""
+
+    mc_class_counts = {}
+    obs_pvalues = {}
+    reverse_complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
+    f = open_allc_file(filen)
+    g = open(output_file,'w')
+    for line in f:
+        line = line.rstrip()
+        fields = line.split("\t")
+        mc_class = fields[3]
+        unconverted_c = int(fields[4])
+        converted_c = int(fields[5]) - unconverted_c
+        total = int(fields[5])
+        if total >= min_cov and unconverted_c != 0:
+            try:
+                p_value = obs_pvalues[(unconverted_c,total)]
+            except:
+                p_value = sci.binom.sf(unconverted_c-1,total,non_conversion)
+                obs_pvalues[(unconverted_c,total)] = p_value
+            g.write("\t".join(fields[:6])+"\t"+str(p_value)+"\n")
+            mc_class_counts[mc_class] = mc_class_counts.get(mc_class,0) + 1
+        elif total != 0:
+            #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
+            #a unmethylated site
+            p_value = 2.0
+            g.write("\t".join(fields[:6])+"\t"+str(p_value)+"\n")
+
+    f.close()
+    g.close()
+    subprocess.check_call(shlex.split("sort" + sort_mem + " -k 7g,7g -o "+output_file+" "+output_file))
+    return mc_class_counts
+
+def filter_files_by_pvalue_split(input_files,output_prefix,
+                                 best_pvalues,num_procs,
+                                 compress_output=True,
+                                 sort_mem="500M"):
+    """
+    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
+    """
+    if sort_mem:
+        if sort_mem.find("-S") == -1:
+            sort_mem = " -S " + sort_mem
+    else:
+        sort_mem = ""
+
+    print_checkpoint("Begin sorting file by position")
+    # sort input files
+    if num_procs > 1:
+        pool=multiprocessing.Pool(num_procs)
+        for input_file in input_files:
+            pool.apply_async(subprocess.check_call,
+                             (shlex.split(
+                                 "sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file),
+                             ))
+        pool.close()
+        pool.join()
+    else:
+        for input_file in input_files:
+            subprocess.check_call(
+                shlex.split("sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file))
+    output_handle = {}
+    for input_file in input_files:
+        f = open(input_file,'r')
+        for line in f:
+            line = line.rstrip()
+            fields = line.split("\t")
+            if not output_handle.get(fields[0],False):
+                if compress_output:
+                    output_handles[fields[0]] = gzip.open(output_prefix+"_"+fields[0]+".tsv.gz",'w')
+                else:
+                    output_handles[fields[0]] = open(output_prefix+"_"+fields[0]+".tsv",'w')
+            if fields[6] != "2.0" and float(fields[6]) <= best_pvalues[fields[3]]:
+                output_handles[fields[0]].write("\t".join(fields[:6])+"\t1\n")
+            else:
+                output_handles[fields[0]].write("\t".join(fields[:6])+"\t0\n")
+        f.close()
+        g.close()        
+    for chrom in output_handles:
+        output_handles[chrom].close()
+    
+
+def filter_files_by_pvalue_combined(input_files,output_file,
+                                    best_pvalues,num_procs,
+                                    compress_output=True,
+                                    sort_mem="500M"):
+    """
+    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
+    """
+    if sort_mem:
+        if sort_mem.find("-S") == -1:
+            sort_mem = " -S " + sort_mem
+    else:
+        sort_mem = ""
+        
+    print_checkpoint("Begin sorting file by position")
+    # sort input files
+    if num_procs > 1:
+        pool=multiprocessing.Pool(num_procs)
+        for input_file in input_files:
+            pool.apply_async(subprocess.check_call,
+                             (shlex.split(
+                                 "sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file),
+                             ))
+        pool.close()
+        pool.join()
+    else:
+        for input_file in input_files:
+            subprocess.check_call(
+                shlex.split("sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file))
+    # output file
+    if compress_output:
+        g = gzip.open(output_file,'w')
+    else:
+        g = open(output_file,'w')
+    # write to output file
+    for input_file in input_files:
+        f = open(input_file,'r')
+
+        for line in f:
+            line = line.rstrip()
+            fields = line.split("\t")
+            if fields[6] != "2.0" and float(fields[6]) <= best_pvalues[fields[3]]:
+                g.write("\t".join(fields[:6])+"\t1\n")
+            else:
+                g.write("\t".join(fields[:6])+"\t0\n")
+        f.close()
+    g.close()
 
 def bam_quality_mch_filter(inputf,
                            outputf,
@@ -1412,165 +1827,3 @@ def bam_quality_mch_filter(inputf,
     
     # remove sam
     subprocess.check_call(shlex.split("rm " +outputf+".sam"))
-                   
-def benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,sig_cutoff):
-    """
-    This function is similar to the one defined here:
-    http://stats.stackexchange.com/questions/870/multiple-hypothesis-testing-correction-with-benjamini-hochberg-p-values-or-q-va
-    But takes advantage of the fact that the elements provided to it are in a sorted file.
-    This way, it doesn't have to load much into memory.
-    This link:
-    http://brainder.org/2011/09/05/fdr-corrected-fdr-adjusted-p-values/
-    was also helpful as the monotonicity correction from stats.stackexchange is not correct.
-    
-    file is a string indicating the path to an allc file (generated by run_binom_tests).
-    
-    mc_class_counts is a dictionary indicating the total number of statistical tests performed for each mc context
-    
-    sig_cutoff is the FDR cutoff you'd like to use to indicate if a site is significant.
-    """
-    #A dict of file_names to file handles for the benjamini hochberg correction step
-    input_files = {}
-    input_lines = {}
-    input_fields ={}
-    input_pvalues={}
-    test_num={}
-    prev_bh_value = {}
-    best_fdr = {}
-    best_pvalue = {}
-    for first in ["A","T","C","G","N"]:
-        for second in ["A","T","C","G","N"]:
-            test_num["C"+first+second] = 1
-            prev_bh_value["C"+first+second] = 0
-            best_fdr["C"+first+second] = 0
-            best_pvalue["C"+first+second] = 1
-    output_files = {}
-    for filen in files:
-        input_files[filen]=open(filen,'r')
-        input_lines[filen] = input_files[filen].readline().rstrip()
-        input_fields[filen] = input_lines[filen].split("\t")
-        try:
-            input_pvalues[filen] = float(input_fields[filen][6])
-        except:
-            #Dummy value that will never be the minimum
-            input_pvalues[filen] = 2.0
-    min_pvalue = min(input_pvalues,key=input_pvalues.get)
-    #pdb.set_trace()
-    while [i for i in input_pvalues if input_pvalues[i]!=2.0]:
-        fields = input_fields[min_pvalue]
-        bh_value = float(fields[6]) * mc_class_counts[fields[3]] / (test_num[fields[3]] + 1)
-        # Sometimes this correction can give values greater than 1,
-        # so we set those values at 1
-        bh_value = min(bh_value, 1)
-        prev_bh_value[fields[3]] = bh_value
-        #if bh_value <= sig_cutoff and bh_value >= best_fdr:
-        if bh_value <= sig_cutoff:
-            best_fdr[fields[3]] = bh_value
-            best_pvalue[fields[3]] = float(fields[6])
-        
-        test_num[fields[3]] += 1
-        input_lines[min_pvalue]=input_files[min_pvalue].readline().rstrip()
-        input_fields[min_pvalue]=input_lines[min_pvalue].split("\t")
-        try:
-            input_pvalues[min_pvalue]=float(input_fields[min_pvalue][6])
-        except:
-            #Dummy value that will never be the minimum
-            input_pvalues[min_pvalue]=2.0
-        min_pvalue = min(input_pvalues,key=input_pvalues.get)
-    for mc_class in best_pvalue:
-        print("The closest p-value cutoff for "
-              +mc_class+" at your desired FDR is "+
-              str(best_pvalue[mc_class])+
-              " which corresponds to an FDR of "+
-              str(best_fdr[mc_class]))
-    for filen in files:
-        input_files[filen].close() 
-    return best_pvalue
-
-def allc_run_binom_tests(filen,non_conversion,min_cov=1,sort_mem="500M"):
-    """
-    This function is used to recall methylated sites. This is faster than
-    going through the original mpileup files.
-    file is a string containing the path to an mpileup file
-    
-    non_conversion is a float indicating the estimated non-conversion rate and sequencing
-        error
-        
-    min_cov is the minimum number of reads a site must have to be tested
-    
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
-    else:
-        sort_mem = ""
-
-    mc_class_counts = defaultdict(0)
-
-    obs_pvalues = {}
-    reverse_complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
-    f = open(filen,'r')
-    g = open(filen+"_binom_results.tsv",'w')
-    for line in f:
-        line = line.rstrip()
-        fields = line.split("\t")
-        mc_class = fields[3]
-        unconverted_c = int(fields[4])
-        converted_c = int(fields[5]) - unconverted_c
-        total = int(fields[5])
-        if total >= min_cov and unconverted_c != 0:
-            try:
-                p_value = obs_pvalues[(unconverted_c,total)]
-            except:
-                p_value = sci.binom.sf(unconverted_c-1,total,non_conversion)
-                obs_pvalues[(unconverted_c,total)] = p_value
-            g.write("\t".join(fields[:6])+"\t"+str(p_value)+"\n")
-            mc_class_counts[mc_class]+=1
-        elif total != 0:
-            #a dummy value that will always sort to the bottom of the BH correction and be interpreted as
-            #a unmethylated site
-            p_value = 2.0
-            g.write("\t".join(fields[:6])+"\t"+str(p_value)+"\n")
-
-    g.close()
-    subprocess.check_call(shlex.split("sort" + sort_mem + " -k 7g,7g -o "+filen+"_binom_results.tsv "+filen+"_binom_results.tsv"))
-    return mc_class_counts
-
-def filter_files_by_pvalue(files,output,best_pvalues,num_procs,remove_file=True, sort_mem="500M"):
-    """
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
-    else:
-        sort_mem = ""
-    output_files = {}
-    for filen in files:
-        f = open(filen,'r')
-        for line in f:
-            line = line.rstrip()
-            fields = line.split("\t")
-            if fields[0] not in output_files:
-                output_files[fields[0]] = open(output[:output.rfind("/")+1]+"allc_"+output[output.rfind("/")+1:]+"_"+fields[0]+".tsv",'w')
-                output_files[fields[0]].write("\t".join(["chr","pos","strand","mc_class","mc_count","total","methylated"])+"\n")
-            if fields[6] != "2.0" and float(fields[6]) <= best_pvalues[fields[3]]:
-                output_files[fields[0]].write("\t".join(fields[:6])+"\t1\n")
-            else:
-                output_files[fields[0]].write("\t".join(fields[:6])+"\t0\n")
-        f.close()
-        if remove_file == True:
-            subprocess.check_call(shlex.split("rm "+filen))    
-    print_checkpoint("Begin sorting files by position")
-    if num_procs > 1:
-        pool=multiprocessing.Pool(num_procs)
-        for chrom in output_files:
-            output_files[chrom].close()
-            pool.apply_async(subprocess.check_call, (shlex.split("sort" + sort_mem + " -k 2n,2n -o "+output_files[chrom].name+" "+output_files[chrom].name),))
-        pool.close()
-        pool.join()
-    else:
-        for chrom in output_files:
-            output_files[chrom].close()
-            subprocess.check_call(shlex.split("sort" + sort_mem + " -k 2n,2n -o "+output_files[chrom].name+" "+output_files[chrom].name))

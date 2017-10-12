@@ -156,7 +156,7 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
             f = bz2.BZ2File(inputf,'r')
         else:
             f = open(inputf,'r')
-                
+
         while True:
             current_file = next(cycle)
             # processing read id
@@ -510,6 +510,15 @@ def parallel_split_files_by_position(filen,cutoffs,
             g.write("\t".join(fields[0:4])+"\t"+str(added_values[0])+"\t"+str(added_values[1])+"\t"+fields[6]+"\n") 
     g.close()
     f.close()
+
+def open_allc_file(allc_file):
+    if allc_file[-3:] == ".gz":
+        f = gzip.open(allc_file,'r')
+    elif allc_file[-4:] == ".bz2":
+        f = bz2.BZ2File(allc_file,'r')
+    else:
+        f = open(allc_file,'r')
+    return(f)
 
 def print_checkpoint(message):
     """

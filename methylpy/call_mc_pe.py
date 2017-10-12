@@ -305,6 +305,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                  split_allc_file=split_allc_file,
                                  min_cov=min_cov,
                                  binom_test=binom_test,
+                                 sort_mem=sort_mem,
                                  path_to_files=path_to_output,
                                  path_to_samtools=path_to_samtools,
                                  min_base_quality=min_base_quality)
@@ -1021,12 +1022,15 @@ def flip_read2_strand(input_file,output_file,path_to_samtools=""):
     output_pipe.stdin.close()
 
     
-def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff=.01,num_procs = 1,
+def call_methylated_sites_pe(inputf, sample, reference_fasta,
+                             unmethylated_control = None,
+                             sig_cutoff=.01,num_procs = 1,
                              num_upstr_bases=0,num_downstr_bases=2,
                              generate_mpileup_file=True,compress_output=True,
                              split_allc_file=False,
                              buffer_line_number = 100000,
                              min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
+                             sort_mem="500M",
                              path_to_files="",min_base_quality=1):
 
     """
@@ -1069,7 +1073,7 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff
     call_methylated_sites(inputf = inputf+".read2flipped.bam",
                           sample = sample,
                           reference_fasta = reference_fasta,
-                          control = control,
+                          unmethylated_control = unmethylated_control,
                           sig_cutoff = sig_cutoff,
                           num_procs = num_procs,
                           num_upstr_bases=num_upstr_bases,
@@ -1082,6 +1086,7 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta, control,sig_cutoff
                           binom_test = binom_test,
                           min_mc = min_mc,
                           path_to_samtools = path_to_samtools,
+                          sort_mem=sort_mem,
                           path_to_files = path_to_files,
                           min_base_quality = min_base_quality)
 
