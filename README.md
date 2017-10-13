@@ -28,6 +28,7 @@ for details.
 
 # What you want to do
 * [Install methylpy](#install-methylpy)
+* [Test methylpy](#test-methylpy)
 * [Process data](#process-data)
 * [Call DMRs](#call-dmrs)
 * [Additional functions for data processing](#additional-functions-for-data-processing)
@@ -65,7 +66,7 @@ In addition, some features of methylpy depend on several publicly available tool
 * [cutadapt](http://cutadapt.readthedocs.io/en/stable/installation.html) (>=1.12) for raw read trimming
 * [bowtie](http://bowtie-bio.sourceforge.net/index.shtml) and/or 
 [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
-* [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment results manipulation
+* [samtools](https://github.com/samtools/samtools) (>=1.2) for alignment results manipulation
 * [Picard](https://broadinstitute.github.io/picard/index.html) (>=2.10.8) for removal of PCR duplicates
 * java (in PATH) for running Picard
 
@@ -88,6 +89,13 @@ In Ubuntu (>=16.04), please try the below commands first.
 ```
 cd methylpy/methylpy/
 g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
+```
+
+# Test methylpy
+To test whether methylpy and the dependencies are installed and set up correctly, run
+```
+cd methylpy/test
+python run_test.py
 ```
 
 # Process data
