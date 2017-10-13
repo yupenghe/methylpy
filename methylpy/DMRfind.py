@@ -5,7 +5,8 @@ from shlex import split
 from glob import glob
 from math import ceil, log10
 from multiprocessing import Pool
-from methylpy.utilities import print_checkpoint,expand_nucleotide_code,split_files_by_position
+from methylpy.utilities import print_checkpoint,expand_nucleotide_code
+from methylpy.utilities import open_allc_file,split_files_by_position
 from scipy.stats import scoreatpercentile
 import subprocess
 import shlex
@@ -131,7 +132,7 @@ def DMRfind(allc_files, samples,
     chrom_pointer = {}
     for allc_file,sample in zip(allc_files,samples):
         cp_dict = {}
-        with open(allc_file,'r') as f:
+        with open_allc_file(allc_file) as f:
             cur_chrom = ""
             cur_pointer = 0
             while True:

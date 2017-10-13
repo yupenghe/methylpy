@@ -35,7 +35,7 @@ def parse_args():
                   dmr_max_dist=args.dmr_max_dist,
                   sig_cutoff=args.sig_cutoff,
                   num_sims=args.num_sims,
-                  num_sig_tests=args.num_sig_tests,
+                  num_sig_tests=args.min_tests,
                   min_num_dms=args.min_num_dms,
                   sample_category=args.sample_category,
                   mc_max_dist=args.mc_max_dist,

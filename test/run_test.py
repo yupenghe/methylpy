@@ -97,7 +97,22 @@ elif bowtie:
 elif bowtie2:
     print("Only bowtie2 is available. Skip tests for bowtie related code")
 
-# 3 - Build reference
+
+# 3 - DMRfind
+sys.stdout.write("\nTest DMRfind: ")
+subprocess.check_call(
+    shlex.split("methylpy DMRfind "
+                +"--allc-files data/allc_P0_FB_1.tsv.gz data/allc_P0_FB_2.tsv.gz "
+                +"data/allc_P0_HT_1.tsv.gz data/allc_P0_HT_2.tsv.gz "
+                +"--samples P0_FB_1 P0_FB_2 P0_HT_1 P0_HT_2 "
+                +"--mc-type CGN "
+                +"--chroms 1 --num-procs 1 "
+                +"--output-prefix results/DMR_P0_FBvsHT"),
+    stdout=f_stdout,
+    stderr=f_stderr)
+sys.stdout.write("pass\n")
+    
+# 4 - Build reference
 print("")
 if bowtie:
     sys.stdout.write("Test build-reference with bowtie: ")
@@ -119,7 +134,7 @@ if bowtie2:
     sys.stdout.write("pass\n")
 
 
-# 4 - Single-end pipeline
+# 5 - Single-end pipeline
 print("")
 if bowtie:
     sys.stdout.write("Test single-end-pipeline with bowtie: ")
@@ -142,7 +157,7 @@ if bowtie:
     stderr=f_stderr)
     sys.stdout.write("pass\n")
 if bowtie2:
-    sys.stdout.write("Test single-end-pipeline with bowtie: ")
+    sys.stdout.write("Test single-end-pipeline with bowtie2: ")
     subprocess.check_call(
         shlex.split("methylpy single-end-pipeline "
                     +"--read-files data/test_data_R1.fastq.gz "
@@ -162,7 +177,7 @@ if bowtie2:
         stderr=f_stderr)
     sys.stdout.write("pass\n")
 
-# 5 - bam-quality-filter
+# 6 - bam-quality-filter
 sys.stdout.write("\nTest quality filter for BAM file of single-end data: ")
 if bowtie:
     subprocess.check_call(
@@ -192,7 +207,7 @@ if bowtie2:
         stderr=f_stderr)
 sys.stdout.write("pass\n")
 
-# 6 - Paired-end pipeline
+# 7 - Paired-end pipeline
 print("")
 if bowtie:
     sys.stdout.write("Test paired-end-pipeline with bowtie: ")
@@ -200,7 +215,7 @@ if bowtie:
         shlex.split("methylpy paired-end-pipeline "
                     +"--read1-files data/test_data_R1.fastq.gz "
                     +"--read2-files data/test_data_R2.fastq.gz "
-                    +"--sample se_bt "
+                    +"--sample pe_bt "
                     +"--path-to-output results/ "
                     +"--forward-ref chrL/chrL_f "
                     +"--reverse-ref chrL/chrL_r "
@@ -216,12 +231,12 @@ if bowtie:
     stderr=f_stderr)
     sys.stdout.write("pass\n")
 if bowtie2:
-    sys.stdout.write("Test paired-end-pipeline with bowtie: ")
+    sys.stdout.write("Test paired-end-pipeline with bowtie2: ")
     subprocess.check_call(
         shlex.split("methylpy paired-end-pipeline "
                     +"--read1-files data/test_data_R1.fastq.gz "
                     +"--read2-files data/test_data_R2.fastq.gz "
-                    +"--sample se_bt2 "
+                    +"--sample pe_bt2 "
                     +"--path-to-output results/ "
                     +"--forward-ref chrL/chrL_f "
                     +"--reverse-ref chrL/chrL_r "
@@ -236,6 +251,48 @@ if bowtie2:
         stdout=f_stdout,
         stderr=f_stderr)
     sys.stdout.write("pass\n")
+    
+# 8 - call-methylation-state
+print("")
+sys.stdout.write("Test call-methylation-state for single-end data: ")
+sample = "se_bt"
+if not bowtie:
+    sample = "se_bt2"
+input_file = "results/"+sample+"_processed_reads.bam"
+subprocess.check_call(
+    shlex.split("methylpy call-methylation-state "
+                +"--input-file %s " %(input_file)
+                +"--paired-end False "
+                +"--sample %s " %(sample)
+                +"--path-to-output results/ "
+                +"--ref-fasta data/chrL.fa "
+                +"--num-procs 1 "
+                +"--path-to-samtools "+path_to_samtools+" "
+                +"--binom-test True "
+                +"--unmethylated-control 0.005"),
+    stdout=f_stdout,
+    stderr=f_stderr)
+sys.stdout.write("pass\n")
+
+sys.stdout.write("Test call-methylation-state for paired-end data: ")
+sample = "pe_bt"
+if not bowtie:
+    sample = "pe_bt2"
+input_file = "results/"+sample+"_processed_reads.bam"
+subprocess.check_call(
+    shlex.split("methylpy call-methylation-state "
+                +"--input-file %s " %(input_file)
+                +"--paired-end True "
+                +"--sample %s " %(sample)
+                +"--path-to-output results/ "
+                +"--ref-fasta data/chrL.fa "
+                +"--num-procs 1 "
+                +"--path-to-samtools "+path_to_samtools+" "
+                +"--binom-test True "
+                +"--unmethylated-control 0.005"),
+    stdout=f_stdout,
+    stderr=f_stderr)
+sys.stdout.write("pass\n")
 
 # successful
 print("\nAll tests are done!\n")
