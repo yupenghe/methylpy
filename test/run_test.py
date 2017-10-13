@@ -125,7 +125,7 @@ if bowtie:
     sys.stdout.write("Test single-end-pipeline with bowtie: ")
     subprocess.check_call(
         shlex.split("methylpy single-end-pipeline "
-                    +"--read-files data/test_data_R1.fastq "
+                    +"--read-files data/test_data_R1.fastq.gz "
                     +"--sample se_bt "
                     +"--path-to-output results/ "
                     +"--forward-ref chrL/chrL_f "
@@ -145,7 +145,7 @@ if bowtie2:
     sys.stdout.write("Test single-end-pipeline with bowtie: ")
     subprocess.check_call(
         shlex.split("methylpy single-end-pipeline "
-                    +"--read-files data/test_data_R1.fastq "
+                    +"--read-files data/test_data_R1.fastq.gz "
                     +"--sample se_bt2 "
                     +"--path-to-output results/ "
                     +"--forward-ref chrL/chrL_f "
@@ -198,8 +198,8 @@ if bowtie:
     sys.stdout.write("Test paired-end-pipeline with bowtie: ")
     subprocess.check_call(
         shlex.split("methylpy paired-end-pipeline "
-                    +"--read1-files data/test_data_R1.fastq "
-                    +"--read2-files data/test_data_R2.fastq "
+                    +"--read1-files data/test_data_R1.fastq.gz "
+                    +"--read2-files data/test_data_R2.fastq.gz "
                     +"--sample se_bt "
                     +"--path-to-output results/ "
                     +"--forward-ref chrL/chrL_f "
@@ -219,8 +219,8 @@ if bowtie2:
     sys.stdout.write("Test paired-end-pipeline with bowtie: ")
     subprocess.check_call(
         shlex.split("methylpy paired-end-pipeline "
-                    +"--read1-files data/test_data_R1.fastq "
-                    +"--read2-files data/test_data_R2.fastq "
+                    +"--read1-files data/test_data_R1.fastq.gz "
+                    +"--read2-files data/test_data_R2.fastq.gz "
                     +"--sample se_bt2 "
                     +"--path-to-output results/ "
                     +"--forward-ref chrL/chrL_f "
