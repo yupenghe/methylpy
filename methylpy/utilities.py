@@ -284,17 +284,8 @@ def parallel_count_lines(filename,
     """
     Parallel helper to count lines in files. Used in split_files_by_position.
     """
-    try:
-        f = gzip.open(filename,'r')
-        f.readline()
-    except:
-        try:
-            f = bz2.BZ2File(filename,'r')
-            f.readline()
-        except:
-            f = open(filename,'r')
-    finally:
-        f.seek(sample_chrom_pointer[chrom])
+    f = open_allc_file(filename)
+    f.seek(sample_chrom_pointer[chrom])
     num_lines = 0
 
     for line in f:
@@ -381,7 +372,7 @@ def split_files_by_position(files,samples,
     count = 0
     #This list stores the position cutoffs for each chunk
     cutoffs = {}
-    with open(min_file,'r') as f:
+    with open_allc_file(min_file) as f:
         f.seek(chrom_pointer[min_sample][chrom])
         for line in f:
             line = line.rstrip("\n")
@@ -446,17 +437,8 @@ def parallel_split_files_by_position(filen,cutoffs,
                                      min_cov=0,max_dist=0,
                                      weight_by_dist=False):
     chunk_num = 0
-    try:
-        f = gzip.open(filen,'r')
-        f.readline()
-    except:
-        try:
-            f = bz2.BZ2File(filen,'r')
-            f.readline()
-        except:
-            f = open(filen,'r')
-    finally:
-        f.seek(sample_chrom_pointer)
+    f = open_allc_file(filen)
+    f.seek(sample_chrom_pointer)
     #Just in case there's a header line in the file
     #I assume that if the position field can't be cast as an int
     #it must be a header

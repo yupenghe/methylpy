@@ -1,4 +1,5 @@
 #/usr/bin/env python
+import time
 import sys
 import subprocess
 import shlex
@@ -41,6 +42,10 @@ def get_executable_version(exec_name):
         sys.stdout.write("failed\n")
         return(False)
 
+print("Tests start")
+print(time.asctime(time.localtime(time.time())))
+print("")
+start_time = time.time()
 
 f_stdout = open("test_output_msg.txt",'w')
 f_stderr = open("test_error_msg.txt",'w')
@@ -295,4 +300,6 @@ subprocess.check_call(
 sys.stdout.write("pass\n")
 
 # successful
-print("\nAll tests are done!\n")
+print("\nAll tests are done!")
+print(time.asctime(time.localtime(time.time())))
+print("The tests took %.2f seconds!" %(time.time() - start_time))
