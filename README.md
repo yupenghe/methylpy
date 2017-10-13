@@ -67,6 +67,7 @@ In addition, some features of methylpy depend on several publicly available tool
 [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
 * [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment results manipulation
 * [Picard](https://broadinstitute.github.io/picard/index.html) (>=2.10.8) for removal of PCR duplicates
+* java (in PATH) for running Picard
 
 Lastly, if paths to cutadapt, bowtie/bowtie2 and samtools are included in `PATH` variable,
 methylpy can run these tools directly. Otherwise, the paths have to be passed to methylpy as augments. 

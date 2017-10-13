@@ -17,9 +17,10 @@ def parse_args():
           from methylpy.call_mc_se import build_ref
           build_ref(input_files=args.input_files,
                     output=args.output_prefix,
+                    bowtie2=args.bowtie2,
+                    path_to_aligner=args.path_to_aligner,
                     buffsize=args.buffsize,
                     parallel=args.parallel,
-                    bowtie2=args.bowtie2,
                     offrate=args.offrate)
                
      elif args.command == "DMRfind":
@@ -434,7 +435,7 @@ def add_se_pipeline_subparser(subparsers):
      parser_se_opt.add_argument("--path-to-aligner",
                                 type=str,
                                 default="",
-                                help="Path to bowtie installation (default is current dir)")
+                                help="Path to bowtie/bowtie2 installation (default is current dir)")
      
      parser_se_opt.add_argument("--aligner-options",
                                 type=str,
@@ -663,7 +664,7 @@ def add_pe_pipeline_subparser(subparsers):
      
      parser_pe_opt.add_argument("--compress-output",
                                 type=str2bool,
-                                default=False,
+                                default=True,
                                 help="Boolean indicating whether to compress (by gzip) the final output "
                                 + "(allc file(s)).")     
 
@@ -685,7 +686,7 @@ def add_pe_pipeline_subparser(subparsers):
      parser_pe_opt.add_argument("--path-to-aligner",
                                 type=str,
                                 default="",
-                                help="Path to bowtie installation (default is current dir)")
+                                help="Path to bowtie/bowtie2 installation (default is current dir)")
      
      parser_pe_opt.add_argument("--aligner-options",
                                 type=str,
@@ -836,6 +837,11 @@ def add_build_ref_subparser(subparsers):
                                    default=True,
                                    help="Boolean indicating whether to create reference for bowtie2 instead "
                                    +"of for bowtie.")
+
+     parser_build_opt.add_argument("--path-to-aligner",
+                                   type=str,
+                                   default="",
+                                   help="Path to bowtie/bowtie2 installation (default is current dir)")
 
      parser_build_opt.add_argument("--buffsize",
                                    type=int,

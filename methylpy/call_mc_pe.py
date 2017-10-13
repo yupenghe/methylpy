@@ -160,9 +160,9 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
             mc_type = [libraries]
         else:
             exit("libraries must be a list of string(s)")
-    if len(libraries) == 1 and len(read_files) > 1:
+    if len(libraries) == 1 and len(read1_files) > 1:
         uniq_library = libraries[0]
-        libraries = [uniq_library for ind in range(len(read_files))]
+        libraries = [uniq_library for ind in range(len(read1_files))]
 
     #Default bowtie option
     if aligner_options is None:

@@ -482,7 +482,9 @@ def merge_bam_files(input_files,output,path_to_samtools=""):
     subprocess.check_call(shlex.split(path_to_samtools+"samtools merge -r -h header.sam "+ output +" "+" ".join(input_files)))
     subprocess.check_call(["rm", "header.sam"])
 
-def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bowtie2=False):
+def build_ref(input_files, output, buffsize=100,
+              bowtie2=False, path_to_aligner = "",
+              offrate=False, parallel=False):
     """
     Creates 2 reference files: one with all C's converted to T's, and one with all G's converted to A's
     
@@ -494,6 +496,9 @@ def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bo
     
     offrate refers to the Bowtie parameter, reference the bowtie manual to see more detail
     """
+    if len(path_to_aligner) !=0:
+        path_to_aligner+="/"
+
     if not isinstance(input_files, list):
         if isinstance(input_files, str):
             input_files = [input_files]
@@ -535,9 +540,9 @@ def build_ref(input_files, output, buffsize=100, offrate=False,parallel=False,bo
                 line = f.read(buffsize)
             f.close()
     if bowtie2:
-        base_cmd = "bowtie2-build -f "
+        base_cmd = path_to_aligner+"bowtie2-build -f "
     else:
-        base_cmd = "bowtie-build -f "
+        base_cmd = path_to_aligner+"bowtie-build -f "
     if offrate:
         base_cmd += "-o " + str(offrate) + " "
     
@@ -757,6 +762,9 @@ def run_bowtie(current_library,library_read_files,
             aligner_options=["-S","-k 1","-m 1","--chunkmbs 3072",
                              "--best","--strata","-o 4","-e 80","-l 20","-n 0"]
     options = aligner_options
+
+    if len(path_to_aligner) !=0:
+        path_to_aligner+="/"
 
     if len(path_to_output) !=0:
         path_to_output+="/"
@@ -1184,11 +1192,11 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         open(path_to_files+inputf+".bai",'r')
     except:
         print_checkpoint("Input not indexed. Indexing...")
-        subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+path_to_files+inputf))
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+inputf))
 
     ## Input
     if not generate_mpileup_file:
-        cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+path_to_files+inputf
+        cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf
         pipes = subprocess.Popen(shlex.split(cmd),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
@@ -1199,7 +1207,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
             subprocess.check_call(
                 shlex.split(
                     path_to_samtools+"samtools mpileup -Q "+
-                    str(min_base_quality)+" -B -f "+reference_fasta+" "+path_to_files+inputf),
+                    str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf),
                 stdout=f)
         fhandle = open(path_to_files+sample+"_mpileup_output.tsv" ,'r')
 
@@ -1212,6 +1220,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         output_file = path_to_files+"allc_"+sample+".tsv"
         
     complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
+    context_len = num_upstr_bases+1+num_downstr_bases
     cur_chrom = ""
     cur_chrom_nochr = ""
     line_counts = 0
@@ -1234,7 +1243,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
             unconverted_c = fields[4].count(".")
             converted_c = fields[4].count("T")
             cov = unconverted_c+converted_c
-            if cov > 0:
+            if cov > 0 and len(context) == context_len:
                 line_counts += 1
                 #output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
                 #                                    str(unconverted_c),str(cov),"1"])+"\n")
@@ -1250,7 +1259,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
             unconverted_c = fields[4].count(",")
             converted_c = fields[4].count("a")
             cov = unconverted_c+converted_c
-            if cov > 0:
+            if cov > 0 and len(context) == context_len:
                 line_counts += 1
                 #output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
                 #                                    str(unconverted_c),str(cov),"1"])+"\n")
@@ -1293,7 +1302,7 @@ def do_split_allc_file(allc_file,
     """
     """
     if len(path_to_output)!=0:
-        path_to_outut+="/"
+        path_to_output+="/"
 
     fhandle = open_allc_file(allc_file)
 
@@ -1345,7 +1354,7 @@ def perform_binomial_test(allc_file,
     """
     """
     if len(path_to_output)!=0:
-        path_to_outut+="/"
+        path_to_output+="/"
 
     # calculate non-conversion rate
     non_conversion = calculate_non_conversion_rate(unmethylated_control,
@@ -1391,6 +1400,7 @@ def perform_binomial_test(allc_file,
     output_file = path_to_output+"allc_"+sample+".tsv"
     if compress_output:
         output_file += ".gz"
+
     filter_files_by_pvalue_combined(input_files=output_files,
                                     output_file=output_file,
                                     best_pvalues=p_value_cutoff,
@@ -1538,7 +1548,8 @@ def benjamini_hochberg_correction_call_methylated_sites(files,mc_class_counts,si
             #Dummy value that will never be the minimum
             input_pvalues[min_pvalue]=2.0
         min_pvalue = min(input_pvalues,key=input_pvalues.get)
-    for mc_class in best_pvalue:
+    for mc_class in mc_class_counts:
+        best_pvalue[mc_class] = best_pvalue.get(mc_class,0)
         print("The closest p-value cutoff for "
               +mc_class+" at your desired FDR is "+
               str(best_pvalue[mc_class])+
