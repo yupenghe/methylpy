@@ -155,6 +155,7 @@ if bowtie:
                     +"--path-to-aligner "+path_to_bowtie+" "
                     +"--path-to-samtools "+path_to_samtools+" "
                     +"--remove-clonal False "
+                    +"--trim-reads False "
                     +"--binom-test True "
                     +"--bowtie2 False "
                     +"--unmethylated-control 0.005"),
@@ -175,6 +176,7 @@ if bowtie2:
                     +"--path-to-aligner "+path_to_bowtie2+" "
                     +"--path-to-samtools "+path_to_samtools+" "
                     +"--remove-clonal False "
+                    +"--trim-reads False "
                     +"--binom-test True "
                     +"--bowtie2 True "
                     +"--unmethylated-control 0.005"),
@@ -229,6 +231,7 @@ if bowtie:
                     +"--path-to-aligner "+path_to_bowtie+" "
                     +"--path-to-samtools "+path_to_samtools+" "
                     +"--remove-clonal False "
+                    +"--trim-reads False "
                     +"--binom-test True "
                     +"--bowtie2 False "
                     +"--unmethylated-control 0.005"),
@@ -250,6 +253,7 @@ if bowtie2:
                     +"--path-to-aligner "+path_to_bowtie2+" "
                     +"--path-to-samtools "+path_to_samtools+" "
                     +"--remove-clonal False "
+                    +"--trim-reads False "
                     +"--binom-test True "
                     +"--bowtie2 True "
                     +"--unmethylated-control 0.005"),
