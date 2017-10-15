@@ -12,8 +12,7 @@ import glob
 import io as cStr
 import bisect
 from methylpy.call_mc_se import call_methylated_sites, remove_clonal_bam
-from methylpy.utilities import get_executable_version
-from pkg_resources import parse_version
+from methylpy.utilities import check_call_mc_dependencies
 
 def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                 forward_reference, reverse_reference, reference_fasta,
@@ -28,6 +27,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                 binom_test=True, min_cov=2,
                                 trim_reads=True, path_to_cutadapt="",
                                 bowtie2=True, path_to_aligner="", aligner_options=None,
+                                merge_by_max_mapq=False,
                                 pbat=False,
                                 remove_clonal=True, keep_clonal_stats=False,
                                 path_to_picard="",java_options="-Xmx20g",
@@ -157,6 +157,14 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
         in the mpileup file (and subsequently to be considered for methylation calling)    
     """
 
+    check_call_mc_dependencies(path_to_samtools,
+                               trim_reads,
+                               path_to_cutadapt,
+                               bowtie2,
+                               path_to_aligner,
+                               remove_clonal,
+                               path_to_picard)
+    
     if not isinstance(libraries, list):
         if isinstance(libraries, str):
             mc_type = [libraries]
@@ -182,11 +190,6 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
     #there's already one at the end
     if len(path_to_samtools) != 0:
         path_to_samtools += "/"
-    # check samtools version
-    samtools_version = get_executable_version(path_to_samtools+"samtools")
-    if parse_version(samtools_version) < parse_version("1.3"):
-        print_error("samtools version %s found.\nmethylpy need at least samtools 1.3\nExit!\n"
-                    %(samtools_version) )
 
     if len(path_to_aligner) != 0:
         path_to_aligner += "/"
@@ -228,7 +231,9 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
             forward_reference, reverse_reference, reference_fasta,
             path_to_output=path_to_output,
             path_to_samtools=path_to_samtools, path_to_aligner=path_to_aligner,
-            aligner_options=aligner_options, num_procs=num_procs,
+            aligner_options=aligner_options,
+            merge_by_max_mapq=merge_by_max_mapq,
+            num_procs=num_procs,
             trim_reads=trim_reads, path_to_cutadapt=path_to_cutadapt,
             adapter_seq_read1=adapter_seq_read1, adapter_seq_read2=adapter_seq_read2,
             max_adapter_removal=max_adapter_removal, overlap_length=overlap_length,
@@ -323,6 +328,7 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
                    path_to_output="",
                    path_to_samtools="", path_to_aligner="",
                    aligner_options=[],
+                   merge_by_max_mapq=False,
                    num_procs=1, trim_reads=True, path_to_cutadapt="",
                    adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
                    adapter_seq_read2="AGATCGGAAGAGCGTCGTGTAGGGA",
@@ -515,16 +521,17 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
     else:
         print_checkpoint("Begin Running Bowtie for "+current_library)
     total_unique = run_bowtie_pe(current_library,
-                                  input_fastq_read1,
-                                  input_fastq_read2,
-                                  sample,
-                                  forward_reference,reverse_reference,reference_fasta,
-                                  path_to_output=path_to_output,
-                                  path_to_samtools=path_to_samtools,
-                                  aligner_options=aligner_options,
-                                  path_to_aligner=path_to_aligner,num_procs=num_procs,
-                                  keep_temp_files=keep_temp_files,
-                                  bowtie2=bowtie2, sort_mem=sort_mem)
+                                 input_fastq_read1,
+                                 input_fastq_read2,
+                                 sample,
+                                 forward_reference,reverse_reference,reference_fasta,
+                                 path_to_output=path_to_output,
+                                 path_to_samtools=path_to_samtools,
+                                 aligner_options=aligner_options,
+                                 merge_by_max_mapq=merge_by_max_mapq,
+                                 path_to_aligner=path_to_aligner,num_procs=num_procs,
+                                 keep_temp_files=keep_temp_files,
+                                 bowtie2=bowtie2, sort_mem=sort_mem)
     
     return total_input,total_unique
 
@@ -534,6 +541,7 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
                   path_to_output="",                  
                   path_to_samtools="",
                   aligner_options="",path_to_aligner="",
+                  merge_by_max_mapq=False,
                   num_procs=1,keep_temp_files=False, bowtie2=True, sort_mem="500M"):
     """
     This function runs bowtie on the forward and reverse converted bisulfite references 
@@ -642,11 +650,21 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
                                               prefix+"_sorted_"+str(file_num)))
     print_checkpoint("Finding multimappers")
 
-    total_unique = merge_sorted_multimap_pe(current_library,
-                                            [prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)],
-                                            prefix,
-                                            reference_fasta,
-                                            path_to_samtools="")
+    if merge_by_max_mapq:
+        total_unique = merge_sorted_multimap_pe_max_mapq(
+            current_library,
+            [prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)],
+            prefix,
+            reference_fasta,
+            path_to_samtools="")
+    else:
+        total_unique = merge_sorted_multimap_pe(
+            current_library,
+            [prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)],
+            prefix,
+            reference_fasta,
+            path_to_samtools="")
+
     subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)])))
     return total_unique
 
@@ -747,7 +765,6 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
     fields = {}
     file_handles = {}    
     total_unique = 0
-    count= 0
     for index,filen in enumerate(files):
         file_handles[filen]=open(filen,'r')
         lines[filen]=file_handles[filen].readline()
@@ -757,10 +774,8 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
         if len(all_fields) == 0:
             break
         min_field = min(all_fields)
-        count_1 = 0
-        count_2 = 0
-        current_line_1 = ""
-        current_line_2 = ""
+        count_1, count_2 = 0, 0
+        current_line_1, current_line_2 = "", ""
         for key in fields:
             while fields[key] == min_field:
                 if(int(lines[key].split("\t")[1]) & 64 == 64): #First in pair
@@ -773,6 +788,98 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
                 fields[key]=lines[key].split("\t")[0]
         #Check if there is only one valid alignment
         if count_1 == 1:
+            output_handle.write(current_line_1)
+            output_handle.write(current_line_2)
+            total_unique += 1
+
+    #output_pipe.stdin.close()
+    output_handle.close()
+    
+    for index,filen in enumerate(files):
+        file_handles[filen].close()
+
+    f = open(output_bam_file,'w')
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
+    f.close()
+
+    subprocess.check_call(shlex.split("rm "+output_sam_file))
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
+                                      " -o "+output_bam_file))
+    
+    return total_unique
+
+def merge_sorted_multimap_pe_max_mapq(current_library,files,prefix,reference_fasta,path_to_samtools=""):
+    """
+    This function takes the files from find_multi_mappers and outputs the uniquely mapping reads
+    
+    files is a list of filenames containing the output of find_multi_mappers
+    
+    output is a prefix you'd like prepended to the file containing the uniquely mapping reads
+        This file will be named as <output>+"_no_multimap_"+<index_num>
+    """
+    
+    output_sam_file = prefix+"_processed_reads.sam"
+    output_bam_file = prefix+"_processed_reads.bam"
+    output_handle = open(output_sam_file,'w')
+
+    #output_pipe = subprocess.Popen(
+    #    shlex.split(path_to_samtools+"samtools view -S -b -"),
+    #    stdin=subprocess.PIPE,stdout=output_handle)
+
+    try:
+        f = open(reference_fasta+".fai",'r')
+    except:
+        print("Reference fasta not indexed. Indexing.")
+        try:
+            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
+            f = open(reference_fasta+".fai",'r')
+        except:
+            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
+    #Create sam header based on reference genome
+    output_handle.write("@HD\tVN:1.0\tSO:unsorted\n")
+    for line in f:
+        fields = line.split("\t")
+        output_handle.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
+    f.close()
+
+    ## Merging alignment results of both strands
+    lines = {}
+    fields = {}
+    file_handles = {}    
+    total_unique = 0
+    for index,filen in enumerate(files):
+        file_handles[filen]=open(filen,'r')
+        lines[filen]=file_handles[filen].readline()
+        fields[filen] = lines[filen].split("\t")[0]#Read ID
+    while True:
+        all_fields = [field for field in list(fields.values()) if field != ""]
+        if len(all_fields) == 0:
+            break
+        min_field = min(all_fields)
+        count_1, count_2 = 0, 0
+        current_line_1, current_line_2 = "", ""
+        count= 0
+        max_maq, min_maq = -1000,1000
+        for key in fields:
+            while fields[key] == min_field:
+                count += 1
+                if int(lines[key].split("\t")[4]) >= max_maq:
+                    max_maq = int(lines[key].split("\t")[4])
+                    if(int(lines[key].split("\t")[1]) & 64 == 64): #First in pair
+                        #count_1 += 1
+                        current_line_1 = lines[key]
+                    else:
+                        #count_2 += 1
+                        current_line_2 = lines[key]
+
+                if int(lines[key].split("\t")[4]) < min_maq:
+                    min_maq = int(lines[key].split("\t")[4])
+
+                lines[key]=file_handles[key].readline()
+                fields[key]=lines[key].split("\t")[0]
+        #Check if there is only one valid alignment
+        #if count_1 == 1:
+        if count == 2 or max_maq > min_maq:
             output_handle.write(current_line_1)
             output_handle.write(current_line_2)
             total_unique += 1

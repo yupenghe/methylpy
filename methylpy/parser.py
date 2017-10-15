@@ -76,6 +76,7 @@ def parse_args():
                                    bowtie2=args.bowtie2,
                                    path_to_aligner=args.path_to_aligner,
                                    aligner_options=args.aligner_options,
+                                   merge_by_max_mapq=args.merge_by_max_mapq,
                                    remove_clonal=args.remove_clonal,
                                    path_to_picard=args.path_to_picard,
                                    keep_clonal_stats=args.keep_clonal_stats,
@@ -118,6 +119,7 @@ def parse_args():
                                       bowtie2=args.bowtie2,
                                       path_to_aligner=args.path_to_aligner,
                                       aligner_options=args.aligner_options,
+                                      merge_by_max_mapq=args.merge_by_max_mapq,
                                       remove_clonal=args.remove_clonal,
                                       path_to_picard=args.path_to_picard,
                                       keep_clonal_stats=args.keep_clonal_stats,
@@ -460,7 +462,16 @@ def add_se_pipeline_subparser(subparsers):
                                 nargs="+",
                                 help="list of strings indicating options you would like passed "
                                 + "to bowtie (e.g., [\"-k 1\",\"-l 2\"])")
-          
+
+     parser_se_opt.add_argument("--merge-by-max-mapq",
+                                type=str2bool,
+                                default=False,
+                                help="Boolean indicates whether to merge alignment results from two "
+                                +"converted genomes by MAPQ score. Be default, we only keep reads that "
+                                +"are mapped to only one of the two converted genomes. If this option "
+                                +"is set to True, for a read that could be mapped to both converted "
+                                +"genomes, the alignment that achieves larger MAPQ score will be kept.")
+
      parser_se_opt.add_argument("--remove-clonal",
                                 type=str2bool,
                                 default=True,
@@ -711,7 +722,16 @@ def add_pe_pipeline_subparser(subparsers):
                                 nargs="+",
                                 help="list of strings indicating options you would like passed "
                                 + "to bowtie (e.g., [\"-k 1\",\"-l 2\"])")
-          
+
+     parser_pe_opt.add_argument("--merge-by-max-mapq",
+                                type=str2bool,
+                                default=False,
+                                help="Boolean indicates whether to merge alignment results from two "
+                                +"converted genomes by MAPQ score. Be default, we only keep read pairs "
+                                "that are mapped to only one of the two converted genomes. If this option "
+                                +"is set to True, for a read pair that could be mapped to both converted "
+                                +"genomes, the alignment that achieves larger MAPQ score will be kept.")
+
      parser_pe_opt.add_argument("--remove-clonal",
                                 type=str2bool,
                                 default=True,

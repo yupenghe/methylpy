@@ -7,7 +7,7 @@ from methylpy.utilities import print_checkpoint, print_error
 from methylpy.utilities import split_fastq_file
 from methylpy.utilities import split_fastq_file_pbat
 from methylpy.utilities import open_allc_file
-from methylpy.utilities import get_executable_version
+from methylpy.utilities import check_call_mc_dependencies
 import pdb
 import shlex
 import itertools
@@ -16,7 +16,6 @@ import glob
 import io as cStr
 import bisect
 import gzip
-from pkg_resources import parse_version
 
 def run_methylation_pipeline(read_files, sample,
                              forward_reference, reverse_reference, reference_fasta,
@@ -31,6 +30,7 @@ def run_methylation_pipeline(read_files, sample,
                              trim_reads=True, path_to_cutadapt="",
                              pbat=False,
                              bowtie2=False, path_to_aligner="", aligner_options=None,
+                             merge_by_max_mapq=False,
                              remove_clonal=True,keep_clonal_stats=False,
                              path_to_picard="",java_options="-Xmx20g",
                              path_to_samtools="",
@@ -137,7 +137,15 @@ def run_methylation_pipeline(read_files, sample,
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be
         included in the mpileup file (and subsequently to be considered for methylation calling).
     """
-
+    
+    check_call_mc_dependencies(path_to_samtools,
+                               trim_reads,
+                               path_to_cutadapt,
+                               bowtie2,
+                               path_to_aligner,
+                               remove_clonal,
+                               path_to_picard)
+    
     if not isinstance(libraries, list):
         if isinstance(libraries, str):
             mc_type = [libraries]
@@ -162,12 +170,6 @@ def run_methylation_pipeline(read_files, sample,
 
     if len(path_to_samtools) != 0:
         path_to_samtools += "/"
-
-    # check samtools version
-    samtools_version = get_executable_version(path_to_samtools+"samtools")
-    if parse_version(samtools_version) < parse_version("1.3"):
-        print_error("samtools version %s found.\nmethylpy need at least samtools 1.3\nExit!\n"
-                    %(samtools_version) )
 
     if len(path_to_aligner) != 0:
         path_to_aligner += "/"
@@ -204,6 +206,7 @@ def run_methylation_pipeline(read_files, sample,
                                             path_to_samtools=path_to_samtools,
                                             path_to_aligner=path_to_aligner,
                                             aligner_options=aligner_options,
+                                            merge_by_max_mapq=merge_by_max_mapq,
                                             pbat=pbat,
                                             num_procs=num_procs,
                                             trim_reads=trim_reads,
@@ -297,7 +300,8 @@ def run_mapping(current_library, library_files, sample,
                 forward_reference, reverse_reference, reference_fasta,
                 path_to_output="",
                 path_to_samtools="", path_to_aligner="",
-                aligner_options=[],pbat=False,
+                aligner_options=[],merge_by_max_mapq=False,
+                pbat=False,
                 num_procs=1, trim_reads=True, path_to_cutadapt="",
                 adapter_seq="AGATCGGAAGAGCACACGTCTG",
                 max_adapter_removal=None, overlap_length=None, zero_cap=None,
@@ -460,6 +464,7 @@ def run_mapping(current_library, library_files, sample,
                               forward_reference, reverse_reference, reference_fasta,
                               path_to_output=path_to_output,
                               aligner_options=aligner_options,
+                              merge_by_max_mapq=merge_by_max_mapq,
                               path_to_aligner=path_to_aligner, num_procs=num_procs,
                               keep_temp_files=keep_temp_files,
                               bowtie2=bowtie2, sort_mem=sort_mem)
@@ -733,7 +738,7 @@ def run_bowtie(current_library,library_read_files,
                forward_reference,reverse_reference,reference_fasta,
                path_to_output="",
                path_to_samtools="",
-               path_to_aligner="",aligner_options="",
+               path_to_aligner="",aligner_options="",merge_by_max_mapq=False,
                num_procs=1,keep_temp_files=False, bowtie2=False, sort_mem="500M"):
     """
     This function runs bowtie on the forward and reverse converted bisulfite references 
@@ -836,11 +841,21 @@ def run_bowtie(current_library,library_read_files,
 
     print_checkpoint("Finding multimappers")
 
-    total_unique = merge_sorted_multimap(current_library,
-                                         [prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)],
-                                         prefix,
-                                         reference_fasta,
-                                         path_to_samtools="")
+    if merge_by_max_mapq:
+        total_unique = merge_sorted_multimap_max_mapq(
+            current_library,
+            [prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)],
+            prefix,
+            reference_fasta,
+            path_to_samtools="")
+    else:
+        total_unique = merge_sorted_multimap(
+            current_library,
+            [prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)],
+            prefix,
+            reference_fasta,
+            path_to_samtools="")
+        
     subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)])))
     return total_unique
  
@@ -973,7 +988,90 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
                                       " -o "+output_bam_file))
     
     return total_unique
-        
+
+def merge_sorted_multimap_max_mapq(current_library,files,prefix,reference_fasta,path_to_samtools=""):
+    """
+    This function takes the files from find_multi_mappers and outputs the uniquely mapping reads.
+    
+    files is a list of filenames containing the output of find_multi_mappers
+    
+    output is a prefix you'd like prepended to the bam file containing the uniquely mapping reads
+        This file will be named as <output>+"_no_multimap_"+<index_num>
+    """
+
+    output_sam_file = prefix+"_processed_reads.sam"
+    output_bam_file = prefix+"_processed_reads.bam"
+    output_handle = open(output_sam_file,'w')
+
+    #output_pipe = subprocess.Popen(
+    #    shlex.split(path_to_samtools+"samtools view -S -b -"),
+    #    stdin=subprocess.PIPE,stdout=output_handle)
+
+    try:
+        f = open(reference_fasta+".fai",'r')
+    except:
+        print("Reference fasta not indexed. Indexing.")
+        try:
+            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
+            f = open(reference_fasta+".fai",'r')
+        except:
+            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
+    #Create sam header based on reference genome
+    output_handle.write("@HD\tVN:1.0\tSO:unsorted\n")
+    for line in f:
+        fields = line.split("\t")
+        output_handle.write("@SQ\tSN:"+fields[0]+"\tLN:"+fields[1]+"\n")
+    f.close()
+
+    ## Merging alignment results of both strands    
+    lines = {}
+    fields = {}
+    file_handles = {}
+    total_unique = 0
+    count= 0    
+    for index,filen in enumerate(files):
+        file_handles[filen]=open(filen,'r')
+        lines[filen]=file_handles[filen].readline()
+        fields[filen] = lines[filen].split("\t")[0]
+    while True:
+        all_fields = [field for field in list(fields.values()) if field != ""]
+        if len(all_fields) == 0:
+            break
+        min_field = min(all_fields)
+        count, count_diff_mapq = 0, 0
+        current_line = ""
+        current_field = ""
+        max_mapq = -100
+        for key in fields:
+            while fields[key] == min_field:
+                mapq = int(lines[key].split("\t")[4])
+                count += 1
+                if mapq > max_mapq:
+                    count_diff_mapq += 1
+                    max_mapq = mapq
+                    current_line = lines[key]
+                lines[key]=file_handles[key].readline()
+                fields[key]=lines[key].split("\t")[0]
+        if count == 1 or count_diff_mapq > 1:
+            output_handle.write(current_line)
+            total_unique += 1
+
+    #output_pipe.stdin.close()
+    output_handle.close()
+    
+    for index,filen in enumerate(files):
+        file_handles[filen].close()
+
+    f = open(output_bam_file,'w')
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
+    f.close()
+
+    subprocess.check_call(shlex.split("rm "+output_sam_file))
+    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
+                                      " -o "+output_bam_file))
+    
+    return total_unique
+
 def quality_trim(inputf, output = None, quality_base = None, min_qual_score = None, min_read_len = None, 
                  adapter_seq = "AGATCGGAAGAGCACACGTCTG", num_procs = 1, input_format = None, error_rate = None, 
                  max_adapter_removal = None, overlap_length = None, zero_cap = False, path_to_cutadapt = ""):

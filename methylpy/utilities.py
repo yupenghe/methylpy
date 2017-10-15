@@ -1,4 +1,5 @@
 import sys
+import os
 import pdb
 import math
 import shlex
@@ -11,13 +12,72 @@ import multiprocessing
 import bz2
 import gzip
 import collections
+from pkg_resources import parse_version
 
 def get_executable_version(exec_name):
-    out = subprocess.check_output(shlex.split(exec_name+" --version"))
+    try:
+        out = subprocess.check_output(shlex.split(exec_name+" --version"))
+    except:
+        print_error("Failed to run %s\n" %(exec_name))
     first_line = out.split("\n")[0]
     fields = first_line.split(" ")
     return(fields[-1])
 
+def check_call_mc_dependencies(path_to_samtools="",
+                               trim_reads=True,
+                               path_to_cutadapt="",
+                               bowtie2=True,
+                               path_to_aligner="",
+                               remove_clonal=True,
+                               path_to_picard=""):
+    
+    # check samtools version
+    if len(path_to_samtools) != 0:
+        path_to_samtools += "/"
+    # check picard
+    samtools_version = get_executable_version(path_to_samtools+"samtools")
+    if parse_version(samtools_version) < parse_version("1.3"):
+        print_error("samtools version %s found.\nmethylpy need at least samtools 1.3\nExit!\n"
+                    %(samtools_version) )
+
+    # check bowtie/bowtie2
+    if len(path_to_aligner) != 0:
+        path_to_aligner += "/"
+    if bowtie2:
+        aligner_version = get_executable_version(path_to_aligner+"bowtie2")
+    else:
+        aligner_version = get_executable_version(path_to_aligner+"bowtie")
+
+    # check cutadapt
+    if trim_reads:
+        if len(path_to_cutadapt) != 0:
+            path_to_cutadapt += "/"
+        cutadapt_version = get_executable_version(path_to_cutadapt+"cutadapt")
+        if parse_version(cutadapt_version) < parse_version("1.12"):
+            print_error("cutadapt version %s found.\nmethylpy need at least cutadapt 1.3\nExit!\n"
+                        %(cutadapt_version) )
+
+    # check picard
+    if remove_clonal:
+        if len(path_to_picard) != 0:
+            path_to_cutadapt += "/"
+        # check java
+        try:
+            exec_name = "java"
+            out = subprocess.check_output(shlex.split(exec_name+" -version"),
+                                          stderr=subprocess.PIPE)
+        except:
+            print_error("java not found.\n"
+                        +"methylpy need java to run picard to remove PCR duplicates\n"
+                        +"Exit!\n")
+        # check picard
+        if not os.path.isfile(path_to_picard+"/picard.jar"):
+            print_error("picard is not found at\n\""
+                        +path_to_picard+"\"\n"
+                        +"Exit!\n")
+
+    return(True)
+            
 def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],
                 "H":["A","C","T"],
