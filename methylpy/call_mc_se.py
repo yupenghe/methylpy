@@ -1233,10 +1233,13 @@ def fasta_iter(fasta_name,query_chrom):
     seq = None
     for header in faiter:
         # drop the ">"
-        header = header.next()[1:].strip().replace("chr","")
-        if header != query_chrom:
-            continue
+        header = header.next()[1:].strip()
+        header = header.split(" ")[0] #.replace("chr","")
         # join all sequence lines to one.
+        if header != query_chrom:
+            for s in next(faiter):
+                pass
+            continue
         seq = "".join(s.strip() for s in next(faiter))
         return seq
 
@@ -1329,15 +1332,15 @@ def call_methylated_sites(inputf, sample, reference_fasta,
     complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
     context_len = num_upstr_bases+1+num_downstr_bases
     cur_chrom = ""
-    cur_chrom_nochr = ""
+    #cur_chrom_nochr = ""
     line_counts = 0
     out = ""
     for line in fhandle:
         fields = line.split("\t")
         if fields[0] != cur_chrom:
             cur_chrom = fields[0]
-            cur_chrom_nochr = cur_chrom.replace("chr","")
-            seq = fasta_iter(reference_fasta,cur_chrom_nochr)
+            #cur_chrom_nochr = cur_chrom #.replace("chr","")
+            seq = fasta_iter(reference_fasta,cur_chrom)
             if seq != None:
                 seq = seq.upper()
 
@@ -1354,7 +1357,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                 line_counts += 1
                 #output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
                 #                                    str(unconverted_c),str(cov),"1"])+"\n")
-                out += "\t".join([cur_chrom_nochr,str(pos+1),"+",context,
+                out += "\t".join([cur_chrom,str(pos+1),"+",context,
                                   str(unconverted_c),str(cov),"1"])+"\n"
         elif fields[2] == "G":
             pos = int(fields[1])-1
@@ -1370,7 +1373,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                 line_counts += 1
                 #output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
                 #                                    str(unconverted_c),str(cov),"1"])+"\n")
-                out += "\t".join([cur_chrom_nochr,str(pos+1),"-",context,
+                out += "\t".join([cur_chrom,str(pos+1),"-",context,
                                   str(unconverted_c),str(cov),"1"])+"\n"
         if line_counts > buffer_line_number:
             output_filehandler.write(out)
@@ -1539,7 +1542,7 @@ def calculate_non_conversion_rate(unmethylated_control,
                 print_error("Invalid unmethylated_control! "
                             +"It should be either a string, or a decimal between 0 and 1!\n")
             # decode
-            fields[0] = fields[0].replace("chr","")
+            fields[0] = fields[0] #.replace("chr","")
             if len(fields) == 1: # chrom only
                 um_chrom = fields[0]
             elif len(fields) == 2: # chrom and start
@@ -1847,8 +1850,8 @@ def bam_quality_mch_filter(inputf,
         fields = line.split("\t")
         if fields[2] != cur_chrom:
             cur_chrom = fields[2]
-            cur_chrom_nochr = cur_chrom.replace("chr","")
-            seq = fasta_iter(reference_fasta,cur_chrom_nochr)
+            #cur_chrom_nochr = cur_chrom.replace("chr","")
+            seq = fasta_iter(reference_fasta,cur_chrom)
             if seq != None:
                 seq = seq.upper()
 

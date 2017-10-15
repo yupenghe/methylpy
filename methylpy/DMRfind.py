@@ -152,7 +152,7 @@ def DMRfind(allc_files, samples,
 
     try:
         for chr_key in chroms:
-            chrom = str(chr_key).replace("chr","")
+            chrom = str(chr_key) #.replace("chr","")
             results = []
             print_checkpoint("Splitting allc files for chromosome "+str(chrom))
             split_files_by_position(allc_files,samples,
@@ -215,7 +215,7 @@ def DMRfind(allc_files, samples,
     g = open(output_prefix+"_rms_results.tsv",'w')
     g.write(header)
     for chr_key in sorted(chroms):
-        chrom = str(chr_key).replace("chr","")
+        chrom = str(chr_key) #.replace("chr","")
         for chunk in range(0,num_procs):
             try:
                 with open(output_prefix+"_rms_results_for_"+chrom+"_chunk_"+str(chunk)+".tsv",'r') as f:
