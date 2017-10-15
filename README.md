@@ -63,7 +63,7 @@ and [scipy](https://www.scipy.org/).
 The easiest way to resolve these dependencies is to install [anaconda](https://www.anaconda.com/download/)
 
 In addition, some features of methylpy depend on several publicly available tools
-* [cutadapt](http://cutadapt.readthedocs.io/en/stable/installation.html) (>=1.12) for raw read trimming
+* [cutadapt](http://cutadapt.readthedocs.io/en/stable/installation.html) (>=1.9) for raw read trimming
 * [bowtie](http://bowtie-bio.sourceforge.net/index.shtml) and/or 
 [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
 * [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment results manipulation

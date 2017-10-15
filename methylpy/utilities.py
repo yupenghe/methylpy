@@ -36,7 +36,7 @@ def check_call_mc_dependencies(path_to_samtools="",
         path_to_samtools += "/"
     # check picard
     samtools_version = get_executable_version(path_to_samtools+"samtools")
-    if parse_version(samtools_version) < parse_version("1.3"):
+    if parse_version(samtools_version) < parse_version("1.2"):
         print_error("samtools version %s found.\nmethylpy need at least samtools 1.3\nExit!\n"
                     %(samtools_version) )
 
@@ -53,8 +53,8 @@ def check_call_mc_dependencies(path_to_samtools="",
         if len(path_to_cutadapt) != 0:
             path_to_cutadapt += "/"
         cutadapt_version = get_executable_version(path_to_cutadapt+"cutadapt")
-        if parse_version(cutadapt_version) < parse_version("1.12"):
-            print_error("cutadapt version %s found.\nmethylpy need at least cutadapt 1.12\nExit!\n"
+        if parse_version(cutadapt_version) < parse_version("1.8"):
+            print_error("cutadapt version %s found.\nmethylpy need at least cutadapt 1.9\nExit!\n"
                         %(cutadapt_version) )
 
     # check picard
