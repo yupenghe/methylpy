@@ -64,6 +64,7 @@ def parse_args():
                                    libraries=args.libraries,                                   
                                    path_to_output=args.path_to_output,
                                    pbat=args.pbat,
+                                   check_dependency=args.check_dependency,
                                    num_procs=args.num_procs,
                                    sort_mem=args.sort_mem,
                                    num_upstr_bases=args.num_upstream_bases,
@@ -107,6 +108,7 @@ def parse_args():
                                       libraries=args.libraries,
                                       path_to_output=args.path_to_output,
                                       pbat=args.pbat,
+                                      check_dependency=args.check_dependency,
                                       num_procs=args.num_procs,
                                       sort_mem=args.sort_mem,
                                       num_upstr_bases=args.num_upstream_bases,
@@ -393,6 +395,11 @@ def add_se_pipeline_subparser(subparsers):
                                 +"Adaptor Tagging) mode, in which reads will be mapped to opposite strand "
                                 +"of C-T converted genome and the forward strand of G-A converted genome.")
 
+     parser_se_opt.add_argument("--check-dependency",
+                                type=str2bool,
+                                default=False,
+                                help="Boolean indicating whether to check dependency requirements are met.")
+
      parser_se_opt.add_argument("--num-procs",
                                 type=int,
                                 default=1,
@@ -652,6 +659,11 @@ def add_pe_pipeline_subparser(subparsers):
                                 help="Boolean indicating whether to process data in PBAT (Post-Bisulfite "
                                 +"Adaptor Tagging) mode, in which reads will be mapped to opposite strand "
                                 +"of C-T converted genome and the forward strand of G-A converted genome.")
+
+     parser_pe_opt.add_argument("--check-dependency",
+                                type=str2bool,
+                                default=False,
+                                help="Boolean indicating whether to check dependency requirements are met.")
 
      parser_pe_opt.add_argument("--num-procs",
                                 type=int,

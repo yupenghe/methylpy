@@ -28,7 +28,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                 trim_reads=True, path_to_cutadapt="",
                                 bowtie2=True, path_to_aligner="", aligner_options=None,
                                 merge_by_max_mapq=False,
-                                pbat=False,
+                                pbat=False,check_dependency=True,
                                 remove_clonal=True, keep_clonal_stats=False,
                                 path_to_picard="",java_options="-Xmx20g",
                                 path_to_samtools="",
@@ -156,14 +156,14 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
     min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included
         in the mpileup file (and subsequently to be considered for methylation calling)    
     """
-
-    check_call_mc_dependencies(path_to_samtools,
-                               trim_reads,
-                               path_to_cutadapt,
-                               bowtie2,
-                               path_to_aligner,
-                               remove_clonal,
-                               path_to_picard)
+    if check_dependency:
+        check_call_mc_dependencies(path_to_samtools,
+                                   trim_reads,
+                                   path_to_cutadapt,
+                                   bowtie2,
+                                   path_to_aligner,
+                                   remove_clonal,
+                                   path_to_picard)
     
     if not isinstance(libraries, list):
         if isinstance(libraries, str):
