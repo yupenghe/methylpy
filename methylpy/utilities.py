@@ -12,6 +12,12 @@ import bz2
 import gzip
 import collections
 
+def get_executable_version(exec_name):
+    out = subprocess.check_output(shlex.split(exec_name+" --version"))
+    first_line = out.split("\n")[0]
+    fields = first_line.split(" ")
+    return(fields[-1])
+
 def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],
                 "H":["A","C","T"],

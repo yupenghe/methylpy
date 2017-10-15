@@ -1,9 +1,12 @@
+import sys
 import argparse
 
 def parse_args():
      # create the top-level parser
      parser = argparse.ArgumentParser()
-     subparsers = parser.add_subparsers(dest="command")
+     subparsers = parser.add_subparsers(
+          title="functions",
+          dest="command",metavar="")
      
      add_build_ref_subparser(subparsers)
      add_DMRfind_subparser(subparsers)
@@ -11,8 +14,14 @@ def parse_args():
      add_pe_pipeline_subparser(subparsers)
      add_bam_filter_subparser(subparsers)
      add_call_mc_subparser(subparsers)
+     add_get_methylation_level_subparser(subparsers)
 
-     args = parser.parse_args()
+     if len(sys.argv) > 1:
+          args = parser.parse_args()
+     else:
+          args = parser.parse_args(["-h"])
+          exit()
+
      if args.command == "build-reference":
           from methylpy.call_mc_se import build_ref
           build_ref(input_files=args.input_files,
@@ -176,6 +185,15 @@ def parse_args():
                                      path_to_samtools=args.path_to_samtools,
                                      path_to_files=args.path_to_output,
                                      min_base_quality=args.min_base_quality)
+     elif args.command == "add-methylation-level":
+          from methylpy.DMRfind import get_methylation_levels_DMRfind
+          get_methylation_levels_DMRfind(input_tsv_file=args.input_tsv_file,
+                                         output=args.output_file,
+                                         input_allc_files=args.allc_files,
+                                         samples=args.samples,
+                                         mc_type=args.mc_type,
+                                         num_procs=args.num_procs,
+                                         buffer_line_number=args.buffer_line_number)
 
 def add_DMRfind_subparser(subparsers):
      # create the parser for the "DMRfind" command
@@ -203,7 +221,7 @@ def add_DMRfind_subparser(subparsers):
                                      type=str,
                                      nargs="+",
                                      required=True,
-                                     help="List of space separated samples")
+                                     help="List of space separated samples matching allc files")
      
      parser_dmrfind_req.add_argument("--output-prefix",
                                      type=str,
@@ -1030,6 +1048,55 @@ def add_call_mc_subparser(subparsers):
                               help="Integer indicating the minimum PHRED quality score for a base to be "
                               +"included in the mpileup file (and subsequently to be considered for "
                               +"methylation calling).")
+
+def add_get_methylation_level_subparser(subparsers):
+     add_mc = subparsers.add_parser("add-methylation-level",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     help="Get methylation level of genomic regions")
+
+     add_mc_req = add_mc.add_argument_group("required inputs")
+     add_mc_req.add_argument("--input-tsv-file",
+                             type=str,
+                             help="A tab-separate file that specifies genomic intervals. The file contains a header."
+                             +"First three columns are required to be chromosome, start and end, which are "
+                             +"1-based cooridates. It may contain additional column(s). ")
+
+     add_mc_req.add_argument("--output-file",
+                             type=str,
+                             required=True,
+                             help="Name of output file")
+
+     add_mc_req.add_argument("--allc-files",
+                             type=str,
+                             nargs="+",
+                             required=True,
+                             help="List of allc files.")
+
+     add_mc_req.add_argument("--samples",
+                             type=str,
+                             nargs="+",
+                             required=True,
+                             help="List of space separated samples")
+
+     add_mc_opt = add_mc.add_argument_group("optional inputs")
+     add_mc_opt.add_argument("--mc-type",
+                             type=str,
+                             nargs="+",
+                             default=["CGN"],
+                             help="List of space separated mc nucleotide contexts for "
+                             + "which you want to look for DMRs. These classifications "
+                             + "may use the wildcards H (indicating anything but a G) and "
+                             + "N (indicating any nucleotide).")
+
+     add_mc_opt.add_argument("--num-procs",
+                             type=int,
+                             default=1,
+                             help="Number of processors you wish to use to parallelize this function")
+     
+     add_mc_opt.add_argument("--buffer-line-number",
+                             type=int,
+                             default=100000,
+                             help="size of buffer for reads to be written on hard drive.")
 
 def str2bool(v):
      ## adapted from the answer by Maxim at

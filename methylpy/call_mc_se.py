@@ -7,6 +7,7 @@ from methylpy.utilities import print_checkpoint, print_error
 from methylpy.utilities import split_fastq_file
 from methylpy.utilities import split_fastq_file_pbat
 from methylpy.utilities import open_allc_file
+from methylpy.utilities import get_executable_version
 import pdb
 import shlex
 import itertools
@@ -15,6 +16,7 @@ import glob
 import io as cStr
 import bisect
 import gzip
+from pkg_resources import parse_version
 
 def run_methylation_pipeline(read_files, sample,
                              forward_reference, reverse_reference, reference_fasta,
@@ -160,6 +162,13 @@ def run_methylation_pipeline(read_files, sample,
 
     if len(path_to_samtools) != 0:
         path_to_samtools += "/"
+
+    # check samtools version
+    samtools_version = get_executable_version(path_to_samtools+"samtools")
+    if parse_version(samtools_version) < parse_version("1.3"):
+        print_error("samtools version %s found.\nmethylpy need at least samtools 1.3\nExit!\n"
+                    %(samtools_version) )
+
     if len(path_to_aligner) != 0:
         path_to_aligner += "/"
     if len(path_to_output) != 0:

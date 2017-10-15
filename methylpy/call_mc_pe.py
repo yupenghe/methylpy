@@ -12,6 +12,8 @@ import glob
 import io as cStr
 import bisect
 from methylpy.call_mc_se import call_methylated_sites, remove_clonal_bam
+from methylpy.utilities import get_executable_version
+from pkg_resources import parse_version
 
 def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                 forward_reference, reverse_reference, reference_fasta,
@@ -167,7 +169,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
     #Default bowtie option
     if aligner_options is None:
         if bowtie2:
-            aligner_options = ["-X 1000", "-k 2", "--no-discordant", "--no-mixed"]
+            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
         else:
             aligner_options = ["-X 1000", "-S", "-k 1", "-m 1", "--best", "--strata",
                                "--chunkmbs 3072", "-n 1", "-e 100"]
@@ -180,6 +182,12 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
     #there's already one at the end
     if len(path_to_samtools) != 0:
         path_to_samtools += "/"
+    # check samtools version
+    samtools_version = get_executable_version(path_to_samtools+"samtools")
+    if parse_version(samtools_version) < parse_version("1.3"):
+        print_error("samtools version %s found.\nmethylpy need at least samtools 1.3\nExit!\n"
+                    %(samtools_version) )
+
     if len(path_to_aligner) != 0:
         path_to_aligner += "/"
     if len(path_to_output) != 0:
@@ -693,7 +701,6 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
             is_read2 = False
         seq = decode_converted_positions(fields[9],header[-1],strand,is_read2)
         file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
-            #file_handles[cycle.next()].write("\t".join(fields[0:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
     f.close()
     if keep_temp_files == False:
         subprocess.check_call(shlex.split("rm "+inputf))
