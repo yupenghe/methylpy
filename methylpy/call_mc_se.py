@@ -1340,7 +1340,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         fields = line.split("\t")
         if fields[0] != cur_chrom:
             cur_chrom = fields[0]
-            #cur_chrom_nochr = cur_chrom #.replace("chr","")
+            cur_chrom_nochr = cur_chrom.replace("chr","")
             seq = fasta_iter(reference_fasta,cur_chrom)
             if seq != None:
                 seq = seq.upper()
@@ -1356,9 +1356,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
             cov = unconverted_c+converted_c
             if cov > 0 and len(context) == context_len:
                 line_counts += 1
-                #output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"+",context,
-                #                                    str(unconverted_c),str(cov),"1"])+"\n")
-                out += "\t".join([cur_chrom,str(pos+1),"+",context,
+                out += "\t".join([cur_chrom_nochr,str(pos+1),"+",context,
                                   str(unconverted_c),str(cov),"1"])+"\n"
         elif fields[2] == "G":
             pos = int(fields[1])-1
@@ -1372,9 +1370,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
             cov = unconverted_c+converted_c
             if cov > 0 and len(context) == context_len:
                 line_counts += 1
-                #output_filehandler.write("\t".join([cur_chrom_nochr,str(pos+1),"-",context,
-                #                                    str(unconverted_c),str(cov),"1"])+"\n")
-                out += "\t".join([cur_chrom,str(pos+1),"-",context,
+                out += "\t".join([cur_chrom_nochr,str(pos+1),"-",context,
                                   str(unconverted_c),str(cov),"1"])+"\n"
         if line_counts > buffer_line_number:
             output_filehandler.write(out)
