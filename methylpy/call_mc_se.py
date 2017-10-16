@@ -1300,7 +1300,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         
     try:
         #make sure bam file is indexed
-        open(path_to_files+inputf+".bai",'r')
+        open(inputf+".bai",'r')
     except:
         print_checkpoint("Input not indexed. Indexing...")
         subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+inputf))
@@ -1539,7 +1539,7 @@ def calculate_non_conversion_rate(unmethylated_control,
                 print_error("Invalid unmethylated_control! "
                             +"It should be either a string, or a decimal between 0 and 1!\n")
             # decode
-            fields[0] = fields[0] #.replace("chr","")
+            fields[0] = fields[0].replace("chr","")
             if len(fields) == 1: # chrom only
                 um_chrom = fields[0]
             elif len(fields) == 2: # chrom and start
