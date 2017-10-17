@@ -30,9 +30,11 @@ def get_executable_version(exec_name):
         sys.stdout.write("- find %s: " %(exec_name))
         if exec_name != "java":
             out = subprocess.check_output(shlex.split(exec_name+" --version"))
+            out = out.decode("utf-8")
         else:
             out = subprocess.check_output(shlex.split(exec_name+" -version"),
                                           stderr=subprocess.STDOUT)
+            out = out.decode("utf-8")
             out = out.replace("\"","")
         first_line = out.split("\n")[0]
         fields = first_line.split(" ")
@@ -82,7 +84,11 @@ if not samtools:
     print("")
     while not samtools:
         print("samtools is required but it is not detected.")
-        path_to_samtools = str(raw_input("Please enter path to samtools: "))
+        try:
+            path_to_samtools = str(raw_input("Please enter path to samtools: "))
+        except:
+            # paython3
+            path_to_samtools = str(input("Please enter path to samtools: "))
         samtools = get_executable_version(path_to_samtools+"samtools")
 
 path_to_bowtie, path_to_bowtie2 = '""','""'
@@ -90,8 +96,12 @@ if not bowtie and not bowtie2:
     print("")
     while not bowtie and not bowtie2:
         print("Neither bowtie nor bowtie2 is detected.")
-        path_to_bowtie = str(raw_input("Please enter path to bowtie: "))
-        path_to_bowtie2 = str(raw_input("Please enter path to bowtie2: "))
+        try:
+            path_to_bowtie = str(raw_input("Please enter path to bowtie: "))
+            path_to_bowtie2 = str(raw_input("Please enter path to bowtie2: "))
+        except:
+            path_to_bowtie = str(input("Please enter path to bowtie: "))
+            path_to_bowtie2 = str(input("Please enter path to bowtie2: "))
         bowtie = get_executable_version(path_to_bowtie+"/bowtie")
         bowtie2 = get_executable_version(path_to_bowtie2+"/bowtie2")
         

@@ -15,6 +15,7 @@ def parse_args():
      add_bam_filter_subparser(subparsers)
      add_call_mc_subparser(subparsers)
      add_get_methylation_level_subparser(subparsers)
+     add_allc2bw_subparser(subparsers)
 
      if len(sys.argv) > 1:
           args = parser.parse_args()
@@ -152,6 +153,7 @@ def parse_args():
                                  max_mch_level=args.max_mch_level,
                                  buffer_line_number=args.buffer_line_number,
                                  path_to_samtools=args.path_to_samtools)
+
      elif args.command == "call-methylation-state":
           if args.paired_end:
                from call_mc_pe import call_methylated_sites_pe
@@ -199,12 +201,23 @@ def parse_args():
                                          num_procs=args.num_procs,
                                          buffer_line_number=args.buffer_line_number)
 
+     elif args.command == "convert-allc-to-bigwig":
+          from methylpy.utilities import convert_allc_to_bigwig
+          convert_allc_to_bigwig(input_allc_file=args.input_allc_file,
+                                 output_file=args.output_file,
+                                 reference_fasta=args.ref_fasta,
+                                 mc_type=args.mc_type,
+                                 bin_size=args.bin_size,
+                                 path_to_wigToBigWig=args.path_to_wigToBigWig,
+                                 path_to_samtools=args.path_to_samtools,
+                                 min_sites=args.min_sites,
+                                 min_cov=args.min_cov)
+
 def add_DMRfind_subparser(subparsers):
      # create the parser for the "DMRfind" command
      parser_dmrfind = subparsers.add_parser(
           "DMRfind",
-          formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-          help="Finding differentially methylated regions")
+          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
      
      # add options
      parser_dmrfind_req = parser_dmrfind.add_argument_group("required inputs")
@@ -452,7 +465,7 @@ def add_se_pipeline_subparser(subparsers):
      parser_se_opt.add_argument("--path-to-cutadapt",
                                 type=str,
                                 default="",
-                                help="Path to cutadapt installation (default is current dir)")
+                                help="Path to cutadapt installation")
      
      parser_se_opt.add_argument("--bowtie2",
                                 type=str2bool,
@@ -462,7 +475,7 @@ def add_se_pipeline_subparser(subparsers):
      parser_se_opt.add_argument("--path-to-aligner",
                                 type=str,
                                 default="",
-                                help="Path to bowtie/bowtie2 installation (default is current dir)")
+                                help="Path to bowtie/bowtie2 installation")
      
      parser_se_opt.add_argument("--aligner-options",
                                 type=str,
@@ -504,7 +517,7 @@ def add_se_pipeline_subparser(subparsers):
      parser_se_opt.add_argument("--path-to-samtools",
                                 type=str,
                                 default="",
-                                help="Path to samtools installation (default is current dir)")
+                                help="Path to samtools installation")
      
      parser_se_opt.add_argument("--adapter-seq",
                                 type=str,
@@ -717,7 +730,7 @@ def add_pe_pipeline_subparser(subparsers):
      parser_pe_opt.add_argument("--path-to-cutadapt",
                                 type=str,
                                 default="",
-                                help="Path to cutadapt installation (default is current dir)")
+                                help="Path to cutadapt installation")
      
      parser_pe_opt.add_argument("--bowtie2",
                                 type=str2bool,
@@ -727,7 +740,7 @@ def add_pe_pipeline_subparser(subparsers):
      parser_pe_opt.add_argument("--path-to-aligner",
                                 type=str,
                                 default="",
-                                help="Path to bowtie/bowtie2 installation (default is current dir)")
+                                help="Path to bowtie/bowtie2 installation")
      
      parser_pe_opt.add_argument("--aligner-options",
                                 type=str,
@@ -769,7 +782,7 @@ def add_pe_pipeline_subparser(subparsers):
      parser_pe_opt.add_argument("--path-to-samtools",
                                 type=str,
                                 default="",
-                                help="Path to samtools installation (default is current dir)")
+                                help="Path to samtools installation")
      
      parser_pe_opt.add_argument("--adapter-seq-read1",
                                 type=str,
@@ -891,7 +904,7 @@ def add_build_ref_subparser(subparsers):
      parser_build_opt.add_argument("--path-to-aligner",
                                    type=str,
                                    default="",
-                                   help="Path to bowtie/bowtie2 installation (default is current dir)")
+                                   help="Path to bowtie/bowtie2 installation")
 
      parser_build_opt.add_argument("--buffsize",
                                    type=int,
@@ -952,7 +965,7 @@ def add_bam_filter_subparser(subparsers):
      parser_filter_opt.add_argument("--path-to-samtools",
                                 type=str,
                                 default="",
-                                help="Path to samtools installation (default is current dir)")
+                                help="Path to samtools installation")
      
      parser_filter_opt.add_argument("--buffer-line-number",
                                 type=int,
@@ -1038,7 +1051,7 @@ def add_call_mc_subparser(subparsers):
      call_mc_opt.add_argument("--path-to-samtools",
                               type=str,
                               default="",
-                              help="Path to samtools installation (default is current dir)")
+                              help="Path to samtools installation")
 
      call_mc_opt.add_argument("--unmethylated-control",
                               type=str,
@@ -1130,6 +1143,63 @@ def add_get_methylation_level_subparser(subparsers):
                              default=100000,
                              help="size of buffer for reads to be written on hard drive.")
 
+def add_allc2bw_subparser(subparsers):
+     allc2bw = subparsers.add_parser("convert-allc-to-bigwig",
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                         help="Get bigwig file from allc file")
+
+     allc2bw_req = allc2bw.add_argument_group("required inputs")
+     allc2bw_req.add_argument("--input-allc-file",
+                              type=str,
+                              help="input allc file to be converted to bigwig format")
+
+     allc2bw_req.add_argument("--output-file",
+                              type=str,
+                              required=True,
+                              help="Name of output file")
+
+     allc2bw_req.add_argument("--ref-fasta",
+                              type=str,
+                              required=True,
+                              help="string indicating the path to a fasta file containing the "
+                              + "genome sequences")
+
+     allc2bw_opt = allc2bw.add_argument_group("optional inputs")
+     allc2bw_opt.add_argument("--mc-type",
+                              type=str,
+                              nargs="+",
+                              default=["CGN"],
+                              help="List of space separated mc nucleotide contexts for "
+                              + "which you want to look for DMRs. These classifications "
+                              + "may use the wildcards H (indicating anything but a G) and "
+                              + "N (indicating any nucleotide).")
+
+     allc2bw_opt.add_argument("--bin-size",
+                              type=int,
+                              default=100,
+                              help="Genomic bin size for calculating methylation level")
+
+     allc2bw_opt.add_argument("--min-sites",
+                              type=int,
+                              default=0,
+                              help="Minimum sites in a bin for methylation level to be calculated.")
+     
+     allc2bw_opt.add_argument("--min-cov",
+                              type=int,
+                              default=0,
+                              help="Minimum total coverage of all sites in a bin for methylation level "
+                              +"to be calculated.")
+
+     allc2bw_opt.add_argument("--path_to_wigToBigWig",
+                              type=str,
+                              default="",
+                              help="Path to wigToBigWig executable ")
+     
+     allc2bw_opt.add_argument("--path-to-samtools",
+                              type=str,
+                              default="",
+                              help="Path to samtools installation")
+     
 def str2bool(v):
      ## adapted from the answer by Maxim at
      ## https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse

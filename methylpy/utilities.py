@@ -77,7 +77,84 @@ def check_call_mc_dependencies(path_to_samtools="",
                         +"Exit!\n")
 
     return(True)
-            
+
+def convert_allc_to_bigwig(input_allc_file,
+                           output_file,
+                           reference_fasta,
+                           mc_type=["CGN"],
+                           bin_size = 100,
+                           path_to_wigToBigWig="",
+                           path_to_samtools="",
+                           min_sites = 0,
+                           min_cov = 0
+                           ):
+    if len(path_to_wigToBigWig):
+        path_to_wigToBigWig += "/"
+
+    mc_class = expand_nucleotide_code(mc_type)
+
+    # prepare wig file
+    cur_chrom = ""
+    bin_end = bin_size
+    bin_mc, bin_h, bin_site = 0, 0, 0
+    g = open(output_file+".wig",'w')
+    with open_allc_file(input_allc_file) as f:
+        for line in f:
+            fields = line.split("\t")
+            if fields[3] not in mc_class:
+                continue
+            pos = int(fields[1])
+            if cur_chrom != fields[0] or pos >= bin_end:
+                if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
+                    mc_level = str(float(bin_mc)/float(bin_h))
+                    g.write("\t".join(["chr"+fields[0],
+                                       str(bin_end-bin_size),
+                                       str(bin_end),
+                                       mc_level])+"\n")
+                # reset
+                cur_chrom = fields[0]
+                bin_end = int(pos/100+1) * bin_size
+                bin_mc, bin_h, bin_site = 0, 0, 0
+
+            # update
+            bin_mc += int(fields[4])
+            bin_h += int(fields[5])
+            bin_site += 1
+
+    if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
+        mc_level = str(float(bin_mc)/float(bin_h))
+        g.write("\t".join(["chr"+fields[0],
+                           str(bin_end-bin_size),
+                           str(bin_end),
+                           mc_level])+"\n")
+    g.close()
+
+    # chromosome size
+    try:
+        f = open(reference_fasta+".fai",'r')
+    except:
+        print("Reference fasta not indexed. Indexing.")
+        try:
+            subprocess.check_call(shlex.split(path_to_samtools
+                                              +"samtools faidx "
+                                              +reference_fasta))
+            f = open(reference_fasta+".fai",'r')
+        except:
+            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. "
+                     +"Please try indexing it manually and running methylpy again.")
+    g = open(output_file+".chrom_size",'w')
+    for line in f:
+        fields = line.split("\t")
+        g.write(fields[0]+"\t"+fields[1]+"\n")
+    g.close()
+    
+    # generate bigwig file
+    subprocess.check_call(shlex.split(path_to_wigToBigWig + "wigToBigWig -clip "
+                                      +"%s.wig " %(output_file)
+                                      +"%s.chrom_size " %(output_file)
+                                      +output_file),stderr=subprocess.PIPE)
+    subprocess.check_call(shlex.split("rm "+output_file+".wig "+output_file+".chrom_size"))
+
 def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],
                 "H":["A","C","T"],
