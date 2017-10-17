@@ -199,7 +199,8 @@ def parse_args():
                                          samples=args.samples,
                                          mc_type=args.mc_type,
                                          num_procs=args.num_procs,
-                                         buffer_line_number=args.buffer_line_number)
+                                         buffer_line_number=args.buffer_line_number,
+                                         input_no_header=args.input_no_header)
 
      elif args.command == "convert-allc-to-bigwig":
           from methylpy.utilities import convert_allc_to_bigwig
@@ -1142,6 +1143,12 @@ def add_get_methylation_level_subparser(subparsers):
                              type=int,
                              default=100000,
                              help="size of buffer for reads to be written on hard drive.")
+
+     add_mc_opt.add_argument("--input-no-header",
+                             type=str2bool,
+                             default=False,
+                             help="Indicating whether input tsv file contains a header. If this is set to "
+                             +"True, a header will be automatically generated in the output file.")
 
 def add_allc2bw_subparser(subparsers):
      allc2bw = subparsers.add_parser("convert-allc-to-bigwig",

@@ -723,7 +723,8 @@ def get_methylation_levels_DMRfind(input_tsv_file,
                                    samples,
                                    mc_type=["CGN"],
                                    num_procs=1,
-                                   buffer_line_number=100000):
+                                   buffer_line_number=100000,
+                                   input_no_header=False):
     """
     This function assumes that allc files are of the format allc_<sample>_<chr>.tsv
     input is the path to a file containing collapsed DMR results
@@ -747,8 +748,14 @@ def get_methylation_levels_DMRfind(input_tsv_file,
         line = f.readline()
         line = line.rstrip("\n")
         fields = line.split("\t")
-        g.write("\t".join(fields)+"\t"+
-                "\t".join(["methylation_level_"+sample for sample in samples])+"\n")
+        if input_no_header:
+            g.write("\t".join(["chr","start","end"])+"\t"+
+                    "\t".join(["col_"+str(ind) for ind in range(3,len(fields))])+"\t"+
+                    "\t".join(["methylation_level_"+sample for sample in samples])+"\n")            
+            f.seek(0)
+        else:
+            g.write("\t".join(fields)+"\t"+
+                    "\t".join(["methylation_level_"+sample for sample in samples])+"\n")
         # 
         methylation_levels = {}
         if num_procs == 1:
@@ -759,7 +766,8 @@ def get_methylation_levels_DMRfind(input_tsv_file,
                     sample,
                     output,
                     mc_class,
-                    buffer_line_number)
+                    buffer_line_number,
+                    input_no_header)
         else:
             pool = Pool(min(num_procs,len(samples)))
             results = {}
@@ -772,7 +780,8 @@ def get_methylation_levels_DMRfind(input_tsv_file,
                      samples[ind],
                      output,
                      mc_class,
-                     buffer_line_number)
+                     buffer_line_number,
+                     input_no_header)
                 )
             pool.close()
             pool.join()
@@ -796,7 +805,8 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
                                          sample,
                                          output,
                                          mc_class,
-                                         buffer_line_number=100000):
+                                         buffer_line_number=100000,
+                                         input_no_header=False):
     # open allc file
     if inputf_allc[-3:] == ".gz":
         allc_file = gzip.open(inputf_allc,'r')
@@ -827,7 +837,8 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
     line_counts = 0
     with open(inputf_tsv,'r') as f,open(output.replace(".tsv","")+"_"+sample+
                                         "_temp_methylation_levels.tsv",'w') as g:
-        f.readline() # skip header
+        if not input_no_header:
+            f.readline() # skip header
         for line in f:
             line = line.rstrip("\n")
             fields = line.split("\t")
