@@ -310,9 +310,15 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
             line = line.rstrip()
             file_handles[current_file].write(line.split(" ")[0]+"\n")
             total_reads += 1
-            for index in range(0,3):
-                line = f.readline()
-                file_handles[current_file].write(line)
+            # seq
+            line = f.readline()
+            file_handles[current_file].write(line)
+            # seq
+            line = f.readline()
+            file_handles[current_file].write("+\n")
+            # qual
+            line = f.readline()
+            file_handles[current_file].write(line)
         f.close()
 
     for index in range(0,num_chunks):
