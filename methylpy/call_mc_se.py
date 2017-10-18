@@ -1399,6 +1399,9 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                               sort_mem=sort_mem,
                               compress_output=compress_output,
                               buffer_line_number=buffer_line_number)
+    elif not unmethylated_control is None:
+        non_conversion = calculate_non_conversion_rate(unmethylated_control,
+                                                       allc_file)
     return(0)
 
 def do_split_allc_file(allc_file,
@@ -1465,7 +1468,8 @@ def perform_binomial_test(allc_file,
 
     # calculate non-conversion rate
     non_conversion = calculate_non_conversion_rate(unmethylated_control,
-                                                   allc_file)                                              
+                                                   allc_file)
+    
     # binomial test
     if num_procs > 1:
         # split allc file by chromosome
@@ -1528,6 +1532,7 @@ def calculate_non_conversion_rate(unmethylated_control,
             print_error("Invalid unmethylated_control! "
                         +"It should be either a string, or a decimal between 0 and 1!\n")
         else:
+            print("The non-conversion rate is "+str(non_conversion*100)+"%")
             return(non_conversion)
     except:
         if isinstance(unmethylated_control,str):
@@ -1591,7 +1596,9 @@ def calculate_non_conversion_rate(unmethylated_control,
 
     non_conversion = None
     if h > 0:
-            return(float(mc) / float(h))
+        non_conversion = float(mc) / float(h)
+        print("The non-conversion rate is "+str(non_conversion*100)+"%")
+        return(non_conversion)
     else:
         print_error("The chromosome and range specified in unmethylated_control "
                     +"is not in the output allc file!\n")
