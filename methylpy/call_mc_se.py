@@ -1431,7 +1431,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                               buffer_line_number=buffer_line_number)
     elif not unmethylated_control is None:
         non_conversion = calculate_non_conversion_rate(unmethylated_control,
-                                                       allc_file)
+                                                       output_file)
     return(0)
 
 def do_split_allc_file(allc_file,
