@@ -1245,6 +1245,23 @@ def fasta_iter(fasta_name,query_chrom):
         seq = "".join(s.strip() for s in next(faiter))
         return seq
 
+def get_chromosome_sequence(fasta_name,query_chrom):
+    chrom_pointer = None
+    with open(fasta_name+".fai",'r') as f:
+        for line in f:
+            fields = line.split("\t")
+            if fields[0] == query_chrom:
+                chrom_pointer = int(fields[2])
+    if chrom_pointer is None: return(None)
+
+    seq = ""
+    with open(fasta_name,'r') as f:
+        f.seek(chrom_pointer)
+        for line in f:
+            if line[0] == ">": break
+            seq += line.rstrip("\n")
+    return(seq)
+                    
 def call_methylated_sites(inputf, sample, reference_fasta,
                           unmethylated_control=None,
                           sig_cutoff=.01,num_procs = 1,
@@ -1306,6 +1323,18 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         print_checkpoint("Input not indexed. Indexing...")
         subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+inputf))
 
+    ## Check fasta index
+    try:
+        f = open(reference_fasta+".fai",'r')
+    except:
+        print("Reference fasta not indexed. Indexing.")
+        try:
+            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
+            f = open(reference_fasta+".fai",'r')
+        except:
+            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. "
+                     +"Please try indexing it manually and running methylpy again.")
+
     ## Input
     if not generate_mpileup_file:
         cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf
@@ -1342,7 +1371,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         if fields[0] != cur_chrom:
             cur_chrom = fields[0]
             cur_chrom_nochr = cur_chrom.replace("chr","")
-            seq = fasta_iter(reference_fasta,cur_chrom)
+            seq = get_chromosome_sequence(reference_fasta,cur_chrom)
             if seq != None:
                 seq = seq.upper()
 
@@ -1831,6 +1860,18 @@ def bam_quality_mch_filter(inputf,
     
     """
 
+    ## Check fasta index
+    try:
+        f = open(reference_fasta+".fai",'r')
+    except:
+        print("Reference fasta not indexed. Indexing.")
+        try:
+            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
+            f = open(reference_fasta+".fai",'r')
+        except:
+            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. "
+                     +"Please try indexing it manually and running methylpy again.")
+
     min_ch = int(min_ch)
     max_mch_level = float(max_mch_level)
     
@@ -1856,7 +1897,7 @@ def bam_quality_mch_filter(inputf,
         if fields[2] != cur_chrom:
             cur_chrom = fields[2]
             #cur_chrom_nochr = cur_chrom.replace("chr","")
-            seq = fasta_iter(reference_fasta,cur_chrom)
+            seq = get_chromosome_sequence(reference_fasta,cur_chrom)
             if seq != None:
                 seq = seq.upper()
 
