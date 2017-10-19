@@ -705,7 +705,7 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
         fields = line.split("\t")
 
         ## Check if it is proper pair
-        if int(fields[1]) & 2 == 0:
+        if int(fields[1]) & 2 == 0 or int(fields[4]) < 2:
             continue;
         
         header = fields[0].split("!")
@@ -718,7 +718,8 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
         else:
             is_read2 = False
         seq = decode_converted_positions(fields[9],header[-1],strand,is_read2)
-        file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
+        file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+
+                                        "\t"+seq+"\t"+"\t".join(fields[10:]))
     f.close()
     if keep_temp_files == False:
         subprocess.check_call(shlex.split("rm "+inputf))

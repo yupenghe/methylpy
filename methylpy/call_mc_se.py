@@ -897,7 +897,7 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
         fields = line.split("\t")
         fields[2] = fields[2].replace("_f","")
         fields[2] = fields[2].replace("_r","")
-        if fields[2] != "*":
+        if fields[2] != "*" and int(fields[4]) >= 2:
             header = fields[0].split("!")
             #BIG ASSUMPTION!! NO TABS IN FASTQ HEADER LINES EXCEPT THE ONES I ADD!
             if (int(fields[1]) & 16) == 16:
@@ -905,7 +905,8 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
             elif (int(fields[1]) & 16) == 0:
                 strand = "+"
             seq = decode_c_positions(fields[9],header[-1],strand)
-            file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+"\t"+seq+"\t"+"\t".join(fields[10:]))
+            file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])
+                                            +"\t"+seq+"\t"+"\t".join(fields[10:]))
     f.close()
     if keep_temp_files == False:
         subprocess.check_call(shlex.split("rm "+inputf))
