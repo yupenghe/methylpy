@@ -1562,7 +1562,7 @@ def calculate_non_conversion_rate(unmethylated_control,
             print_error("Invalid unmethylated_control! "
                         +"It should be either a string, or a decimal between 0 and 1!\n")
         else:
-            print("The non-conversion rate is "+str(non_conversion*100)+"%")
+            print_checkpoint("The non-conversion rate is "+str(non_conversion*100)+"%")
             return(non_conversion)
     except:
         if isinstance(unmethylated_control,str):
@@ -1627,7 +1627,7 @@ def calculate_non_conversion_rate(unmethylated_control,
     non_conversion = None
     if h > 0:
         non_conversion = float(mc) / float(h)
-        print("The non-conversion rate is "+str(non_conversion*100)+"%")
+        print_checkpoint("The non-conversion rate is "+str(non_conversion*100)+"%")
         return(non_conversion)
     else:
         print_error("The chromosome and range specified in unmethylated_control "
