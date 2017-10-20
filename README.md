@@ -69,7 +69,7 @@ if you only use a subset of methylpy functions).
 [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
 * [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment results manipulation
 * [Picard](https://broadinstitute.github.io/picard/index.html) (>=2.10.8) for removal of PCR duplicates
-* java (in PATH) for running Picard
+* java (its path included in `PATH` environment variable) for running Picard
 * [wigToBigWig](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig) for converting methylpy output 
 to bigwig format
 
