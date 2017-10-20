@@ -107,10 +107,11 @@ def DMRfind(allc_files, samples,
         
     if len(samples) != len(set(samples)):
         exit("Sample names must be unique")
-    if sample_category and not isinstance(sample_category, list):
-        exit("sample_category must be a list of strings")
-    if len(samples) != len(sample_category):
-        exit("The sample number must match category number.")   
+    if sample_category:
+        if not isinstance(sample_category, list):
+            exit("sample_category must be a list of strings")
+        elif len(samples) != len(sample_category):
+            exit("The sample number must match category number.")
 
     if mc_max_dist <0:
         exit("In DMRfind, mc_max_dist must be greater than or equal to 0")
