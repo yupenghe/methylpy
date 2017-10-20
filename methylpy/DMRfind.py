@@ -13,8 +13,9 @@ import shlex
 import gzip
 
 def DMRfind(allc_files, samples,
-            mc_type, chroms,
+            mc_type, 
             output_prefix,
+            chroms = None,
             num_procs=1, 
             min_cov=0,keep_temp_files=False,mc_max_dist=0,
             dmr_max_dist=250,resid_cutoff=.01,sig_cutoff=.01,
@@ -103,9 +104,6 @@ def DMRfind(allc_files, samples,
         min_cov = int(min_cov)
     except:
         exit("In DMRfind, min_cov must be an integer")
-    if isinstance(chroms,list) == False:
-        exit("chroms must be a list of string(s)")
-    chroms = list(map(str,chroms))
         
     if collapse_samples != False:
         if not isinstance(collapse_samples, list):
@@ -125,8 +123,17 @@ def DMRfind(allc_files, samples,
     if dmr_max_dist <0:
         exit("In DMRfind, dmr_max_dist must be greater than 0")
     
+    if num_procs > 1:
+        pool = Pool(num_procs)
+    else:
+        pool = False
+
+    if not(chroms is None) and isinstance(chroms,list) == False:
+        exit("chroms must be a list of string(s)")
+
     #This code creates all variations of the shorthand C contexts (e.g., CHG->CHG,CAG,CCG,CTG)
     mc_class = expand_nucleotide_code(mc_type)
+
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
     chrom_pointer = {}
@@ -145,11 +152,10 @@ def DMRfind(allc_files, samples,
                 cur_pointer = f.tell()
         chrom_pointer[sample] = cp_dict
 
-    if num_procs > 1:
-        pool = Pool(num_procs)
-    else:
-        pool = False
-
+    if chroms is None:
+        chroms = list(chrom_pointer[samples[0]].keys())
+    
+    chroms = list(map(str,chroms))
     try:
         for chr_key in chroms:
             chrom = str(chr_key) #.replace("chr","")
@@ -212,7 +218,7 @@ def DMRfind(allc_files, samples,
                         "\t".join(["uc_residual_"+sample for sample in samples]),
                         "num_simulations_sig\tnum_simulations_run"+"\n"])
     #I put this up here because it's actually a lot harder to prepend a header file than you might think
-    g = open(output_prefix+"_rms_results.tsv",'w')
+    g = gzip.open(output_prefix+"_rms_results.tsv.gz",'w')
     g.write(header)
     for chr_key in sorted(chroms):
         chrom = str(chr_key) #.replace("chr","")
@@ -235,27 +241,23 @@ def DMRfind(allc_files, samples,
                 check_call(basecmd + file_paths)
             except:
                 pass
-    print_checkpoint("Begin FDR Correction")
-    pvalue_cutoff=histogram_correction_DMRfind(output_prefix+"_rms_results.tsv",
-                                               num_sims,num_sig_tests,
-                                               target_fdr =sig_cutoff,
-                                               max_iterations=max_iterations,
-                                               convergence_diff=convergence_diff)
 
-    print_checkpoint("Calculating Residual Cutoff")
-    resid_cutoff = get_resid_cutoff(resid_cutoff, pvalue_cutoff,
-                                    len(samples), output_prefix+"_rms_results.tsv")
 
-    print_checkpoint("Begin Defining Windows")
-    collapse_dmr_windows(output_prefix+"_rms_results.tsv",
-                         output_prefix+"_rms_results_collapsed.tsv",
-                         column=4,sig_cutoff=pvalue_cutoff,
-                         max_dist=dmr_max_dist,
-                         resid_cutoff=resid_cutoff,
-                         min_num_dms=min_num_dms,
-                         collapse_samples=collapse_samples,
-                         sample_category=sample_category,
-                         min_cluster=min_cluster)
+    merge_DMS_to_DMR(input_rms_file=output_prefix+"_rms_results.tsv.gz",
+                     output_file=output_prefix+"_rms_results_collapsed.tsv",
+                     collapse_samples=collapse_samples,
+                     sample_category=sample_category,
+                     min_cluster=min_cluster,
+                     sig_cutoff=sig_cutoff,
+                     dmr_max_dist=dmr_max_dist,
+                     min_num_dms=min_num_dms,
+                     resid_cutoff=resid_cutoff,
+                     num_sims=num_sims,
+                     num_sig_tests=num_sig_tests,
+                     max_iterations=max_iterations,
+                     convergence_diff=convergence_diff)
+
+    print_checkpoint("Adding Methylation Levels")
     get_methylation_levels_DMRfind(output_prefix+"_rms_results_collapsed.tsv",
                                    output_prefix+"_rms_results_collapsed_with_levels.tsv",
                                    allc_files,
@@ -267,74 +269,44 @@ def DMRfind(allc_files, samples,
                                       output_prefix+"_rms_results_collapsed.tsv"))
     print_checkpoint("Done")
 
-def filter_collapsed(filen,output,min_level_diff=0,min_DMS=0,samples = [],hyper_samples=[],hypo_samples=[],strict=False):
-    """
-    This function filters collapsed DMR files based on the parameters passed and writes to output.
-    
-    filen is the path to the collapsed file that was output by DMRfind
-    output is the path that you want to write the results to
-    min_level_diff is the minimum methylation level difference between max and min sites in a block
-    min_DMS is the minimum number of sites that need to be in a block for it to be output
-    samples is a list of samples for which you want DMRs. These samples can be hyper or hypo methylated.
-    hyper_samples is a list of samples that are hypermethylated to be included in the output.
-    hypo_samples is a list of samples that are hypomethylated to be included in the output.
-    strict is a boolean that if set to True means that all entries in samples/hyper_samples/hypo_samples
-        must be present. If set to False, only one sample is necessary as long as the other samples are 
-        not in the opposite category (e.g., a sample in hypo_samples is in the hypermethylated list)
-    """
-    f = open(filen, 'r')
-    g = open(output, 'w')
-    
-    for sample in hypo_samples:
-        if sample in hyper_samples:
-            exit(sample+" found in both hyper and hypo sample list. These lists must not overlap.")
-    for sample in samples:
-        if sample in hyper_samples or sample in hypo_samples:
-            exit(sample+" found in the hyper or hypo list. The samples list must not overlap with either the hyper or hypo list.")
-    
-    g.write(f.readline()) #write header in new file
-    for line in f:
-        write = True
-        fields = line.rstrip().split('\t')
-        
-        levels = [float(x) for x in fields[6:] if x!="NA"]
-        if int(fields[3]) < min_DMS or max(levels) - min(levels) < min_level_diff:
-            continue
-        else:
-            hyper_count = 0
-            hypo_count = 0
-            sample_count = 0
-            
-            hyper = fields[4].split(',')
-            hypo = fields[5].split(',')                
-            
-            for sample in samples:
-                if sample in hyper:
-                    hyper_count += 1
-                if sample in hypo:
-                    hypo_count += 1
-            
-            for sample in hyper_samples:
-                if sample in hypo:
-                    write = False
-                    break
-                if sample in hyper:
-                    hyper_count += 1
-            
-            for sample in hypo_samples:
-                if sample in hyper:
-                    write = False
-                    break
-                if sample in hypo:
-                    hypo_count += 1
-            
-            if strict == True and (hyper_count + hypo_count) != (len(hyper_samples) + len(hypo_samples) + len(samples)):
-                write = False
-            if strict == False and (hypo_count == 0 or hyper_count == 0):
-                write = False
-                    
-        if write:
-            g.write(line)
+def merge_DMS_to_DMR(input_rms_file,
+                     output_file,
+                     collapse_samples=False,
+                     sample_category=False,
+                     min_cluster=0,
+                     sig_cutoff=.01,
+                     # DMR
+                     dmr_max_dist=250,
+                     min_num_dms=0,
+                     # misc
+                     resid_cutoff=.01,
+                     num_sims=3000,
+                     num_sig_tests=100,
+                     max_iterations=1000,
+                     convergence_diff=1):
+
+    print_checkpoint("Begin FDR Correction")
+    pvalue_cutoff=histogram_correction_DMRfind(input_rms_file,
+                                               num_sims,num_sig_tests,
+                                               target_fdr =sig_cutoff,
+                                               max_iterations=max_iterations,
+                                               convergence_diff=convergence_diff)
+
+    print_checkpoint("Calculating Residual Cutoff")
+    resid_cutoff = get_resid_cutoff(resid_cutoff, pvalue_cutoff,
+                                    input_rms_file)
+
+    print_checkpoint("Begin Defining Windows")
+    collapse_dmr_windows(input_rms_file,
+                         output_file,
+                         column=4,
+                         sig_cutoff=pvalue_cutoff,
+                         max_dist=dmr_max_dist,
+                         resid_cutoff=resid_cutoff,
+                         min_num_dms=min_num_dms,
+                         collapse_samples=collapse_samples,
+                         sample_category=sample_category,
+                         min_cluster=min_cluster)
         
 def run_rms_tests(files,output,samples,min_cov = 0,num_sims="10000",num_sig_tests="100",seed=-1,keep_temp_files=False):
     """
@@ -389,7 +361,7 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
         if pvalue not in sorted_pvalues:
             sorted_pvalues.append((num_sig_tests,denominator))
         last_pvalue = pvalue
-    f = open(rms_results,'r')
+    f = gzip.open(rms_results,'r')
     f.readline()
     for line in f:
         line = line.rstrip()
@@ -420,8 +392,10 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
             table[pvalue][0]=expected_value
             last_pvalue = pvalue_frac
     if iter == 1 or (iter == max_iterations and m0_estim_diff > convergence_diff):
-        print("Histogram FDR correction did not converge. Switching to Benjamini-Hochberg.")
-        return benjamini_hochberg_correction_DMRfind(rms_results,target_fdr)
+        p_value = 1.0 / float(num_sims)
+        print("Histogram FDR correction did not converge. Using the smallest p-value "
+              +str(p_value)+" as cutoff.\n")
+        return p_value
     print("m0 estimate for iteration "+str(iter)+": "+str(m0_estim))
     #get the number of tests that would be declared significant at each p-value
     #and figure out the FDR
@@ -442,10 +416,11 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
             pvalue_cutoff = pvalue
             diff = abs(target_fdr - fdr)
     print("Difference between best and last m0 estimate: "+str(m0_estim_diff))
-    print("The closest p-value cutoff for your desired FDR is "+str(float(pvalue_cutoff[0])/pvalue_cutoff[1])+" which corresponds to an FDR of "+str(best_fdr))
+    print("The closest p-value cutoff for your desired FDR is "+str(float(pvalue_cutoff[0])/pvalue_cutoff[1])+" which corresponds to an FDR of "+str(best_fdr)+"\n")
+    
     return float(pvalue_cutoff[0])/pvalue_cutoff[1]
 
-def get_resid_cutoff(resid_cutoff, pvalue_cutoff, num_samples, rms_file):
+def get_resid_cutoff(resid_cutoff, pvalue_cutoff, rms_file):
     """
     Get all residual values from rms_file that are above the p-value cutoff and return the
     resid_cutoff percentile number.
@@ -455,11 +430,16 @@ def get_resid_cutoff(resid_cutoff, pvalue_cutoff, num_samples, rms_file):
     num_samples - number of samples
     rms_file
     """
-    index = 5 + num_samples * 3 #get the starting index for the residual fields
     resid_cutoff = 100 - resid_cutoff*100
     residuals = []
-    f = open(rms_file, 'r')
-    f.readline()
+    f = gzip.open(rms_file, 'r')
+    # get number of samples
+    line = f.readline()
+    fields_offset = 5
+    fields = line.split("\t")
+    num_samples = len(fields[fields_offset:])/5
+    index = 5 + num_samples * 3 #get the starting index for the residual fields
+
     for line in f:
         #All of the negative results should be equivalent so only
         #grab 10M of them.
@@ -474,46 +454,6 @@ def get_resid_cutoff(resid_cutoff, pvalue_cutoff, num_samples, rms_file):
         print("There are no null residuals to calculate resid_cutoff. Using 2 as the cutoff.")
         return 2
     return scoreatpercentile(residuals, resid_cutoff)
-    
-
-def benjamini_hochberg_correction_DMRfind(filen,sig_cutoff):
-    """
-    This function is similar to the one defined here:
-    http://stats.stackexchange.com/questions/870/multiple-hypothesis-testing-correction-with-benjamini-hochberg-p-values-or-q-va
-    But takes advantage of the fact that the elements provided to it are in a sorted file.
-    This way, it doesn't have to load much into memory.
-    This link:
-    http://brainder.org/2011/09/05/fdr-corrected-fdr-adjusted-p-values/
-    was also helpful as the monotonicity correction from stats.stackexchange is not correct.
-    
-    file is a string indicating the path to an rms_results file (generated by DMRfind).
-    sig_cutoff is the FDR cutoff you'd like to use to indicate if a site is significant.
-    """
-    total_tests=int(check_output(split("wc -l "+filen)).split(" ")[0])
-    check_call(split("sort -k 5g,5g -o "+filen+" "+filen))
-    f = open(filen,'r')
-    line = f.readline()
-    test_num = 1
-    prev_bh_value = 0
-    best_fdr = 0
-    best_pvalue = 0
-    for line in f:
-        fields = line.rstrip().split("\t")
-        bh_value = float(fields[4]) * total_tests / (test_num + 1)
-        # Sometimes this correction can give values greater than 1,
-        # so we set those values at 1
-        bh_value = min(bh_value, 1)
-        prev_bh_value = bh_value
-        if bh_value <= sig_cutoff and bh_value >= best_fdr:
-            best_fdr = bh_value
-            best_pvalue = fields[4]
-            
-        test_num += 1
-    f.close()
-    print("The closest p-value cutoff for your desired FDR is "+str(best_pvalue)+" which corresponds to an FDR of "+str(best_fdr))
-    print_checkpoint("Sorting "+filen+" by position")
-    check_call(split("sort -k 1n,1n -k 2n,2n "+filen+" -o "+filen))
-    return float(best_pvalue)
 
 def check_clusters(category_dict, min_cluster, block):
     """
@@ -526,13 +466,13 @@ def check_clusters(category_dict, min_cluster, block):
     """  
     #This is to ensure that if a sample category has fewer than min_cluster samples
     #in total (regardless of hyper/hypo status) that it won't get left out.
-    total_category = [0] * len(set(category_dict.values()))
-    for category_number in list(category_dict.values()):
-        total_category[category_number] += 1
+    total_category = {}
+    for sample,category in category_dict.items():
+        total_category[category] = total_category.get(category,0) + 1
     #create a list of counters for hypermethylated and hypomethylated sites
 
-    meth_count = [0] * len(set(category_dict.values()))
-    unmeth_count = [0] * len(set(category_dict.values()))
+    meth_count = {}
+    unmeth_count = {}
     
     #split lists into samples
     meth_list = block[4].split(",")
@@ -540,17 +480,30 @@ def check_clusters(category_dict, min_cluster, block):
     
     #check if there are no samples in a certain list
     if [_f for _f in meth_list if _f]:
-        for sample in meth_list: 
-            meth_count[category_dict[sample]] += 1 #increment the counter
+        for sample in meth_list:
+            category = category_dict[sample]
+            meth_count[category] = meth_count.get(category,0) + 1
     if [_f for _f in unmeth_list if _f]:
         for sample in unmeth_list:
-            unmeth_count[category_dict[sample]] += 1
-    
-    #check if at least two sample groups have the minimum number of samples in the unmethylated
-    #and methylated categories
-    if [count for index,count in enumerate(meth_count) if count >= min_cluster or (total_category[index] < min_cluster and total_category[index] == count)] and [count for index,count in enumerate(unmeth_count) if count >= min_cluster or (total_category[index] < min_cluster and total_category[index] == count)]:
+            category = category_dict[sample]
+            unmeth_count[category] = unmeth_count.get(category,0) + 1
+
+    # check if there is conflicting evidence
+    for sample, category in category_dict.items():
+        if meth_count.get(category,0) > 0 and unmeth_count.get(category,0) > 0:
+            return False
+
+    # check if at least two sample groups have the minimum number of samples in the unmethylated
+    # and methylated categories
+    cond_meth = [count for category,count in meth_count.items()
+                 if count >= min_cluster or
+                 (total_category[category] < min_cluster and total_category[category] == count)]
+    cond_unmeth = [count for category,count in unmeth_count.items()
+                   if count >= min_cluster or
+                   (total_category[category] < min_cluster and total_category[category] == count)]
+    if len(cond_meth) > 0 or len(cond_unmeth) > 0:
         return True
-        
+
     return False
 
 def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=False, sig_cutoff=.01, min_num_dms=0,
@@ -595,7 +548,7 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
     #I created a variable in case I add a fixed field later.
     fields_offset = 5  
     #Collapse DMRs into windows
-    f = open(inputf,'r')
+    f = gzip.open(inputf,'r')
     g = open(output,'w')
     g.write("chr\tstart\tend\tnumber_of_dms\thypermethylated_samples\thypomethylated_samples\n")
     line = f.readline()
@@ -621,7 +574,8 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
         line = line.rstrip()
     while line:
         fields = line.split("\t")
-        try:
+        #try:
+        if True:
             #some fields may contain a less than sign because of the permutation procedure used to
             #generate the p-values. These sites are automatically assumed to be significant
             if fields[column].find("<")!= -1 or float(fields[column]) <= sig_cutoff:
@@ -698,11 +652,11 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
                      
             line = f.readline()
             line = line.rstrip()
-        except Exception as e:
-            exc_type, exc_obj, exc_tb = exc_info()
-            print(exc_type, exc_tb.tb_lineno)
-            print(e)
-            set_trace()
+        #except Exception as e:
+        #    exc_type, exc_obj, exc_tb = exc_info()
+        #    print(exc_type, exc_tb.tb_lineno)
+        #    print(e)
+        #    set_trace()
         
     f.close()
     #Write out the last block
@@ -710,7 +664,7 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
         block[4] = ",".join(block[4])
         block[5] = ",".join(block[5])
         if block[3] >= min_num_dms:
-            if not sample_category or check_clusters(category_dict, min_cluster, block):                                                    
+            if not sample_category or check_clusters(category_dict, min_cluster, block):
                 g.write("\t".join(map(str,block))+"\n")
                 block_count+=1
     g.close()

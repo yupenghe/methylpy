@@ -10,6 +10,7 @@ def parse_args():
      
      add_build_ref_subparser(subparsers)
      add_DMRfind_subparser(subparsers)
+     add_merge_DMS_subparser(subparsers)
      add_se_pipeline_subparser(subparsers)
      add_pe_pipeline_subparser(subparsers)
      add_bam_filter_subparser(subparsers)
@@ -32,7 +33,7 @@ def parse_args():
                     buffsize=args.buffsize,
                     parallel=args.parallel,
                     offrate=args.offrate)
-               
+
      elif args.command == "DMRfind":
           from methylpy.DMRfind import DMRfind
           DMRfind(allc_files = args.allc_files,
@@ -54,6 +55,20 @@ def parse_args():
                   keep_temp_files=args.keep_temp_files,
                   min_cluster=args.min_cluster,
                   seed=args.seed)
+
+     elif args.command == "reidentify-DMR":
+          from methylpy.DMRfind import merge_DMS_to_DMR
+          merge_DMS_to_DMR(input_rms_file=args.input_rms_file,
+                           output_file=args.output_file,
+                           collapse_samples=args.collapse_samples,
+                           sample_category=args.sample_category,
+                           min_cluster=args.min_cluster,
+                           sig_cutoff=args.sig_cutoff,
+                           dmr_max_dist=args.dmr_max_dist,
+                           min_num_dms=args.min_num_dms,
+                           resid_cutoff=args.resid_cutoff,
+                           num_sims=args.num_sims,
+                           num_sig_tests=args.min_tests)
 
      elif args.command == "single-end-pipeline":
           from methylpy.call_mc_se import run_methylation_pipeline
@@ -218,7 +233,8 @@ def add_DMRfind_subparser(subparsers):
      # create the parser for the "DMRfind" command
      parser_dmrfind = subparsers.add_parser(
           "DMRfind",
-          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+          formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+          help="Identify differentially methylated regions")
      
      # add options
      parser_dmrfind_req = parser_dmrfind.add_argument_group("required inputs")
@@ -227,13 +243,6 @@ def add_DMRfind_subparser(subparsers):
                                      nargs="+",
                                      required=True,
                                      help="List of allc files.")
-
-     parser_dmrfind_req.add_argument("--chroms",
-                                     type=str,
-                                     nargs="+",
-                                     required=True,
-                                     help="Space separated listing of chromosomes where DMRs will "
-                                     + "be called.")
 
      parser_dmrfind_req.add_argument("--samples",
                                      type=str,
@@ -247,6 +256,15 @@ def add_DMRfind_subparser(subparsers):
                                      help="String indicating the prefix for output files")
      
      parser_dmrfind_opt = parser_dmrfind.add_argument_group("optional inputs")
+
+     parser_dmrfind_req.add_argument("--chroms",
+                                     type=str,
+                                     nargs="+",
+                                     required=False,
+                                     default=None,
+                                     help="Space separated listing of chromosomes where DMRs will "
+                                     +"be called. If not specified, DMRs will be called across all chromosomes "
+                                     +"contained in the first allc file.")
 
      parser_dmrfind_opt.add_argument("--mc-type",
                                      type=str,
@@ -300,7 +318,7 @@ def add_DMRfind_subparser(subparsers):
                                      + "reported")
      
      parser_dmrfind_opt.add_argument("--sample-category",
-                                     type=int,
+                                     type=str,
                                      nargs="+",
                                      default=False,
                                      help="A list of categories that each respective sample belongs "
@@ -346,7 +364,86 @@ def add_DMRfind_subparser(subparsers):
                                      help="A seed to provide to the random number generator for "
                                      + "permutation testing. Only change this if you are debugging "
                                      + "and want to make sure the permutation output is consistent")
+
+def add_merge_DMS_subparser(subparsers):
+     # create the parser for the "merge_DMS" command
+     parser_mergedms = subparsers.add_parser(
+          "reidentify-DMR",
+          formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+          help="Re-call DMRs from existing DMRfind result")
      
+     # add options
+     parser_mergedms_req = parser_mergedms.add_argument_group("required inputs")
+     parser_mergedms_req.add_argument("--input-rms-file",
+                                      type=str,
+                                      required=True,
+                                      help="File storing the results of RMS tests (from DMRfind function.")
+
+     parser_mergedms_req.add_argument("--output-file",
+                                      type=str,
+                                      required=True,
+                                      help="String indicating the name of output file")
+     
+     parser_mergedms_opt = parser_mergedms.add_argument_group("optional inputs")
+
+     parser_mergedms_opt.add_argument("--collapse-samples",
+                                      type=str,
+                                      nargs="+",
+                                      default=False,
+                                      help="A list of samples for collapsing blocks")     
+     
+     parser_mergedms_opt.add_argument("--sample-category",
+                                      type=str,
+                                      nargs="+",
+                                      default=False,
+                                      help="A list of categories that each respective sample belongs "
+                                      + "to; the categories must begin at 0 and increase by 1 for "
+                                      + "each category added. ex: samples [A,B,C] categories [0,1,2] "
+                                      + "or categories [0, 1, 0] ")
+     
+     parser_mergedms_opt.add_argument("--min-cluster",
+                                      type=int,
+                                      default=0,
+                                      help="The minimum number of each sample category that must be "
+                                      + "present in every block that is output.")
+     
+     parser_mergedms_opt.add_argument("--sig-cutoff",
+                                      type=float,
+                                      default=.01,
+                                      help="Float indicating at what FDR you want to consider a result "
+                                      + "significant.")
+
+     parser_mergedms_opt.add_argument("--dmr-max-dist",
+                                      type=int,
+                                      default=250,
+                                      help="Maximum distance two significant sites can be to be included "
+                                      + "in the same block.")
+     
+     parser_mergedms_opt.add_argument("--min-num-dms",
+                                      type=int,
+                                      default=0,
+                                      help="The minimum number of differentially methylated sites "
+                                      + "that a differentially methylated region needs to contain to be "
+                                      + "reported")
+
+     parser_mergedms_opt.add_argument("--resid-cutoff",
+                                      type=int,
+                                      default=0.01,
+                                      help="Results will have to show deviations in the contingency "
+                                      + "table in the same direction as the rest of the window")
+
+     parser_mergedms_opt.add_argument("--num-sims",
+                                      type=int,
+                                      default=3000,
+                                      help="Number of permutation tests you would like to run to estimate "
+                                      + "the p-values of the differential methylation tests")
+     
+     parser_mergedms_opt.add_argument("--min-tests",
+                                      type=int,
+                                      default=100,
+                                      help="Minimum number of permuation tests you\ would d like to run "
+                                      + "for each mC")     
+
 def add_se_pipeline_subparser(subparsers):
      parser_se = subparsers.add_parser("single-end-pipeline",
                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
