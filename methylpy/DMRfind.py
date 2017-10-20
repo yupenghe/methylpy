@@ -20,7 +20,7 @@ def DMRfind(allc_files, samples,
             min_cov=0,keep_temp_files=False,mc_max_dist=0,
             dmr_max_dist=250,resid_cutoff=.01,sig_cutoff=.01,
             num_sims=3000,num_sig_tests=100,seed=-1,
-            min_num_dms=0,collapse_samples=False,
+            min_num_dms=0,
             sample_category=False, min_cluster=0,
             max_iterations=1000,convergence_diff=1,
             buffer_line_number=100000):
@@ -105,18 +105,12 @@ def DMRfind(allc_files, samples,
     except:
         exit("In DMRfind, min_cov must be an integer")
         
-    if collapse_samples != False:
-        if not isinstance(collapse_samples, list):
-            exit("collapse_samples must be a list of strings")
-        if sample_category and not isinstance(sample_category, list):
-            exit("sample_category must be a list of strings")
-        for sample in collapse_samples:
-            if sample not in samples:
-                exit("There is a sample in collapse_samples that is not in samples."+
-                     "collapse_samples MUST be a subset of samples.")   
-    elif sample_category != False:
-        exit("In order to use sample_category, you must specify a corresponding"+
-             " list of samples in collapse_samples!")
+    if len(samples) != len(set(samples)):
+        exit("Sample names must be unique")
+    if sample_category and not isinstance(sample_category, list):
+        exit("sample_category must be a list of strings")
+    if len(samples) != len(sample_category):
+        exit("The sample number must match category number.")   
 
     if mc_max_dist <0:
         exit("In DMRfind, mc_max_dist must be greater than or equal to 0")
@@ -245,7 +239,7 @@ def DMRfind(allc_files, samples,
 
     merge_DMS_to_DMR(input_rms_file=output_prefix+"_rms_results.tsv.gz",
                      output_file=output_prefix+"_rms_results_collapsed.tsv",
-                     collapse_samples=collapse_samples,
+                     collapse_samples=samples,
                      sample_category=sample_category,
                      min_cluster=min_cluster,
                      sig_cutoff=sig_cutoff,

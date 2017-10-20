@@ -51,7 +51,6 @@ def parse_args():
                   sample_category=args.sample_category,
                   mc_max_dist=args.mc_max_dist,
                   resid_cutoff=args.resid_cutoff,
-                  collapse_samples=args.collapse_samples,
                   keep_temp_files=args.keep_temp_files,
                   min_cluster=args.min_cluster,
                   seed=args.seed)
@@ -340,12 +339,6 @@ def add_DMRfind_subparser(subparsers):
                                      default=0.01,
                                      help="Results will have to show deviations in the contingency "
                                      + "table in the same direction as the rest of the window")
-     
-     parser_dmrfind_opt.add_argument("--collapse-samples",
-                                     type=str,
-                                     nargs="+",
-                                     default=False,
-                                     help="A list of samples for collapsing blocks")
      
      parser_dmrfind_opt.add_argument("--keep-temp-files",
                                      type=str2bool,
