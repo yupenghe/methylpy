@@ -219,6 +219,32 @@ methylpy bam-quality-filter \
 	--buffer-line-number 100
 ```
 
+#### Convert allc file to bigwig format
+`convert-allc-to-bigwig` function generates bigwig file from allc file. Methylation level will be
+calculated in equally divided non-overlapping genomic bins and the output will be stored in a bigwig
+file. See `methylpy convert-allc-to-bigwig -h` for more information. 
+```
+methylpy convert-allc-to-bigwig \
+	--input-allc-file results/allc_mESC.tsv.gz \
+	--output-file results/allc_mESC.bw \
+	--ref-fasta mm10_bt2/mm10.fa \
+	--mc-type CGN \
+	--bin-size 100 	
+```
+
+#### Reidentify DMRs from existing result
+methylpy is able to reidentify-DMR based on the result of previous DMRfind run. This function is especially
+useful in picking out DMRs across a subset of categories and/or with different filters. 
+See `methylpy reidentify-DMR -h` for details about the options.
+```
+methylpy reidentify-DMR \
+	--input-rms-file results/DMR_P0_FBvsHT_rms_results.tsv.gz \
+	--output-file results/DMR_P0_FBvsHT_rms_results_recollapsed.tsv \
+	--collapse-samples P0_FB_1 P0_FB_2 P0_HT_1 P0_HT_2 \
+	--sample-category P0_FB P0_FB P0_HT P0_HT \
+	--min-cluster 2
+```
+
 # Cite methylpy
 If you use methylpy, please cite
 >Matthew D. Schultz, Yupeng He, John W.Whitaker, Manoj Hariharan, Eran A. Mukamel,

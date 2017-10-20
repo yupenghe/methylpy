@@ -115,18 +115,38 @@ elif bowtie2:
 
 # 3 - DMRfind
 sys.stdout.write("\nTest DMRfind: ")
-subprocess.check_call(
-    shlex.split("methylpy DMRfind "
-                +"--allc-files data/allc_P0_FB_1.tsv.gz data/allc_P0_FB_2.tsv.gz "
-                +"data/allc_P0_HT_1.tsv.gz data/allc_P0_HT_2.tsv.gz "
-                +"--samples P0_FB_1 P0_FB_2 P0_HT_1 P0_HT_2 "
-                +"--mc-type CGN "
-                +"--chroms 1 --num-procs 1 "
-                +"--output-prefix results/DMR_P0_FBvsHT"),
-    stdout=f_stdout,
-    stderr=f_stderr)
-sys.stdout.write("pass\n")
-    
+try:
+    subprocess.check_call(
+        shlex.split("methylpy DMRfind "
+                    +"--allc-files data/allc_P0_FB_1.tsv.gz data/allc_P0_FB_2.tsv.gz "
+                    +"data/allc_P0_HT_1.tsv.gz data/allc_P0_HT_2.tsv.gz "
+                    +"--samples P0_FB_1 P0_FB_2 P0_HT_1 P0_HT_2 "
+                    +"--sample-category P0_FB P0_FB P0_HT P0_HT "
+                    +"--min-cluster 2 "
+                    +"--mc-type CGN "
+                    +"--chroms 1 --num-procs 1 "
+                    +"--output-prefix results/DMR_P0_FBvsHT"),
+        stdout=f_stdout,
+        stderr=f_stderr)
+    sys.stdout.write("pass\n")
+except:
+    sys.stdout.write("failed\n")
+
+sys.stdout.write("Test reidentify-DMR: ")
+try:
+    subprocess.check_call(
+        shlex.split("methylpy reidentify-DMR "
+                    +"--input-rms-file results/DMR_P0_FBvsHT_rms_results.tsv.gz "
+                    +"--output-file results/DMR_P0_FBvsHT_rms_results_recollapsed.tsv "
+                    +"--collapse-samples P0_FB_1 P0_FB_2 P0_HT_1 P0_HT_2 "
+                    +"--sample-category P0_FB P0_FB P0_HT P0_HT "
+                    +"--min-cluster 2 "),
+        stdout=f_stdout,
+        stderr=f_stderr)
+    sys.stdout.write("pass\n")
+except:
+    sys.stdout.write("failed\n")
+
 # 4 - Build reference
 print("")
 if bowtie:
