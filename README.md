@@ -62,15 +62,18 @@ methylpy also depends on two python modules, [numpy](http://www.numpy.org/)
 and [scipy](https://www.scipy.org/).
 The easiest way to resolve these dependencies is to install [anaconda](https://www.anaconda.com/download/)
 
-In addition, some features of methylpy depend on several publicly available tools
+In addition, some features of methylpy depend on several publicly available tools (not all of them are required
+if you only use a subset of methylpy functions).
 * [cutadapt](http://cutadapt.readthedocs.io/en/stable/installation.html) (>=1.9) for raw read trimming
 * [bowtie](http://bowtie-bio.sourceforge.net/index.shtml) and/or 
 [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
 * [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment results manipulation
 * [Picard](https://broadinstitute.github.io/picard/index.html) (>=2.10.8) for removal of PCR duplicates
 * java (in PATH) for running Picard
+* [wigToBigWig](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig) for converting methylpy output 
+to bigwig format
 
-Lastly, if paths to cutadapt, bowtie/bowtie2 and samtools are included in `PATH` variable,
+Lastly, if paths to cutadapt, bowtie/bowtie2, samtools and wigToBigWig are included in `PATH` variable,
 methylpy can run these tools directly. Otherwise, the paths have to be passed to methylpy as augments. 
 Path to Picard needs to be passed to methylpy as a parameter to run PCR duplicate removal.
 
