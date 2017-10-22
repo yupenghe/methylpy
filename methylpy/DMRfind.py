@@ -13,9 +13,9 @@ import shlex
 import gzip
 
 def DMRfind(allc_files, samples,
-            mc_type, 
             output_prefix,
-            chroms = None,
+            mc_type="CGN",
+            chroms=None,
             num_procs=1, 
             min_cov=0,keep_temp_files=False,mc_max_dist=0,
             dmr_max_dist=250,resid_cutoff=.01,sig_cutoff=.01,
@@ -78,7 +78,8 @@ def DMRfind(allc_files, samples,
     
     #User input checks
     if not isinstance(allc_files, list):
-        exit("mc_type must be a list of string(s)")
+        exit("allc_files must be a list of string(s)")
+
     if not isinstance(mc_type, list):
         if isinstance(mc_type, str):
             mc_type = [mc_type]
@@ -670,7 +671,7 @@ def get_methylation_levels_DMRfind(input_tsv_file,
                                    output,
                                    input_allc_files,
                                    samples,
-                                   mc_type=["CGN"],
+                                   mc_type="CGN",
                                    num_procs=1,
                                    buffer_line_number=100000,
                                    input_no_header=False):
@@ -689,6 +690,12 @@ def get_methylation_levels_DMRfind(input_tsv_file,
     # 2. check whether samples are stored in a list
     # 4. whether samples and allc files have the same length
     
+    if not isinstance(mc_type, list):
+        if isinstance(mc_type, str):
+            mc_type = [mc_type]
+        else:
+            exit("mc_type must be a list of string(s)")
+
     mc_class = expand_nucleotide_code(mc_type)
     
     with open(output,'w') as g:

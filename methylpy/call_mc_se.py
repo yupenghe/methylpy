@@ -19,7 +19,7 @@ import gzip
 
 def run_methylation_pipeline(read_files, sample,
                              forward_reference, reverse_reference, reference_fasta,
-                             libraries = ["libA"], 
+                             libraries = None,
                              unmethylated_control=None,
                              path_to_output="", sig_cutoff=0.01,
                              num_procs=1, sort_mem="500M",
@@ -146,12 +146,16 @@ def run_methylation_pipeline(read_files, sample,
                                    path_to_aligner,
                                    remove_clonal,
                                    path_to_picard)
-    
+
+    if libraries is None:
+        libraries = ["libA"]
+
     if not isinstance(libraries, list):
         if isinstance(libraries, str):
-            mc_type = [libraries]
+            libraries = [libraries]
         else:
             exit("libraries must be a list of string(s)")
+
     if len(libraries) == 1 and len(read_files) > 1:
         uniq_library = libraries[0]
         libraries = [uniq_library for ind in range(len(read_files))]
@@ -301,7 +305,7 @@ def run_mapping(current_library, library_files, sample,
                 forward_reference, reverse_reference, reference_fasta,
                 path_to_output="",
                 path_to_samtools="", path_to_aligner="",
-                aligner_options=[],merge_by_max_mapq=False,
+                aligner_options=None,merge_by_max_mapq=False,
                 pbat=False,
                 num_procs=1, trim_reads=True, path_to_cutadapt="",
                 adapter_seq="AGATCGGAAGAGCACACGTCTG",
@@ -383,10 +387,18 @@ def run_mapping(current_library, library_files, sample,
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
 
-    if len(aligner_options) == 0:
-        if not bowtie2:
-            aligner_options=["-S", "-k 1", "-m 1", "--chunkmbs 3072",
-                             "--best", "--strata", "-o 4", "-e 80", "-l 20", "-n 0"]
+    #Default bowtie option
+    if aligner_options is None:
+        if bowtie2:
+            aligner_options = []            
+        else:
+            aligner_options = ["-S", "-k 1", "-m 1", "--chunkmbs 3072",
+                               "--best", "--strata", "-o 4", "-e 80",
+                               "-l 20", "-n 0"]
+
+    # CASAVA >= 1.8
+    aligner_options.append("--phred33-quals")
+    quality_base = 33
 
     if len(path_to_output) != 0:
         path_to_output += "/"

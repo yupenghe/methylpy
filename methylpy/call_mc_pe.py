@@ -16,7 +16,7 @@ from methylpy.utilities import check_call_mc_dependencies
 
 def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                 forward_reference, reverse_reference, reference_fasta,
-                                libraries = ["libA"], 
+                                libraries = None,
                                 unmethylated_control=None,
                                 path_to_output="", sig_cutoff=0.01,
                                 num_procs=1, sort_mem="500M",
@@ -165,11 +165,15 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                    remove_clonal,
                                    path_to_picard)
     
+    if libraries is None:
+        libraries = ["libA"]
+
     if not isinstance(libraries, list):
         if isinstance(libraries, str):
-            mc_type = [libraries]
+            libraries = [libraries]
         else:
             exit("libraries must be a list of string(s)")
+
     if len(libraries) == 1 and len(read1_files) > 1:
         uniq_library = libraries[0]
         libraries = [uniq_library for ind in range(len(read1_files))]
@@ -327,7 +331,7 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
                    sample, forward_reference, reverse_reference, reference_fasta,
                    path_to_output="",
                    path_to_samtools="", path_to_aligner="",
-                   aligner_options=[],
+                   aligner_options=None,
                    merge_by_max_mapq=False,
                    num_procs=1, trim_reads=True, path_to_cutadapt="",
                    adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
@@ -417,6 +421,19 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
     
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
+
+    #Default bowtie option
+    if aligner_options is None:
+        if bowtie2:
+            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
+        else:
+            aligner_options = ["-X 1000", "-S", "-k 1", "-m 1", "--best", "--strata",
+                               "--chunkmbs 3072", "-n 1", "-e 100"]
+
+    # CASAVA >= 1.8
+    aligner_options.append("--phred33-quals")
+    quality_base = 33
+
     if len(path_to_output) !=0:
         path_to_output+="/"
         
@@ -540,7 +557,7 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
                   forward_reference,reverse_reference,reference_fasta,
                   path_to_output="",                  
                   path_to_samtools="",
-                  aligner_options="",path_to_aligner="",
+                  aligner_options=None,path_to_aligner="",
                   merge_by_max_mapq=False,
                   num_procs=1,keep_temp_files=False, bowtie2=True, sort_mem="500M"):
     """
@@ -577,6 +594,19 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
     
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
+
+    #Default bowtie option
+    if aligner_options is None:
+        if bowtie2:
+            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
+        else:
+            aligner_options = ["-X 1000", "-S", "-k 1", "-m 1", "--best", "--strata",
+                               "--chunkmbs 3072", "-n 1", "-e 100"]
+
+    # CASAVA >= 1.8
+    aligner_options.append("--phred33-quals")
+    quality_base = 33
+
     options = aligner_options
     if " ".join(options).find(" -p ") == -1:
         options.append("-p "+str(num_procs))

@@ -347,7 +347,7 @@ def add_DMRfind_subparser(subparsers):
      
      parser_dmrfind_opt.add_argument("--min-cluster",
                                      type=int,
-                                     default=0,
+                                     default=2,
                                      help="The minimum number of each sample category that must be "
                                      + "present in every block that is output.")
      

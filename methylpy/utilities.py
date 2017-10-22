@@ -81,13 +81,19 @@ def check_call_mc_dependencies(path_to_samtools="",
 def convert_allc_to_bigwig(input_allc_file,
                            output_file,
                            reference_fasta,
-                           mc_type=["CGN"],
+                           mc_type="CGN",
                            bin_size = 100,
                            path_to_wigToBigWig="",
                            path_to_samtools="",
                            min_sites = 0,
                            min_cov = 0
                            ):
+    if not isinstance(mc_type, list):
+        if isinstance(mc_type, str):
+            mc_type = [mc_type]
+        else:
+            exit("mc_type must be a list of string(s)")
+
     if len(path_to_wigToBigWig):
         path_to_wigToBigWig += "/"
 
