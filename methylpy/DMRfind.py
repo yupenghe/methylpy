@@ -133,6 +133,7 @@ def DMRfind(allc_files, samples,
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
     chrom_pointer = {}
+    chrom_counts = {}
     for allc_file,sample in zip(allc_files,samples):
         cp_dict = {}
         with open_allc_file(allc_file) as f:
@@ -144,12 +145,13 @@ def DMRfind(allc_files, samples,
                 fields = line.split("\t")
                 if fields[0] != cur_chrom:
                     cp_dict[fields[0]] = cur_pointer
+                    chrom_counts[fields[0]] = chrom_counts.get(fields[0],0) + 1
                     cur_chrom = fields[0]
                 cur_pointer = f.tell()
         chrom_pointer[sample] = cp_dict
 
     if chroms is None:
-        chroms = list(chrom_pointer[samples[0]].keys())
+        chroms = [chrom for chrom in chrom_counts if chrom_counts[chrom] == len(samples)]
     
     chroms = list(map(str,chroms))
     try:

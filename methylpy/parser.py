@@ -262,8 +262,8 @@ def add_DMRfind_subparser(subparsers):
                                      required=False,
                                      default=None,
                                      help="Space separated listing of chromosomes where DMRs will "
-                                     +"be called. If not specified, DMRs will be called across all chromosomes "
-                                     +"contained in the first allc file.")
+                                     +"be called. If not specified, DMRs will be called across the chromosomes/contigs "
+                                     +"that contained any data in all allc files.")
 
      parser_dmrfind_opt.add_argument("--mc-type",
                                      type=str,
