@@ -570,6 +570,11 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
         block = [fields[0],fields[1],fields[1],1,[],[]]
         line = f.readline()
         line = line.rstrip()
+    else:
+        f.close()
+        g.close()
+        return 0
+    
     while line:
         fields = line.split("\t")
         #try:

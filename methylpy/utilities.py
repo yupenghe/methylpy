@@ -180,110 +180,6 @@ def expand_nucleotide_code(mc_type):
                          itertools.product(*[iub_dict[nuc] for nuc in motif])])
     return(set(mc_class))
 
-def split_allc_window(num_chunks, inputf, output_prefix, max_dist, jump_size, window_size):
-    """
-    This function mimics the unix split utility. This splits the allc file into num_chunks files.
-        max_dist = block must meet distance from either side of block from center
-        jump_size = amount to jump centers when doing new overlaps
-        window_size = the amount of positions to consider in each window to calc mc/h value
-        
-    Assumption that the input file only has one chromosome information inside
-    """
-    try:
-        f = gzip.open(inputf,'r')
-        f.readline()
-    except:
-        try:
-            f = bz2.BZ2File(inputf,'r')
-            f.readline()
-        except:
-            f = open(inputf,'r')
-    finally:
-        f.seek(0)
-    
-    total_lines = int(subprocess.check_output(["wc", "-l", inputf]).rstrip().split()[0])
-    chunk_size = math.ceil(float(total_lines) / num_chunks)
-    if chunk_size == 0:
-        sys.exit("No lines in allc files")
-    line_queue = [] #maintains list of previous lines to draw from for windows
-    chunk_num = 0
-    g = open(output_prefix+str(chunk_num),'w')
-    
-    #start with whole window loaded into queue
-    for i in range(0, window_size):
-        line = f.readline()
-        line = line.strip().split('\t')
-        line_queue.append(line)
-    
-    print_count = 0
-    while True:   
-        center = line_queue[window_size/2] #add all mc and h if it meets distance requirements
-        if center == "NA": #end loop if center no longer exists
-            break
-        mc = 0
-        h = 0
-        for line in [x for x in line_queue if x!="NA"]: #filter out NA's to calc mc & h
-            if math.fabs(int(line[1]) - int(center[1])) <= max_dist: #if it meets distance req
-                mc += int(line[4])
-                h += int(line[5])
-        
-        if print_count >= chunk_size: #print out center information for this window
-            g.close()
-            chunk_num+=1
-            g = open(output_prefix+str(chunk_num),'w')
-            print_count = 0
-        g.write("\t".join([center[0], center[1], center[2], center[3], str(mc), str(h), center[6]]) + "\n")
-        print_count+=1
-        
-        #shift window by amount specified by jump_size
-        for i in range(0, jump_size):
-            line = f.readline()
-            if not line: #very last window will have missing lines, fill in with "NA"
-                line_queue.pop(0)
-                line_queue.append("NA")
-            else:
-                line = line.strip().split('\t')
-                line_queue.pop(0) #remove oldest line from queue
-                line_queue.append(line) #add line to queue
-    
-    g.close()
-    f.close()
-
-def split_allc_file(num_chunks, inputf, output_prefix, window=False):
-    """
-    This function mimics the unix split utility.
-    """
-    total_lines = int(subprocess.check_output(["wc", "-l", inputf]).rstrip().split()[0])
-    chunk_size = math.ceil(float(total_lines) / num_chunks)
-    if chunk_size == 0:
-        sys.exit("No lines in allc_file "+inputf)
-    chunk_num = 0
-    try:
-        f = gzip.open(inputf,'r')
-        f.readline()
-    except:
-        try:
-            f = bz2.BZ2File(inputf,'r')
-            f.readline()
-        except:
-            f = open(inputf,'r')
-    finally:
-        f.seek(0)
-    g = open(output_prefix+str(chunk_num),'w')
-    count = 0
-    line = f.readline()
-    while line:
-        if count >= chunk_size:
-            g.close()
-            chunk_num+=1
-            g = open(output_prefix+str(chunk_num),'w')
-            count = 0
-        g.write(line)
-        count+=1
-        line = f.readline()
-    g.close()
-    f.close()
-
 def split_fastq_file(num_chunks, input_files, output_prefix):
     """
     This function mimics the unix split utility.
@@ -483,11 +379,6 @@ def split_files_by_position(files,samples,
             files = [files]
         else:
             sys.exit("files must be a list")
-    #I have to guarantee that the smallest file is the one the chunk splitting is based on
-    #if I don't do this, the smallest file might not have enough lines to be split into enough
-    #chunks and then bad things happen.
-    min_lines = 100000000000000
-
     #use multiprocessing to count lines in each file and return (num_lines, filename) tuple
     if num_procs > 1:
         line_results = []
@@ -512,17 +403,24 @@ def split_files_by_position(files,samples,
         for input_file,sample in zip(files,samples):
             lines.append(parallel_count_lines(input_file,chrom_pointer[sample],
                                               chrom,min_cov,mc_class))
-    min_entry = min(lines, key=lambda x: x[0])
-    min_lines = min(min_entry[0], min_lines)
-    min_file = min_entry[1]
+
+    #I have to guarantee that the smallest file is the one the chunk splitting is based on
+    #if I don't do this, the smallest file might not have enough lines to be split into enough
+    #chunks and then bad things happen.
+    min_lines = 100000000000000
+    min_file = None
+    for index in range(len(lines)):
+        if lines[index][0] > 0 and min_lines > lines[index][0]:
+            min_lines,min_file = lines[index]
+    chunk_size = math.ceil(float(min_lines) / chunks)
+    if chunk_size == 0:
+        return 0
+        #sys.exit("No lines match your range and/or mc_class criteria")
     min_sample = 0
     for input_file,sample in zip(files,samples):
         if input_file == min_file:
             min_sample = sample
             break
-    chunk_size = math.ceil(float(min_lines) / chunks)
-    if chunk_size == 0:
-        sys.exit("No lines match your range and/or mc_class criteria")    
     chunk_num = 0
     count = 0
     #This list stores the position cutoffs for each chunk
