@@ -16,6 +16,7 @@ import glob
 import io as cStr
 import bisect
 import gzip
+import math
 
 def run_methylation_pipeline(read_files, sample,
                              forward_reference, reverse_reference, reference_fasta,
@@ -1392,7 +1393,10 @@ def call_methylated_sites(inputf, sample, reference_fasta,
     
         if fields[2] == "C":
             pos = int(fields[1])-1
-            context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
+            try:
+                context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
+            except: # complete context is not available, skip
+                continue
             unconverted_c = fields[4].count(".")
             converted_c = fields[4].count("T")
             cov = unconverted_c+converted_c
@@ -1402,11 +1406,14 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                                   str(unconverted_c),str(cov),"1"])+"\n"
         elif fields[2] == "G":
             pos = int(fields[1])-1
-            context = "".join([complement[base]
-                               for base in reversed(
-                                       seq[(pos-num_downstr_bases):(pos+num_upstr_bases+1)]
-                               )]
-            )
+            try:
+                context = "".join([complement[base]
+                                   for base in reversed(
+                                           seq[(pos-num_downstr_bases):(pos+num_upstr_bases+1)]
+                                   )]
+                )
+            except: # complete context is not available, skip
+                continue
             unconverted_c = fields[4].count(",")
             converted_c = fields[4].count("a")
             cov = unconverted_c+converted_c
@@ -1493,6 +1500,59 @@ def do_split_allc_file(allc_file,
     output_handle.close()
     return(output_files)
 
+def do_split_allc_file_chunk(allc_file,
+                             sample,
+                             num_chunks,
+                             path_to_output = "",
+                             compress_output=True):
+    """
+    """
+    if len(path_to_output)!=0:
+        path_to_output+="/"
+
+    f = open_allc_file(allc_file)
+    chrom_line_counts = {}
+    total_line_count = 0
+    for line in f:
+        fields = line.split("\t")
+        chrom_line_counts[fields[0]] = chrom_line_counts.get(fields[0],0)+1
+        total_line_count += 1
+
+    if total_line_count == 0:
+        return 0
+
+    chunk_size = math.ceil(float(total_line_count)/float(num_chunks))    
+
+    index, cur_line_count = 0, 0
+    chrom2index = {}
+    for chrom in sorted(chrom_line_counts.keys(),key=lambda x:chrom_line_counts[x]):
+        if cur_line_count >= chunk_size:
+            cur_line_count = 0
+            index += 1
+        cur_line_count += chrom_line_counts[chrom]
+        chrom2index[chrom] = index
+        
+    output_files = []
+    output_handles = {}
+    for index in range(index+1):
+        if compress_output:
+            output_handle = gzip.open(path_to_output+"allc_"+sample+"_"+str(index)+".tsv.gz",'w')
+            output_files.append(path_to_output+"allc_"+sample+"_"+str(index)+".tsv")
+        else:
+            output_handle = open(path_to_output+"allc_"+sample+"_"+str(index)+".tsv",'w')
+            output_files.append(path_to_output+"allc_"+sample+"_"+str(index)+".tsv")
+        output_handles[index] = output_handle
+
+    f.seek(0)
+    for line in f:
+        fields = line.split("\t")
+        output_handles[chrom2index[fields[0]]].write(line)
+
+    for index in output_handles:
+        output_handles[index].close()
+
+    return(output_files)
+
 def perform_binomial_test(allc_file,
                           sample,
                           path_to_output,
@@ -1509,17 +1569,39 @@ def perform_binomial_test(allc_file,
         path_to_output+="/"
 
     # calculate non-conversion rate
+    f = open_allc_file(allc_file)
+    chrom_pointer = {}
+    cur_chrom = ""
+    cur_pointer = 0
+    while True:
+        line = f.readline()
+        if not line: break
+        fields = line.split("\t")
+        if fields[0] != cur_chrom:
+            chrom_pointer[fields[0]] = cur_pointer
+            cur_chrom = fields[0]
+        cur_pointer = f.tell()
+
     non_conversion = calculate_non_conversion_rate(unmethylated_control,
-                                                   allc_file)
+                                                   allc_file,
+                                                   chrom_pointer)
     
     # binomial test
     if num_procs > 1:
-        # split allc file by chromosome
-        input_files = do_split_allc_file(allc_file,
-                                         sample,
-                                         path_to_output,
-                                         compress_output=False,
-                                         buffer_line_number=buffer_line_number)
+        #if len(chrom_pointer.keys()) > 100: # with too many files open can cause problem
+        if True:
+            input_files = do_split_allc_file_chunk(allc_file,
+                                                   sample,
+                                                   min(100,num_procs),
+                                                   path_to_output,
+                                                   compress_output=False)
+        else:
+            # split allc file by chromosome
+            input_files = do_split_allc_file(allc_file,
+                                             sample,
+                                             path_to_output,
+                                             compress_output=False,
+                                             buffer_line_number=buffer_line_number)
         output_files = [input_file+"_binom_results.tsv" for input_file in input_files]
         pool=multiprocessing.Pool(num_procs)
         results = []
@@ -1564,7 +1646,8 @@ def perform_binomial_test(allc_file,
     subprocess.check_call(shlex.split("rm "+" ".join(output_files)))
 
 def calculate_non_conversion_rate(unmethylated_control,
-                                  allc_file):
+                                  allc_file,
+                                  chrom_pointer=None):
     """
     """
     # Parse unmethylated_control
@@ -1606,17 +1689,18 @@ def calculate_non_conversion_rate(unmethylated_control,
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
     f = open_allc_file(allc_file)
-    chrom_pointer = {}
-    cur_chrom = ""
-    cur_pointer = 0
-    while True:
-        line = f.readline()
-        if not line: break
-        fields = line.split("\t")
-        if fields[0] != cur_chrom:
-            chrom_pointer[fields[0]] = cur_pointer
-            cur_chrom = fields[0]
-        cur_pointer = f.tell()
+    if chrom_pointer is None:
+        chrom_pointer = {}
+        cur_chrom = ""
+        cur_pointer = 0
+        while True:
+            line = f.readline()
+            if not line: break
+            fields = line.split("\t")
+            if fields[0] != cur_chrom:
+                chrom_pointer[fields[0]] = cur_pointer
+                cur_chrom = fields[0]
+            cur_pointer = f.tell()
 
     if um_chrom not in chrom_pointer:
         print_error("The chromosome specified in unmethylated_control is not in the output allc file!\n")
@@ -1765,54 +1849,6 @@ def allc_run_binom_tests(filen,output_file,non_conversion,min_cov=1,sort_mem="50
     subprocess.check_call(shlex.split("sort" + sort_mem + " -k 7g,7g -o "+output_file+" "+output_file))
     return mc_class_counts
 
-def filter_files_by_pvalue_split(input_files,output_prefix,
-                                 best_pvalues,num_procs,
-                                 compress_output=True,
-                                 sort_mem="500M"):
-    """
-    sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
-    """
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
-    else:
-        sort_mem = ""
-
-    print_checkpoint("Begin sorting file by position")
-    # sort input files
-    if num_procs > 1:
-        pool=multiprocessing.Pool(num_procs)
-        for input_file in input_files:
-            pool.apply_async(subprocess.check_call,
-                             (shlex.split(
-                                 "sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file),
-                             ))
-        pool.close()
-        pool.join()
-    else:
-        for input_file in input_files:
-            subprocess.check_call(
-                shlex.split("sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file))
-    output_handles = {}
-    for input_file in input_files:
-        f = open(input_file,'r')
-        for line in f:
-            line = line.rstrip()
-            fields = line.split("\t")
-            if not output_handles.get(fields[0],False):
-                if compress_output:
-                    output_handles[fields[0]] = gzip.open(output_prefix+"_"+fields[0]+".tsv.gz",'w')
-                else:
-                    output_handles[fields[0]] = open(output_prefix+"_"+fields[0]+".tsv",'w')
-            if fields[6] != "2.0" and float(fields[6]) <= best_pvalues[fields[3]]:
-                output_handles[fields[0]].write("\t".join(fields[:6])+"\t1\n")
-            else:
-                output_handles[fields[0]].write("\t".join(fields[:6])+"\t0\n")
-        f.close()
-    for chrom in output_handles:
-        output_handles[chrom].close()
-    
-
 def filter_files_by_pvalue_combined(input_files,output_file,
                                     best_pvalues,num_procs,
                                     compress_output=True,
@@ -1833,14 +1869,14 @@ def filter_files_by_pvalue_combined(input_files,output_file,
         for input_file in input_files:
             pool.apply_async(subprocess.check_call,
                              (shlex.split(
-                                 "sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file),
+                                 "sort" + sort_mem + " -k 1,1 -k 2,2g -o "+input_file+" "+input_file),
                              ))
         pool.close()
         pool.join()
     else:
         for input_file in input_files:
             subprocess.check_call(
-                shlex.split("sort" + sort_mem + " -k 1n,1n -k 2n,2n -o "+input_file+" "+input_file))
+                shlex.split("sort" + sort_mem + " -k 1,1 -k 2,2g -o "+input_file+" "+input_file))
     # output file
     if compress_output:
         g = gzip.open(output_file,'w')
@@ -1926,32 +1962,37 @@ def bam_quality_mch_filter(inputf,
                 pos = ind + read_pos
                 if seq[pos] != "C":
                     continue
-                if base == "C":
-                    if seq[pos+1] == "G":
-                        continue
-                    else:
-                        mch += 1
-                elif base == "T":
-                    if seq[pos+1] == "G":
-                        continue
-                    else:
-                        uch += 1
+                try:
+                    if base == "C":
+                        if seq[pos+1] == "G":
+                            continue
+                        else:
+                            mch += 1
+                    elif base == "T":
+                        if seq[pos+1] == "G":
+                            continue
+                        else:
+                            uch += 1
+                except: # pos + 1 exceed reference boundary
+                    pass
         else: # - strand
             for ind,base in enumerate(fields[9]):
                 pos = ind + read_pos
                 if seq[pos] != "G":
                     continue
-                if base == "G":
-                    if seq[pos-1] == "C":
-                        continue
-                    else:
-                        mch += 1
-                elif base == "A":
-                    if seq[pos-1] == "C":
-                        continue
-                    else:
-                        uch += 1
-
+                try:
+                    if base == "G":
+                        if seq[pos-1] == "C":
+                            continue
+                        else:
+                            mch += 1
+                    elif base == "A":
+                        if seq[pos-1] == "C":
+                            continue
+                        else:
+                            uch += 1
+                except: # pos - 1 exceed reference boundary
+                    pass
         # apply filter
         tot_ch = float(mch+uch)
         if tot_ch >= min_ch and float(mch)/float(tot_ch) > max_mch_level:
