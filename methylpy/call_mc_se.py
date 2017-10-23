@@ -1960,9 +1960,9 @@ def bam_quality_mch_filter(inputf,
         if int(fields[1]) & 16 == 0: # + strand
             for ind,base in enumerate(fields[9]):
                 pos = ind + read_pos
-                if seq[pos] != "C":
-                    continue
                 try:
+                    if seq[pos] != "C":
+                        continue
                     if base == "C":
                         if seq[pos+1] == "G":
                             continue
@@ -1978,9 +1978,9 @@ def bam_quality_mch_filter(inputf,
         else: # - strand
             for ind,base in enumerate(fields[9]):
                 pos = ind + read_pos
-                if seq[pos] != "G":
-                    continue
                 try:
+                    if seq[pos] != "G":
+                        continue
                     if base == "G":
                         if seq[pos-1] == "C":
                             continue
