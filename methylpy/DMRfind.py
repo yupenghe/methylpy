@@ -399,6 +399,11 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
     #and figure out the FDR
     
     running_count = table[sorted_pvalues[0]][1]
+    if running_count == 0:
+        p_value = 1.0 / float(num_sims)
+        print("No test result found. Using the smallest p-value "
+              +str(p_value)+" as cutoff.\n")
+        return p_value
     diff = 1
 
     frac = round(float(sorted_pvalues[0][0]) / sorted_pvalues[0][1],precision)

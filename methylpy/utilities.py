@@ -413,7 +413,7 @@ def split_files_by_position(files,samples,
         if lines[index][0] > 0 and min_lines > lines[index][0]:
             min_lines,min_file = lines[index]
     chunk_size = math.ceil(float(min_lines) / chunks)
-    if chunk_size == 0:
+    if chunk_size == 0 or min_file is None:
         return 0
         #sys.exit("No lines match your range and/or mc_class criteria")
     min_sample = 0
