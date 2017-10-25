@@ -5,7 +5,7 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * differential methylation analysis
 
 # Note
-* methylpy was initiated by [Mattew D. Schultz](https://github.com/schultzmattd)
+* methylpy was initiated by and built on the work of [Mattew D. Schultz](https://github.com/schultzmattd)
 * [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) is being written
 * In new version, allc files for one sample are no longer split and the current allc format does not support header. Command `cat allc_SAMPLENAME_*.tsv |grep chr -v > allc_SAMPLENAME.tsv` can be used to change the older version of allc to the new version.
 * Current version methylpy has major difference compared to previous version.
