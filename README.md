@@ -187,7 +187,8 @@ Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylp
 
 # Additional functions for data processing
 #### Extract cytosine methylation state from BAM file
-This function allows users to get cytosine methylation state (allc file) from alignment file (BAM file).
+The `call-methylation-state` function allows users to get cytosine methylation state (allc file) from
+alignment file (BAM file).
 It is part of the data processing pipeline which is especially useful for getting the allc file from
 alignment file from other methylation data pipelines like bismark. Run `methylpy call-methylation-state -h`
 to get help information. Below is an example of running this function. Please make sure to remove 
@@ -200,6 +201,45 @@ methylpy call-methylation-state \
 	--sample mESC \
 	--ref-fasta mm10_bt2/mm10.fa \
 	--num-procs 8
+```
+
+### Get methylation level for genomic regions
+Calculating methylation level of certain genomic regions can give an estimate of the methylation
+abundance of these loci. This can be achieved using the `add-methylation-level` function. 
+See `methylpy add-methylation-level -h` for more details about the input format and available options.
+```
+methylpy add-methylation-level \
+	--input-tsv-file DMR_AD_IT.tsv \
+	--output-file DMR_AD_IT_with_level.tsv \
+	--allc-files allc/allc_AD_HT_1.tsv.gz allc/allc_AD_HT_2.tsv.gz \
+		allc/allc_AD_IT_1.tsv.gz allc/allc_AD_IT_2.tsv.gz \
+	--samples AD_HT_1 AD_HT_2 AD_IT_1 AD_IT_2 \
+	--mc-type CGN \
+	--num-procs 4
+```
+
+#### Merge allc files (of replicates)
+The `merge-allc` function can merge multiple allc files into a single allc file. It is useful when 
+separate allc files are generated for replicates of a tissue or cell type, and one wants to get a single
+allc file for that tissue/cell type. See `methylpy merge-allc -h` for more information. 
+```
+methylpy merge-allc \
+	--allc-files allc/allc_AD_HT_1.tsv.gz allc/allc_AD_HT_2.tsv.gz \
+	--output-file allc/allc_AD_HT.tsv.gz \
+	--compress-output True
+```
+
+#### Convert allc file to bigwig format
+The `allc-to-bigwig` function generates bigwig file from allc file. Methylation level will be
+calculated in equally divided non-overlapping genomic bins and the output will be stored in a bigwig
+file. See `methylpy allc-to-bigwig -h` for more information. 
+```
+methylpy allc-to-bigwig \
+	--input-allc-file results/allc_mESC.tsv.gz \
+	--output-file results/allc_mESC.bw \
+	--ref-fasta mm10_bt2/mm10.fa \
+	--mc-type CGN \
+	--bin-size 100 	
 ```
 
 #### Quality filter for bisulfite sequencing reads
@@ -220,19 +260,6 @@ methylpy bam-quality-filter \
 	--min-num-ch 3 \
 	--max-mch-level 0.7 \
 	--buffer-line-number 100
-```
-
-#### Convert allc file to bigwig format
-`convert-allc-to-bigwig` function generates bigwig file from allc file. Methylation level will be
-calculated in equally divided non-overlapping genomic bins and the output will be stored in a bigwig
-file. See `methylpy convert-allc-to-bigwig -h` for more information. 
-```
-methylpy convert-allc-to-bigwig \
-	--input-allc-file results/allc_mESC.tsv.gz \
-	--output-file results/allc_mESC.bw \
-	--ref-fasta mm10_bt2/mm10.fa \
-	--mc-type CGN \
-	--bin-size 100 	
 ```
 
 #### Reidentify DMRs from existing result

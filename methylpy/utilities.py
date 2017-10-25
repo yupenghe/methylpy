@@ -161,6 +161,120 @@ def convert_allc_to_bigwig(input_allc_file,
                                       +output_file),stderr=subprocess.PIPE)
     subprocess.check_call(shlex.split("rm "+output_file+".wig "+output_file+".chrom_size"))
 
+def merge_allc_files_minibatch(allc_files,
+                               output_file,
+                               mini_batch=20,
+                               compress_output=True):
+    
+    # User input checks
+    if not isinstance(allc_files, list):
+        exit("allc_files must be a list of string(s)")
+
+    # init
+    remaining_allc_files = list(allc_files[2:])
+    output_tmp_file = output_file + ".tmp"
+    merge_allc_files(allc_files=allc_files[:2],
+                     output_file=output_file,
+                     compress_output=compress_output)
+    # batch merge
+    while len(remaining_allc_files) > 0:
+        processing_allc_files = [output_file]
+        while len(remaining_allc_files) > 0 \
+              and len(processing_allc_files) < mini_batch:
+            processing_allc_files.append(remaining_allc_files.pop())
+        merge_allc_files(allc_files=processing_allc_files,
+                         output_file=output_tmp_file,
+                         compress_output=compress_output)
+        subprocess.check_call(["mv",output_tmp_file,output_file])
+    return 0
+
+def merge_allc_files(allc_files,
+                     output_file,
+                     compress_output=True):
+    #User input checks
+    if not isinstance(allc_files, list):
+        exit("allc_files must be a list of string(s)")
+
+    # scan allc file to set up a table for fast look-up of lines belong
+    # to different chromosomes
+    fhandles = {}
+    chrom_pointer = {}
+    chroms = set([])
+    for allc_file in allc_files:
+        cp_dict = {}
+        fhandles[allc_file] = open_allc_file(allc_file)
+        cur_chrom = ""
+        cur_pointer = 0
+        while True:
+            line = fhandles[allc_file].readline()
+            if not line: break
+            fields = line.split("\t")
+            if fields[0] != cur_chrom:
+                cp_dict[fields[0]] = cur_pointer
+                chroms.add(fields[0])
+                cur_chrom = fields[0]
+            cur_pointer = fhandles[allc_file].tell()
+        chrom_pointer[allc_file] = cp_dict
+    # output
+    if compress_output:
+        g = gzip.open(output_file,'w')
+    else:
+        g = open(output_file,'w')
+
+    # merge allc files
+    chroms = list(map(str,chroms))
+    for chrom in chroms:
+        cur_pos = {}
+        cur_fields = {}
+        # init
+        for allc_file in allc_files:
+            fhandles[allc_file].seek(chrom_pointer[allc_file].get(chrom,0))
+            line = fhandles[allc_file].readline()
+            fields = line.split("\t")
+            cur_pos[allc_file] = None
+            cur_fields[allc_file] = None
+            if fields[0] == chrom:
+                cur_pos[allc_file] = int(fields[1])
+                cur_fields[allc_file] = fields
+        # merge
+        query_allc_files = list(allc_files)
+        while len(query_allc_files) > 0:
+            min_pos = min([cur_pos[allc_file]
+                           for allc_file in query_allc_files
+                           if cur_pos[allc_file] is not None])
+            mc, h = 0, 0
+            c_info = None
+            prev_allc_file = ""
+            for allc_file in query_allc_files:
+                if cur_pos[allc_file] == min_pos:
+                    mc += int(cur_fields[allc_file][4])
+                    h += int(cur_fields[allc_file][5])
+                    c_info_tmp = "\t".join(cur_fields[allc_file][:4])
+                    #if c_info is not None:
+                        # check
+                    #    if c_info != c_info_tmp:
+                    #        print("Warning! Inconsistent cytosine info:\n"
+                    #              +prev_allc_file+"\n"
+                    #              +c_info+"\n"
+                    #              +allc_file+"\n"
+                    #              +c_info_tmp+"\n")
+                    prev_allc_file = allc_file
+                    c_info = c_info_tmp
+                    # update
+                    line = fhandles[allc_file].readline()
+                    fields = line.split("\t")
+                    if fields[0] == chrom:
+                        cur_pos[allc_file] = int(fields[1])
+                        cur_fields[allc_file] = fields
+                    else:
+                        cur_pos[allc_file] = None
+            # output
+            g.write(c_info+"\t"+str(mc)+"\t"+str(h)+"\t1\n")
+            # update query_allc_files
+            query_allc_files = [allc_file for allc_file in query_allc_files
+                                if cur_pos[allc_file] is not None]
+    return 0
+
 def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],
                 "H":["A","C","T"],

@@ -17,6 +17,7 @@ def parse_args():
      add_call_mc_subparser(subparsers)
      add_get_methylation_level_subparser(subparsers)
      add_allc2bw_subparser(subparsers)
+     add_merge_allc_subparser(subparsers)
 
      if len(sys.argv) > 1:
           args = parser.parse_args()
@@ -205,6 +206,7 @@ def parse_args():
                                      path_to_samtools=args.path_to_samtools,
                                      path_to_files=args.path_to_output,
                                      min_base_quality=args.min_base_quality)
+
      elif args.command == "add-methylation-level":
           from methylpy.DMRfind import get_methylation_levels_DMRfind
           get_methylation_levels_DMRfind(input_tsv_file=args.input_tsv_file,
@@ -216,7 +218,14 @@ def parse_args():
                                          buffer_line_number=args.buffer_line_number,
                                          input_no_header=args.input_no_header)
 
-     elif args.command == "convert-allc-to-bigwig":
+     elif args.command == "merge-allc":
+          from methylpy.utilities import merge_allc_files_minibatch
+          merge_allc_files_minibatch(allc_files=args.allc_files,
+                                     output_file=args.output_file,
+                                     mini_batch=args.mini_batch,
+                                     compress_output=args.compress_output)
+
+     elif args.command == "allc-to-bigwig":
           from methylpy.utilities import convert_allc_to_bigwig
           convert_allc_to_bigwig(input_allc_file=args.input_allc_file,
                                  output_file=args.output_file,
@@ -1241,7 +1250,7 @@ def add_get_methylation_level_subparser(subparsers):
                              +"True, a header will be automatically generated in the output file.")
 
 def add_allc2bw_subparser(subparsers):
-     allc2bw = subparsers.add_parser("convert-allc-to-bigwig",
+     allc2bw = subparsers.add_parser("allc-to-bigwig",
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                          help="Get bigwig file from allc file")
 
@@ -1296,7 +1305,37 @@ def add_allc2bw_subparser(subparsers):
                               type=str,
                               default="",
                               help="Path to samtools installation")
+
+def add_merge_allc_subparser(subparsers):
+     merge_allc = subparsers.add_parser("merge-allc",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     help="Merge allc files")
+
+     merge_allc_req = merge_allc.add_argument_group("required inputs")
+     merge_allc_req.add_argument("--allc-files",
+                             type=str,
+                             nargs="+",
+                             required=True,
+                             help="List of allc files to merge.")
+
+     merge_allc_req.add_argument("--output-file",
+                                 type=str,
+                                 required=True,
+                                 help="String indicating the name of output file")
      
+     merge_allc_opt = merge_allc.add_argument_group("optional inputs")
+     merge_allc_opt.add_argument("--compress-output",
+                                 type=str2bool,
+                                 default=True,
+                                 help="Boolean indicating whether to compress (by gzip) the final output")
+
+     merge_allc_opt.add_argument("--mini-batch",
+                                 type=int,
+                                 default=20,
+                                 help="The maximum number of allc files to be merged at the same time. Since "
+                                 +"OS or python may limit the number of files that can be open at once, value "
+                                 +"larger than 100 is not recommended")
+
 def str2bool(v):
      ## adapted from the answer by Maxim at
      ## https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
