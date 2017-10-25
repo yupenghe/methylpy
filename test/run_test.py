@@ -214,37 +214,7 @@ if bowtie2:
         stderr=f_stderr)
     sys.stdout.write("pass\n")
 
-# 6 - bam-quality-filter
-sys.stdout.write("\nTest quality filter for BAM file of single-end data: ")
-if bowtie:
-    subprocess.check_call(
-        shlex.split("methylpy bam-quality-filter "
-                    +"--input-file results/se_bt_processed_reads.bam "
-                    +"--output-file results/se_bt_processed_reads.filtered.bam "
-                    +"--ref-fasta data/chrL.fa "
-                    +"--path-to-samtools "+path_to_samtools+" "
-                    +"--quality-cutoff 30 "
-                    +"--min-num-ch 3 "
-                    +"--max-mch-level 0.7 "
-                    +"--buffer-line-number 100"),
-        stdout=f_stdout,
-        stderr=f_stderr)
-if bowtie2:
-    subprocess.check_call(
-        shlex.split("methylpy bam-quality-filter "
-                    +"--input-file results/se_bt2_processed_reads.bam "
-                    +"--output-file results/se_bt2_processed_reads.filtered.bam "
-                    +"--ref-fasta data/chrL.fa "
-                    +"--path-to-samtools "+path_to_samtools+" "
-                    +"--quality-cutoff 30 "
-                    +"--min-num-ch 3 "
-                    +"--max-mch-level 0.7 "
-                    +"--buffer-line-number 100"),
-        stdout=f_stdout,
-        stderr=f_stderr)
-sys.stdout.write("pass\n")
-
-# 7 - Paired-end pipeline
+# 6 - Paired-end pipeline
 print("")
 if bowtie:
     sys.stdout.write("Test paired-end-pipeline with bowtie: ")
@@ -291,6 +261,36 @@ if bowtie2:
         stderr=f_stderr)
     sys.stdout.write("pass\n")
     
+# 7 - bam-quality-filter
+sys.stdout.write("\nTest quality filter for BAM file of single-end data: ")
+if bowtie:
+    subprocess.check_call(
+        shlex.split("methylpy bam-quality-filter "
+                    +"--input-file results/se_bt_processed_reads.bam "
+                    +"--output-file results/se_bt_processed_reads.filtered.bam "
+                    +"--ref-fasta data/chrL.fa "
+                    +"--path-to-samtools "+path_to_samtools+" "
+                    +"--quality-cutoff 30 "
+                    +"--min-num-ch 3 "
+                    +"--max-mch-level 0.7 "
+                    +"--buffer-line-number 100"),
+        stdout=f_stdout,
+        stderr=f_stderr)
+if bowtie2:
+    subprocess.check_call(
+        shlex.split("methylpy bam-quality-filter "
+                    +"--input-file results/se_bt2_processed_reads.bam "
+                    +"--output-file results/se_bt2_processed_reads.filtered.bam "
+                    +"--ref-fasta data/chrL.fa "
+                    +"--path-to-samtools "+path_to_samtools+" "
+                    +"--quality-cutoff 30 "
+                    +"--min-num-ch 3 "
+                    +"--max-mch-level 0.7 "
+                    +"--buffer-line-number 100"),
+        stdout=f_stdout,
+        stderr=f_stderr)
+sys.stdout.write("pass\n")
+
 # 8 - call-methylation-state
 print("")
 sys.stdout.write("Test call-methylation-state for single-end data: ")
@@ -332,6 +332,20 @@ subprocess.check_call(
     stdout=f_stdout,
     stderr=f_stderr)
 sys.stdout.write("pass\n")
+
+# 9 - merge allc
+sys.stdout.write("\nTest merge-allc: ")
+try:
+    subprocess.check_call(
+        shlex.split("methylpy merge-allc "
+                    +"--allc-files data/allc_P0_FB_1.tsv.gz data/allc_P0_FB_2.tsv.gz "
+                    +"data/allc_P0_HT_1.tsv.gz data/allc_P0_HT_2.tsv.gz "
+                    +"--output-file results/allc_merged.tsv.gz "),
+        stdout=f_stdout,
+        stderr=f_stderr)
+    sys.stdout.write("pass\n")
+except:
+    sys.stdout.write("failed\n")
 
 # successful
 print("\nAll tests are done!")
