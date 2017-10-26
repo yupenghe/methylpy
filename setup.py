@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 setup(
     name='methylpy',
@@ -7,7 +7,6 @@ setup(
     author_email='yupeng.he.bioinfo@gmail.com',
     packages=['methylpy'], 
     url='http://pypi.python.org/pypi/methylpy/',
-    download_url='https://github.com/yupenghe/methylpy/archive/1.0.0.tar.gz',
     license='LICENSE.txt',
     description='Bisulfite sequencing data processing and differential methylation analysis',
     long_description=open('README.md').read(),
