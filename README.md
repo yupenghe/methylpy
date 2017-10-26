@@ -43,20 +43,13 @@ run `methylpy -h` to get a list of functions.
 Enter the directory where you would like to install methylpy and run
 ```
 git clone https://github.com/yupenghe/methylpy.git
+cd methylpy/
+python setup.py install
 ```
-Next, the methylpy folder needs to be included in the python search path. Also, methylpy executable will easy to use if its path is included in `PATH`. To do these, if the path of methylpy (not the methylpy/methylpy folder) is /YOUR/PATH/methylpy/, please include the below code in the $HOME/.bashrc file:
-```
-export PYTHONPATH=/YOUR/PATH/methylpy/:$PYTHONPATH
-export PATH=/YOUR/PATH/methylpy/bin/:$PATH
-```
-and then do
-```
-source $HOME/.bashrc
-```
-If the below command gives no error, the setup is successful.
-```
-methylpy
-```
+If you would like to install methylpy in path of your choice, run 
+`python setup.py install --prefix=/USER/PATH/`. 
+Then, try `methylpy` and if it gives no error, the setup is likely successful.
+See [Test methylpy](#test-methylpy) for more rigorious test.
 
 #### Step 2 - Install dependencies
 methylpy is written in python so obviously python2/3 needs to be installed.

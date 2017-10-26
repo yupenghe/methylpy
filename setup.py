@@ -24,5 +24,6 @@ setup(
                 "Differential methylation",
                 "Calling DMRs",
                 "Epigenetics",
-                "Functional genomics"]
+                "Functional genomics"],
+    scripts = ["bin/methylpy"]
 )
