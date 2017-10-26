@@ -17,12 +17,12 @@ setup(
     package_data = {
 	'methylpy':['rms.cpp', 'run_rms_tests.out']
     },
-    keyword = ["Bioinformatics pipeline",
-               "Dna methylation",
-               "Bisulfite sequencing data",
-               "Nome-seq data",
-               "Differential methylation",
-               "Calling DMRs",
-               "Epigenetics",
-               "Functional genomics"]
+    keywords = ["Bioinformatics pipeline",
+                "DNA methylation",
+                "Bisulfite sequencing data",
+                "Nome-seq data",
+                "Differential methylation",
+                "Calling DMRs",
+                "Epigenetics",
+                "Functional genomics"]
 )
