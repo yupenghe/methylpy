@@ -2,20 +2,27 @@ from setuptools import setup
 
 setup(
     name='methylpy',
-    version='0.1.1',
-    author='Matthew Schultz',
-    author_email='schultzmattd@gmail.com',
-    packages=['methylpy', 'methylpy.test', 'methylpy.test.test_files'], 
+    version='1.0.0',
+    author='Yupeng He',
+    author_email='yupeng.he.bioinfo@gmail.com',
+    packages=['methylpy'], 
     url='http://pypi.python.org/pypi/methylpy/',
     license='LICENSE.txt',
-    description='A package for the processing and analysis of bisulfite sequencing data.',
-    long_description=open('README.txt').read(),
+    description='Bisulfite sequencing data processing and differential methylation analysis',
+    long_description=open('README.md').read(),
     install_requires=[
         "numpy >= 1.6.1",
 	"scipy >= 0.10.0",
     ],
     package_data = {
-	    'methylpy.test':['test_files/*'],
-	    'methylpy':['rms.cpp', 'run_rms_tests.out']
-	}
+	'methylpy':['rms.cpp', 'run_rms_tests.out']
+    },
+    keyword = ["Bioinformatics pipeline",
+               "Dna methylation",
+               "Bisulfite sequencing data",
+               "Nome-seq data",
+               "Differential methylation",
+               "Calling DMRs",
+               "Epigenetics",
+               "Functional genomics"]
 )
