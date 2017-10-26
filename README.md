@@ -39,8 +39,10 @@ for details.
 run `methylpy -h` to get a list of functions.
 
 # Install methylpy
-#### Step 1 - Download methylpy and set up environment variable
-Enter the directory where you would like to install methylpy and run
+#### Step 1 - Download methylpy
+Easiest way of installing methylpy will be through PyPI by running `easy_install methylpy`.
+Alternatively, methylpy can be installed through github: eenter the directory where you would
+like to install methylpy and run
 ```
 git clone https://github.com/yupenghe/methylpy.git
 cd methylpy/
