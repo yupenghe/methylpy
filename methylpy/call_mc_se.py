@@ -1367,7 +1367,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
 
     ## Output
     if compress_output:
-        output_filehandler = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'w')
+        output_filehandler = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'wt')
         output_file = path_to_files+"allc_"+sample+".tsv.gz"
     else:
         output_filehandler = open(path_to_files+"allc_"+sample+".tsv",'w')
@@ -1480,7 +1480,7 @@ def do_split_allc_file(allc_file,
                 output_handle.close()
             cur_chrom = fields[0]
             if compress_output:
-                output_handle = gzip.open(path_to_output+"allc_"+sample+"_"+cur_chrom+".tsv.gz",'w')
+                output_handle = gzip.open(path_to_output+"allc_"+sample+"_"+cur_chrom+".tsv.gz",'wt')
                 output_files.append(path_to_output+"allc_"+sample+"_"+cur_chrom+".tsv")
             else:
                 output_handle = open(path_to_output+"allc_"+sample+"_"+cur_chrom+".tsv",'w')
@@ -1536,7 +1536,7 @@ def do_split_allc_file_chunk(allc_file,
     output_handles = {}
     for index in range(index+1):
         if compress_output:
-            output_handle = gzip.open(path_to_output+"allc_"+sample+"_"+str(index)+".tsv.gz",'w')
+            output_handle = gzip.open(path_to_output+"allc_"+sample+"_"+str(index)+".tsv.gz",'wt')
             output_files.append(path_to_output+"allc_"+sample+"_"+str(index)+".tsv")
         else:
             output_handle = open(path_to_output+"allc_"+sample+"_"+str(index)+".tsv",'w')
@@ -1879,7 +1879,7 @@ def filter_files_by_pvalue_combined(input_files,output_file,
                 shlex.split("sort" + sort_mem + " -k 1,1 -k 2,2g -o "+input_file+" "+input_file))
     # output file
     if compress_output:
-        g = gzip.open(output_file,'w')
+        g = gzip.open(output_file,'wt')
     else:
         g = open(output_file,'w')
     # write to output file

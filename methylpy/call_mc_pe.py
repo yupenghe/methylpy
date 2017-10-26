@@ -1133,12 +1133,14 @@ def flip_read2_strand(input_file,output_file,path_to_samtools=""):
     # Input initialization
     input_pipe = subprocess.Popen(
         shlex.split(path_to_samtools+"samtools view -h "+input_file),
-        stdout=subprocess.PIPE)
+        stdout=subprocess.PIPE,
+        universal_newlines=True)
     # Output initialization
     output_handle = open(output_file,'w')
     output_pipe = subprocess.Popen(
         shlex.split(path_to_samtools+"samtools view -S -b -"),
-        stdin=subprocess.PIPE,stdout=output_handle)
+        stdin=subprocess.PIPE,stdout=output_handle,
+        universal_newlines=True)
 
     for line in input_pipe.stdout:
         # header

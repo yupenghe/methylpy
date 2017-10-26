@@ -217,7 +217,7 @@ def merge_allc_files(allc_files,
         chrom_pointer[allc_file] = cp_dict
     # output
     if compress_output:
-        g = gzip.open(output_file,'w')
+        g = gzip.open(output_file,'wt')
     else:
         g = open(output_file,'w')
 
@@ -310,7 +310,7 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
     total_reads=0
     for inputf in input_files:
         if inputf[-3:] == ".gz":
-            f = gzip.open(inputf,'r')
+            f = gzip.open(inputf,'rt')
         elif inputf[-4:] == ".bz2":
             f = bz2.BZ2File(inputf,'r')
         else:
@@ -363,7 +363,7 @@ def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
     total_reads=0
     for inputf in input_files:
         if inputf[-3:] == ".gz":
-            f = gzip.open(inputf,'r')
+            f = gzip.open(inputf,'rt')
         elif inputf[-4:] == ".bz2":
             f = bz2.BZ2File(inputf,'r')
         else:
@@ -410,7 +410,7 @@ def split_mpileup_file(num_chunks,inputf,output_prefix):
         sys.exit("No lines in "+inputf)
     chunk_num = 0
     try:
-        f = gzip.open(inputf,'r')
+        f = gzip.open(inputf,'rt')
         f.readline()
     except:
         try:
@@ -662,9 +662,9 @@ def parallel_split_files_by_position(filen,cutoffs,
 
 def open_allc_file(allc_file):
     if allc_file[-3:] == ".gz":
-        f = gzip.open(allc_file,'r')
+        f = gzip.open(allc_file,'rt')
     elif allc_file[-4:] == ".bz2":
-        f = bz2.BZ2File(allc_file,'r')
+        f = bz2.BZ2File(allc_file,'rt')
     else:
         f = open(allc_file,'r')
     return(f)

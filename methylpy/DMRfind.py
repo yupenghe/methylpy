@@ -216,7 +216,7 @@ def DMRfind(allc_files, samples,
                         "\t".join(["uc_residual_"+sample for sample in samples]),
                         "num_simulations_sig\tnum_simulations_run"+"\n"])
     #I put this up here because it's actually a lot harder to prepend a header file than you might think
-    g = gzip.open(output_prefix+"_rms_results.tsv.gz",'w')
+    g = gzip.open(output_prefix+"_rms_results.tsv.gz",'wt')
     g.write(header)
     for chr_key in sorted(chroms):
         chrom = str(chr_key) #.replace("chr","")
@@ -338,7 +338,11 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
         more than convergence_diff.
     """
     #The minus 1 is for the header
-    total_tests=int(check_output(split("wc -l "+rms_results)).split(" ")[0])-1
+    f = gzip.open(rms_results,'rt')
+    f.readline() # header
+    total_tests = 0
+    for line in f:
+        total_tests += 1
     #A dict of lists
     #the list is in the format [expected_count, observed_count,total_significant] the key is the pvalue
     table = {(1,num_sims):[(1.0/num_sims)*total_tests,0]}
@@ -359,7 +363,7 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
         if pvalue not in sorted_pvalues:
             sorted_pvalues.append((num_sig_tests,denominator))
         last_pvalue = pvalue
-    f = gzip.open(rms_results,'r')
+    # get table
     f.readline()
     for line in f:
         line = line.rstrip()
@@ -435,12 +439,12 @@ def get_resid_cutoff(resid_cutoff, pvalue_cutoff, rms_file):
     """
     resid_cutoff = 100 - resid_cutoff*100
     residuals = []
-    f = gzip.open(rms_file, 'r')
+    f = gzip.open(rms_file, 'rt')
     # get number of samples
     line = f.readline()
     fields_offset = 5
     fields = line.split("\t")
-    num_samples = len(fields[fields_offset:])/5
+    num_samples = int((len(fields) - fields_offset - 2)/5)
     index = 5 + num_samples * 3 #get the starting index for the residual fields
 
     for line in f:
@@ -549,14 +553,14 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
     
     #this is where sample specific fields begin. Since the number of fields before these fields is fixed
     #I created a variable in case I add a fixed field later.
-    fields_offset = 5  
+    fields_offset = 5
     #Collapse DMRs into windows
-    f = gzip.open(inputf,'r')
+    f = gzip.open(inputf,'rt')
     g = open(output,'w')
     g.write("chr\tstart\tend\tnumber_of_dms\thypermethylated_samples\thypomethylated_samples\n")
     line = f.readline()
     fields = line.split("\t")
-    num_samples = len(fields[fields_offset:])/5
+    num_samples = int((len(fields) - fields_offset - 2)/5)
     samples = [mc_field[3:] for mc_field in fields[fields_offset:fields_offset+num_samples]]
     
     line = f.readline().rstrip()
@@ -776,12 +780,7 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
                                          buffer_line_number=100000,
                                          input_no_header=False):
     # open allc file
-    if inputf_allc[-3:] == ".gz":
-        allc_file = gzip.open(inputf_allc,'r')
-    elif inputf_allc[-4:] == ".bz2":
-        allc_file = bz2.BZ2File(inputf_allc,'r')
-    else:
-        allc_file = open(inputf_allc,'r')
+    allc_file = open_allc_file(inputf_allc)
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
     chrom_pointer = {}

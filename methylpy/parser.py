@@ -171,7 +171,7 @@ def parse_args():
 
      elif args.command == "call-methylation-state":
           if args.paired_end:
-               from call_mc_pe import call_methylated_sites_pe
+               from methylpy.call_mc_pe import call_methylated_sites_pe
                call_methylated_sites_pe(inputf=args.input_file,
                                         sample=args.sample,
                                         reference_fasta=args.ref_fasta,
@@ -189,7 +189,7 @@ def parse_args():
                                         path_to_files=args.path_to_output,
                                         min_base_quality=args.min_base_quality)
           else:
-               from call_mc_se import call_methylated_sites
+               from methylpy.call_mc_se import call_methylated_sites
                call_methylated_sites(inputf=args.input_file,
                                      sample=args.sample,
                                      reference_fasta=args.ref_fasta,
