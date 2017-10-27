@@ -9,7 +9,7 @@ setup(
     url='http://pypi.python.org/pypi/methylpy/',
     license='LICENSE.txt',
     description='Bisulfite sequencing data processing and differential methylation analysis',
-    long_description=open('README.md').read(),
+    long_description=open('README.rst').read(),
     install_requires=[
         "numpy >= 1.6.1",
 	"scipy >= 0.10.0",
