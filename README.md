@@ -200,7 +200,7 @@ methylpy call-methylation-state \
 	--num-procs 8
 ```
 
-### Get methylation level for genomic regions
+#### Get methylation level for genomic regions
 Calculating methylation level of certain genomic regions can give an estimate of the methylation
 abundance of these loci. This can be achieved using the `add-methylation-level` function. 
 See `methylpy add-methylation-level -h` for more details about the input format and available options.

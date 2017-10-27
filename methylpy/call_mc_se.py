@@ -1,4 +1,5 @@
 import sys
+import os
 import multiprocessing
 import subprocess
 import scipy.stats as sci
@@ -179,9 +180,16 @@ def run_methylation_pipeline(read_files, sample,
 
     if len(path_to_aligner) != 0:
         path_to_aligner += "/"
+
+    # output path
     if len(path_to_output) != 0:
         path_to_output += "/"
-
+        if not os.path.exists(path_to_output):
+            try:
+                os.makedirs(path_to_output)
+            except:
+                print_error("Failed to create output folder!")
+                
     if sort_mem:
         if sort_mem.find("-S") == -1:
             sort_mem = " -S " + sort_mem
@@ -908,8 +916,8 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
             continue
 
         fields = line.split("\t")
-        fields[2] = fields[2].replace("_f","")
-        fields[2] = fields[2].replace("_r","")
+        #fields[2] = fields[2].replace("_f","")
+        #fields[2] = fields[2].replace("_r","")
         if fields[2] != "*" and int(fields[4]) >= 2:
             header = fields[0].split("!")
             #BIG ASSUMPTION!! NO TABS IN FASTQ HEADER LINES EXCEPT THE ONES I ADD!
