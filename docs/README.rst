@@ -8,6 +8,10 @@ for
 -  (single-cell) NOMe-seq data
 -  differential methylation analysis
 
+`github <https://github.com/yupenghe/methylpy>`__
+
+`PyPI <https://pypi.python.org/pypi/methylpy/>`__
+
 Note
 ====
 

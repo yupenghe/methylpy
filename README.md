@@ -5,6 +5,10 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * (single-cell)  NOMe-seq data
 * differential methylation analysis
 
+[github](https://github.com/yupenghe/methylpy)
+
+[PyPI](https://pypi.python.org/pypi/methylpy/)
+
 # Note
 * methylpy was initiated by and built on the work of [Mattew D. Schultz](https://github.com/schultzmattd)
 * [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) is being written

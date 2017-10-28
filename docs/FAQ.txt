@@ -1,1 +1,0 @@
-The docs dir should contain any design docs, implementation notes, a FAQ, or any other docs you've written
