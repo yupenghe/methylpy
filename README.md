@@ -5,9 +5,8 @@ Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 * (single-cell)  NOMe-seq data
 * differential methylation analysis
 
-[github](https://github.com/yupenghe/methylpy)
-
-[PyPI](https://pypi.python.org/pypi/methylpy/)
+methylpy is available at [github](https://github.com/yupenghe/methylpy)
+and [PyPI](https://pypi.python.org/pypi/methylpy/).
 
 # Note
 * methylpy was initiated by and built on the work of [Mattew D. Schultz](https://github.com/schultzmattd)
@@ -45,8 +44,9 @@ run `methylpy -h` to get a list of functions.
 
 # Install methylpy
 #### Step 1 - Download methylpy
-Easiest way of installing methylpy will be through PyPI by running `easy_install methylpy`.
-Alternatively, methylpy can be installed through github: eenter the directory where you would
+Easiest way of installing methylpy will be through PyPI by running `pip install methylpy`. The
+command `pip install --upgrade methylpy` updates methylpy to latest version.
+Alternatively, methylpy can be installed through github: enter the directory where you would
 like to install methylpy and run
 ```
 git clone https://github.com/yupenghe/methylpy.git
