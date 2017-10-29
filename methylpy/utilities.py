@@ -161,6 +161,39 @@ def convert_allc_to_bigwig(input_allc_file,
                                       +output_file),stderr=subprocess.PIPE)
     subprocess.check_call(shlex.split("rm "+output_file+".wig "+output_file+".chrom_size"))
 
+
+def filter_allc_file(allc_file,
+                     output_file,
+                     mc_type="CGN",
+                     chroms = None,
+                     compress_output=True,
+                     buffer_line_number=100000):
+
+    mc_class = expand_nucleotide_code(mc_type)
+    # input & output
+    f = open_allc_file(allc_file)
+    if compress_output:
+        output_fhandler = gzip.open(output_file,'wt')
+    else:
+        output_fhandler = open(output_file,'w')
+    # begin
+    line_counts = 0
+    out = ""
+    for line in f:
+        fields = line.split("\t")
+        if (chroms is None or fields[0] in chrom) and fields[3] in mc_class:
+            line_counts += 1
+            out += line
+        if line_counts > buffer_line_number:
+            output_fhandler.write(out)
+            line_counts = 0
+            out = ""
+    if line_counts > 0:
+        output_fhandler.write(out)
+        out = ""
+    f.close()
+    output_fhandler.close()
+
 def merge_allc_files_minibatch(allc_files,
                                output_file,
                                mini_batch=20,
@@ -278,6 +311,7 @@ def merge_allc_files(allc_files,
 def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],
                 "H":["A","C","T"],
+                "D":["A","G","T"],
                 "C":["C"],
                 "G":["G"],
                 "T":["T"],

@@ -7,6 +7,7 @@ from math import ceil, log10
 from multiprocessing import Pool
 from methylpy.utilities import print_checkpoint,expand_nucleotide_code
 from methylpy.utilities import open_allc_file,split_files_by_position
+from methylpy.utilities import filter_allc_file
 from scipy.stats import scoreatpercentile
 import subprocess
 import shlex
@@ -119,22 +120,50 @@ def DMRfind(allc_files, samples,
     if dmr_max_dist <0:
         exit("In DMRfind, dmr_max_dist must be greater than 0")
     
-    if num_procs > 1:
-        pool = Pool(num_procs)
-    else:
-        pool = False
-
     if not(chroms is None) and isinstance(chroms,list) == False:
         exit("chroms must be a list of string(s)")
 
     #This code creates all variations of the shorthand C contexts (e.g., CHG->CHG,CAG,CCG,CTG)
     mc_class = expand_nucleotide_code(mc_type)
 
+
+    # filter allc file
+    if num_procs > 1:
+        pool = Pool(min(num_procs,len(samples)))
+    else:
+        pool = False
+    query_allc_files = []
+    for allc_file,sample in zip(allc_files,samples):
+        query_allc_files.append(output_prefix+"_filtered_allc_"+sample+".tsv")
+        if pool:
+            pool.apply_async(filter_allc_file,
+                             (),
+                             {"allc_file":allc_file,
+                              "output_file":output_prefix+"_filtered_allc_"+sample+".tsv",
+                              "mc_type":mc_type,
+                              "chroms":chroms,
+                              "compress_output":False,
+                              "buffer_line_number":buffer_line_number}
+            )
+        else:
+            filter_allc_file(allc_file=allc_file,
+                             output_file=output_prefix+"_filtered_allc_"+sample+".tsv",
+                             mc_type=mc_type,
+                             chroms=chroms,
+                             compress_output=False,
+                             buffer_line_number=buffer_line_number)
+    pool.close()
+    pool.join()
+            
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
+    if num_procs > 1:
+        pool = Pool(num_procs)
+    else:
+        pool = False
     chrom_pointer = {}
     chrom_counts = {}
-    for allc_file,sample in zip(allc_files,samples):
+    for allc_file,sample in zip(query_allc_files,samples):
         cp_dict = {}
         with open_allc_file(allc_file) as f:
             cur_chrom = ""
@@ -159,7 +188,7 @@ def DMRfind(allc_files, samples,
             chrom = str(chr_key) #.replace("chr","")
             results = []
             print_checkpoint("Splitting allc files for chromosome "+str(chrom))
-            split_files_by_position(allc_files,samples,
+            split_files_by_position(query_allc_files,samples,
                                     num_procs,mc_class,
                                     chrom_pointer = chrom_pointer,
                                     chrom=chrom,
@@ -169,7 +198,7 @@ def DMRfind(allc_files, samples,
             if num_procs > 1:
                 for chunk in range(0,num_procs):
                     filenames = []
-                    for allc_file in allc_files:
+                    for allc_file in query_allc_files:
                         filenames.extend(glob(allc_file+"_"+chrom+"_"+str(chunk)))
                     if len(filenames) == 0:
                         print("Nothing to run for chunk "+str(chunk))
@@ -184,7 +213,7 @@ def DMRfind(allc_files, samples,
                                       "seed":seed,"keep_temp_files":keep_temp_files})
             else:
                 filenames = []
-                for allc_file in allc_files:
+                for allc_file in query_allc_files:
                     filenames.extend(glob(allc_file+"_"+chrom+"_0"))
                 if len(filenames) == 0:
                     print("Nothing to run for chunk "+str(chunk))
@@ -258,7 +287,7 @@ def DMRfind(allc_files, samples,
     print_checkpoint("Adding Methylation Levels")
     get_methylation_levels_DMRfind(output_prefix+"_rms_results_collapsed.tsv",
                                    output_prefix+"_rms_results_collapsed_with_levels.tsv",
-                                   allc_files,
+                                   query_allc_files,
                                    samples,
                                    mc_type=mc_type,
                                    num_procs=num_procs,
