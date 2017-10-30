@@ -86,7 +86,13 @@ install methylpy and run
 If you would like to install methylpy in path of your choice, run
 ``python setup.py install --prefix=/USER/PATH/``. Then, try ``methylpy``
 and if it gives no error, the setup is likely successful. See `Test
-methylpy <#test-methylpy>`__ for more rigorious test.
+methylpy <#test-methylpy>`__ for more rigorious test. Last, processing
+large dataset will require space for storing temporary files. However,
+the default directory is unlikely to fit the need. You may want to set
+the ``TMPDIR`` environmental variable to the absolute path of a
+directory on hard drive with sufficient space (e.g. ``/YOUR/TMP/DIR/``).
+This can be done by adding the below command to ~/.bashrc file:
+``export TMPDIR=/YOUR/TMP/DIR/``.
 
 Step 2 - Install dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

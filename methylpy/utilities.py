@@ -113,7 +113,7 @@ def convert_allc_to_bigwig(input_allc_file,
             if cur_chrom != fields[0] or pos >= bin_end:
                 if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
                     mc_level = str(float(bin_mc)/float(bin_h))
-                    g.write("\t".join(["chr"+fields[0],
+                    g.write("\t".join(["chr"+cur_chrom,
                                        str(bin_end-bin_size),
                                        str(bin_end),
                                        mc_level])+"\n")
@@ -129,7 +129,7 @@ def convert_allc_to_bigwig(input_allc_file,
 
     if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
         mc_level = str(float(bin_mc)/float(bin_h))
-        g.write("\t".join(["chr"+fields[0],
+        g.write("\t".join(["chr"+cur_chrom,
                            str(bin_end-bin_size),
                            str(bin_end),
                            mc_level])+"\n")
