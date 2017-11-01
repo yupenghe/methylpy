@@ -152,8 +152,9 @@ def DMRfind(allc_files, samples,
                              chroms=chroms,
                              compress_output=False,
                              buffer_line_number=buffer_line_number)
-    pool.close()
-    pool.join()
+    if pool:
+        pool.close()
+        pool.join()
             
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes

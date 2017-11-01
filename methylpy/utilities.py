@@ -86,7 +86,8 @@ def convert_allc_to_bigwig(input_allc_file,
                            path_to_wigToBigWig="",
                            path_to_samtools="",
                            min_sites = 0,
-                           min_cov = 0
+                           min_cov = 0,
+                           remove_chr_prefix=False
                            ):
     if not isinstance(mc_type, list):
         if isinstance(mc_type, str):
@@ -113,7 +114,7 @@ def convert_allc_to_bigwig(input_allc_file,
             if cur_chrom != fields[0] or pos >= bin_end:
                 if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
                     mc_level = str(float(bin_mc)/float(bin_h))
-                    g.write("\t".join(["chr"+cur_chrom,
+                    g.write("\t".join([cur_chrom,
                                        str(bin_end-bin_size),
                                        str(bin_end),
                                        mc_level])+"\n")
@@ -129,7 +130,7 @@ def convert_allc_to_bigwig(input_allc_file,
 
     if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
         mc_level = str(float(bin_mc)/float(bin_h))
-        g.write("\t".join(["chr"+cur_chrom,
+        g.write("\t".join([cur_chrom,
                            str(bin_end-bin_size),
                            str(bin_end),
                            mc_level])+"\n")
@@ -151,9 +152,11 @@ def convert_allc_to_bigwig(input_allc_file,
     g = open(output_file+".chrom_size",'w')
     for line in f:
         fields = line.split("\t")
+        if remove_chr_prefix and fields[0].startswith("chr"):
+            fields[0] = fields[0][3:]
         g.write(fields[0]+"\t"+fields[1]+"\n")
     g.close()
-    
+
     # generate bigwig file
     subprocess.check_call(shlex.split(path_to_wigToBigWig + "wigToBigWig -clip "
                                       +"%s.wig " %(output_file)
@@ -181,7 +184,7 @@ def filter_allc_file(allc_file,
     out = ""
     for line in f:
         fields = line.split("\t")
-        if (chroms is None or fields[0] in chrom) and fields[3] in mc_class:
+        if (chroms is None or fields[0] in chroms) and fields[3] in mc_class:
             line_counts += 1
             out += line
         if line_counts > buffer_line_number:
@@ -312,6 +315,14 @@ def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],
                 "H":["A","C","T"],
                 "D":["A","G","T"],
+                "B":["C","G","T"],
+                "A":["A","C","G"],
+                "R":["A","G"],
+                "Y":["C","T"],
+                "K":["G","T"],
+                "M":["A","C"],
+                "S":["G","C"],
+                "W":["A","T"],
                 "C":["C"],
                 "G":["G"],
                 "T":["T"],

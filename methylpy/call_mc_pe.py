@@ -30,9 +30,10 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                 bowtie2=True, path_to_aligner="", aligner_options=None,
                                 merge_by_max_mapq=False,
                                 pbat=False,check_dependency=True,
-                                remove_clonal=True, keep_clonal_stats=False,
+                                remove_clonal=True, keep_clonal_stats=True,
                                 path_to_picard="",java_options="-Xmx20g",
                                 path_to_samtools="",
+                                remove_chr_prefix=True,
                                 adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
                                 adapter_seq_read2="AGATCGGAAGAGCGTCGTGTAGGGA",
                                 max_adapter_removal=None,
@@ -327,6 +328,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                  compress_output=compress_output,
                                  min_cov=min_cov,
                                  binom_test=binom_test,
+                                 remove_chr_prefix=remove_chr_prefix,
                                  sort_mem=sort_mem,
                                  path_to_files=path_to_output,
                                  path_to_samtools=path_to_samtools,
@@ -1181,6 +1183,7 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                              generate_mpileup_file=True,compress_output=True,
                              buffer_line_number = 100000,
                              min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
+                             remove_chr_prefix=True,
                              sort_mem="500M",
                              path_to_files="",min_base_quality=1):
 
@@ -1238,7 +1241,8 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                           path_to_samtools = path_to_samtools,
                           sort_mem=sort_mem,
                           path_to_files = path_to_files,
-                          min_base_quality = min_base_quality)
+                          min_base_quality = min_base_quality,
+                          remove_chr_prefix = remove_chr_prefix)
 
     #Remove intermediate bam file
     try:

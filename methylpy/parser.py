@@ -99,6 +99,7 @@ def parse_args():
                                    keep_clonal_stats=args.keep_clonal_stats,
                                    java_options=args.java_options,
                                    path_to_samtools=args.path_to_samtools,
+                                   remove_chr_prefix=args.remove_chr_prefix,
                                    adapter_seq=args.adapter_seq,
                                    unmethylated_control=args.unmethylated_control,
                                    binom_test=args.binom_test,
@@ -143,6 +144,7 @@ def parse_args():
                                       keep_clonal_stats=args.keep_clonal_stats,
                                       java_options=args.java_options,
                                       path_to_samtools=args.path_to_samtools,
+                                      remove_chr_prefix=args.remove_chr_prefix,
                                       adapter_seq_read1=args.adapter_seq_read1,
                                       adapter_seq_read2=args.adapter_seq_read2,
                                       unmethylated_control=args.unmethylated_control,                                   
@@ -186,6 +188,7 @@ def parse_args():
                                         binom_test=args.binom_test,
                                         min_mc=args.min_mc,
                                         path_to_samtools=args.path_to_samtools,
+                                        remove_chr_prefix=args.remove_chr_prefix,
                                         path_to_files=args.path_to_output,
                                         min_base_quality=args.min_base_quality)
           else:
@@ -235,7 +238,8 @@ def parse_args():
                                  path_to_wigToBigWig=args.path_to_wigToBigWig,
                                  path_to_samtools=args.path_to_samtools,
                                  min_sites=args.min_sites,
-                                 min_cov=args.min_cov)
+                                 min_cov=args.min_cov,
+                                 remove_chr_prefix=args.remove_chr_prefix)
 
 def add_DMRfind_subparser(subparsers):
      # create the parser for the "DMRfind" command
@@ -606,7 +610,7 @@ def add_se_pipeline_subparser(subparsers):
           
      parser_se_opt.add_argument("--keep-clonal-stats",
                                 type=str2bool,
-                                default=False,
+                                default=True,
                                 help="Boolean indicates whether to store the metric file from picard.")
      
      parser_se_opt.add_argument("--java-options",
@@ -625,6 +629,12 @@ def add_se_pipeline_subparser(subparsers):
                                 help="sequence of an adapter that was ligated to the 3\' end. The "
                                 +"adapter itself and anything that follows is trimmed.")
 
+     parser_se_opt.add_argument("--remove-chr-prefix",
+                                type=str2bool,
+                                default=True,
+                                help="Boolean indicates whether to remove in the final output the \"chr\" prefix "
+                                +"in the chromosome name")
+     
      parser_se_opt.add_argument("--unmethylated-control",
                                 type=str,
                                 default=None,
@@ -871,7 +881,7 @@ def add_pe_pipeline_subparser(subparsers):
           
      parser_pe_opt.add_argument("--keep-clonal-stats",
                                 type=str2bool,
-                                default=False,
+                                default=True,
                                 help="Boolean indicates whether to store the metric file from picard.")
      
      parser_pe_opt.add_argument("--java-options",
@@ -896,6 +906,12 @@ def add_pe_pipeline_subparser(subparsers):
                                 help="sequence of an adapter that was ligated to the 3\' end of read 2. The "
                                 +"adapter itself and anything that follows is trimmed.")
 
+     parser_pe_opt.add_argument("--remove-chr-prefix",
+                                type=str2bool,
+                                default=True,
+                                help="Boolean indicates whether to remove in the final output the \"chr\" prefix "
+                                +"in the chromosome name")
+     
      parser_pe_opt.add_argument("--unmethylated-control",
                                 type=str,
                                 default=None,
@@ -1153,6 +1169,12 @@ def add_call_mc_subparser(subparsers):
                               default="",
                               help="Path to samtools installation")
 
+     call_mc_opt.add_argument("--remove-chr-prefix",
+                              type=str2bool,
+                              default=True,
+                              help="Boolean indicates whether to remove in the final output the \"chr\" prefix "
+                              +"in the chromosome name")
+
      call_mc_opt.add_argument("--unmethylated-control",
                               type=str,
                               default=None,
@@ -1305,6 +1327,12 @@ def add_allc2bw_subparser(subparsers):
                               type=str,
                               default="",
                               help="Path to samtools installation")
+
+     allc2bw_opt.add_argument("--remove-chr-prefix",
+                              type=str2bool,
+                              default=True,
+                              help="Boolean indicates whether to remove \"chr\" in the chromosome names in "
+                              +"genome sequence file to match chromosome names in input allc file.")
 
 def add_merge_allc_subparser(subparsers):
      merge_allc = subparsers.add_parser("merge-allc",

@@ -31,11 +31,12 @@ def run_methylation_pipeline(read_files, sample,
                              binom_test=False, min_cov=2,
                              trim_reads=True, path_to_cutadapt="",
                              pbat=False,check_dependency=True,
-                             bowtie2=False, path_to_aligner="", aligner_options=None,
+                             bowtie2=True, path_to_aligner="", aligner_options=None,
                              merge_by_max_mapq=False,
-                             remove_clonal=True,keep_clonal_stats=False,
+                             remove_clonal=True,keep_clonal_stats=True,
                              path_to_picard="",java_options="-Xmx20g",
                              path_to_samtools="",
+                             remove_chr_prefix=True,
                              adapter_seq="AGATCGGAAGAGCACACGTCTG",
                              max_adapter_removal=None,
                              overlap_length=None, zero_cap=None,
@@ -304,6 +305,7 @@ def run_methylation_pipeline(read_files, sample,
                               compress_output=compress_output,
                               min_cov=min_cov,
                               binom_test=binom_test,
+                              remove_chr_prefix=remove_chr_prefix,
                               sort_mem=sort_mem,
                               path_to_files=path_to_output,
                               path_to_samtools=path_to_samtools,
@@ -479,7 +481,11 @@ def run_mapping(current_library, library_files, sample,
                                                           for i in range(0, num_procs)])))
         input_fastq = [file_path+"_split_converted_"+str(i) for i in range(0, num_procs)]
 
-    print_checkpoint("Begin Running Bowtie for "+current_library)
+    #Run bowtie
+    if bowtie2:
+        print_checkpoint("Begin Running Bowtie2 for "+current_library)
+    else:
+        print_checkpoint("Begin Running Bowtie for "+current_library)
     total_unique = run_bowtie(current_library,
                               input_fastq,
                               sample,
@@ -1238,9 +1244,9 @@ def remove_clonal_bam(input_bam,output_bam,metric,is_pe=False,path_to_picard="",
         line = f.readline()
         fields = line.split("\t")
         if is_pe:
-            total_clonal = fields[5]
+            total_clonal = fields[6]
         else:
-            total_clonal = fields[4]
+            total_clonal = fields[5]
     return int(total_clonal)
 
     
@@ -1257,7 +1263,7 @@ def fasta_iter(fasta_name,query_chrom):
     for header in faiter:
         # drop the ">"
         header = header.next()[1:].strip()
-        header = header.split(" ")[0] #.replace("chr","")
+        header = header.split(" ")[0]
         # join all sequence lines to one.
         if header != query_chrom:
             for s in next(faiter):
@@ -1292,6 +1298,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                           buffer_line_number = 100000,
                           min_cov=1,binom_test=True,min_mc=0,
                           path_to_samtools="",
+                          remove_chr_prefix=True,
                           sort_mem="500M",
                           path_to_files="",min_base_quality=1):
 
@@ -1391,7 +1398,9 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         fields = line.split("\t")
         if fields[0] != cur_chrom:
             cur_chrom = fields[0]
-            cur_chrom_nochr = cur_chrom.replace("chr","")
+            cur_chrom_nochr = cur_chrom
+            if remove_chr_prefix and cur_chrom.startswith("chr"):
+                cur_chrom_nochr = cur_chrom_nochr[3:]
             seq = get_chromosome_sequence(reference_fasta,cur_chrom)
             if seq != None:
                 seq = seq.upper()
@@ -1455,10 +1464,13 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                               num_procs=num_procs,
                               sort_mem=sort_mem,
                               compress_output=compress_output,
-                              buffer_line_number=buffer_line_number)
+                              buffer_line_number=buffer_line_number,
+                              remove_chr_prefix=remove_chr_prefix)
     elif not unmethylated_control is None:
         non_conversion = calculate_non_conversion_rate(unmethylated_control,
-                                                       output_file)
+                                                       output_file,
+                                                       chrom_pointer=None,
+                                                       remove_chr_prefix=remove_chr_prefix)
     return(0)
 
 def do_split_allc_file(allc_file,
@@ -1570,7 +1582,8 @@ def perform_binomial_test(allc_file,
                           num_procs=1,
                           sort_mem="500M",
                           compress_output=True,
-                          buffer_line_number=100000):
+                          buffer_line_number=100000,
+                          remove_chr_prefix=True):
     """
     """
     if len(path_to_output)!=0:
@@ -1655,7 +1668,8 @@ def perform_binomial_test(allc_file,
 
 def calculate_non_conversion_rate(unmethylated_control,
                                   allc_file,
-                                  chrom_pointer=None):
+                                  chrom_pointer=None,
+                                  remove_chr_prefix=True):
     """
     """
     # Parse unmethylated_control
@@ -1677,7 +1691,9 @@ def calculate_non_conversion_rate(unmethylated_control,
                 print_error("Invalid unmethylated_control! "
                             +"It should be either a string, or a decimal between 0 and 1!\n")
             # decode
-            fields[0] = fields[0].replace("chr","")
+            fields[0] = fields[0]
+            if remove_chr_prefix and fields[0].startswith("chr"):
+                fields[0] = fields[0][3:]
             if len(fields) == 1: # chrom only
                 um_chrom = fields[0]
             elif len(fields) == 2: # chrom and start
@@ -1952,7 +1968,6 @@ def bam_quality_mch_filter(inputf,
         fields = line.split("\t")
         if fields[2] != cur_chrom:
             cur_chrom = fields[2]
-            #cur_chrom_nochr = cur_chrom.replace("chr","")
             seq = get_chromosome_sequence(reference_fasta,cur_chrom)
             if seq != None:
                 seq = seq.upper()
