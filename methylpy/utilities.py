@@ -240,7 +240,20 @@ def merge_allc_files(allc_files,
         cp_dict = {}
         fhandles[allc_file] = open_allc_file(allc_file)
         cur_chrom = ""
-        cur_pointer = 0
+        # check header
+        line = fhandles[allc_file].readline()
+        try:
+            fields = line.split("\t")
+            int(fields[1])
+            int(fields[4])
+            int(fields[5])
+            # no header, continue to start from the beginning of allc file
+            fhandles[allc_file].seek(0)
+            cur_pointer = 0
+        except:
+            # find header, skip it
+            cur_pointer = fhandles[allc_file].tell()
+        # find chrom pointer
         while True:
             line = fhandles[allc_file].readline()
             if not line: break
