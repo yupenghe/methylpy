@@ -174,7 +174,6 @@ def DMRfind(allc_files, samples,
         chrom_pointer[sample] = read_allc_index(allc_file)
         for chrom in chrom_pointer[sample].keys():
             chrom_counts[chrom] = chrom_counts.get(chrom,0) + 1
-        remove_allc_index(allc_file)
     if chroms is None:
         chroms = [chrom for chrom in chrom_counts
                   if chrom_counts[chrom] == len(samples)]
@@ -296,7 +295,8 @@ def DMRfind(allc_files, samples,
 
     # remove filtered allc files
     subprocess.check_call(["rm"]+query_allc_files)
-
+    for allc_file in query_allc_files:
+        remove_allc_index(allc_file)
     print_checkpoint("Done")
 
 def merge_DMS_to_DMR(input_rms_file,
@@ -855,17 +855,7 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
     allc_file = open_allc_file(inputf_allc)
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
-    chrom_pointer = {}
-    cur_chrom = ""
-    cur_pointer = 0
-    while True:
-        line = allc_file.readline()
-        if not line: break
-        fields = line.split("\t")
-        if fields[0] != cur_chrom:
-            chrom_pointer[fields[0]] = cur_pointer
-            cur_chrom = fields[0]
-        cur_pointer = allc_file.tell()
+    chrom_pointer = read_allc_index(inputf_allc)
 
     # init
     prev_chrom = ""

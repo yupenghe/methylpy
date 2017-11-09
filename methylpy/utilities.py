@@ -203,13 +203,13 @@ def filter_allc_file(allc_file,
 
 def merge_allc_files_minibatch(allc_files,
                                output_file,
-                               mini_batch=20,
+                               mini_batch=100,
                                compress_output=True):
     
     # User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
-
+    # merge all files at once
     try:
         merge_allc_files(allc_files=allc_files,
                          output_file=output_file,
@@ -217,8 +217,7 @@ def merge_allc_files_minibatch(allc_files,
         index_allc_file(output_file)
         return 0
     except:
-        print("Failed to merge all allc files once. Do minibatch merging")
-        
+        print("Failed to merge all allc files at once. Do minibatch merging")
     # init
     remaining_allc_files = list(allc_files[mini_batch:])
     output_tmp_file = output_file + ".tmp"

@@ -8,6 +8,7 @@ from methylpy.utilities import print_checkpoint, print_error
 from methylpy.utilities import split_fastq_file
 from methylpy.utilities import split_fastq_file_pbat
 from methylpy.utilities import open_allc_file,index_allc_file
+from methylpy.utilities import read_allc_index
 from methylpy.utilities import check_call_mc_dependencies
 import pdb
 import shlex
@@ -1589,29 +1590,14 @@ def perform_binomial_test(allc_file,
     """
     if len(path_to_output)!=0:
         path_to_output+="/"
-
     # calculate non-conversion rate
-    f = open_allc_file(allc_file)
-    chrom_pointer = {}
-    cur_chrom = ""
-    cur_pointer = 0
-    while True:
-        line = f.readline()
-        if not line: break
-        fields = line.split("\t")
-        if fields[0] != cur_chrom:
-            chrom_pointer[fields[0]] = cur_pointer
-            cur_chrom = fields[0]
-        cur_pointer = f.tell()
-
+    chrom_pointer = read_allc_index(allc_file)
     non_conversion = calculate_non_conversion_rate(unmethylated_control,
                                                    allc_file,
-                                                   chrom_pointer)
-    
+                                                   chrom_pointer)    
     # binomial test
     if num_procs > 1:
-        #if len(chrom_pointer.keys()) > 100: # with too many files open can cause problem
-        if True:
+        if len(chrom_pointer.keys()) > 100: # with too many files open can cause problem
             input_files = do_split_allc_file_chunk(allc_file,
                                                    sample,
                                                    min(100,num_procs),
@@ -1713,20 +1699,8 @@ def calculate_non_conversion_rate(unmethylated_control,
 
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
+    chrom_pointer = read_allc_index(allc_file)
     f = open_allc_file(allc_file)
-    if chrom_pointer is None:
-        chrom_pointer = {}
-        cur_chrom = ""
-        cur_pointer = 0
-        while True:
-            line = f.readline()
-            if not line: break
-            fields = line.split("\t")
-            if fields[0] != cur_chrom:
-                chrom_pointer[fields[0]] = cur_pointer
-                cur_chrom = fields[0]
-            cur_pointer = f.tell()
-
     if um_chrom not in chrom_pointer:
         print_error("The chromosome specified in unmethylated_control is not in the output allc file!\n")
     f.seek(chrom_pointer[um_chrom])

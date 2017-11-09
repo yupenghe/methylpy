@@ -1359,10 +1359,10 @@ def add_merge_allc_subparser(subparsers):
 
      merge_allc_opt.add_argument("--mini-batch",
                                  type=int,
-                                 default=20,
+                                 default=100,
                                  help="The maximum number of allc files to be merged at the same time. Since "
                                  +"OS or python may limit the number of files that can be open at once, value "
-                                 +"larger than 100 is not recommended")
+                                 +"larger than 200 is not recommended")
 
 def str2bool(v):
      ## adapted from the answer by Maxim at
