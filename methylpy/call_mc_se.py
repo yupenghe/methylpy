@@ -7,7 +7,7 @@ from scipy.stats.mstats import mquantiles
 from methylpy.utilities import print_checkpoint, print_error
 from methylpy.utilities import split_fastq_file
 from methylpy.utilities import split_fastq_file_pbat
-from methylpy.utilities import open_allc_file
+from methylpy.utilities import open_allc_file,index_allc_file
 from methylpy.utilities import check_call_mc_dependencies
 import pdb
 import shlex
@@ -1471,6 +1471,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                                                        output_file,
                                                        chrom_pointer=None,
                                                        remove_chr_prefix=remove_chr_prefix)
+    index_allc_file(output_file,no_reindex=False)
     return(0)
 
 def do_split_allc_file(allc_file,

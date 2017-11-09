@@ -7,7 +7,8 @@ from math import ceil, log10
 from multiprocessing import Pool
 from methylpy.utilities import print_checkpoint,expand_nucleotide_code
 from methylpy.utilities import open_allc_file,split_files_by_position
-from methylpy.utilities import filter_allc_file
+from methylpy.utilities import filter_allc_file,index_allc_file_batch
+from methylpy.utilities import read_allc_index,remove_allc_index
 from scipy.stats import scoreatpercentile
 import subprocess
 import shlex
@@ -143,6 +144,7 @@ def DMRfind(allc_files, samples,
                               "mc_type":mc_type,
                               "chroms":chroms,
                               "compress_output":False,
+                              "min_cov":min_cov,
                               "buffer_line_number":buffer_line_number}
             )
         else:
@@ -151,6 +153,7 @@ def DMRfind(allc_files, samples,
                              mc_type=mc_type,
                              chroms=chroms,
                              compress_output=False,
+                             min_cov=min_cov,
                              buffer_line_number=buffer_line_number)
     if pool:
         pool.close()
@@ -162,27 +165,20 @@ def DMRfind(allc_files, samples,
         pool = Pool(num_procs)
     else:
         pool = False
+
+    # index query allc files
+    index_allc_file_batch(query_allc_files,num_procs)
     chrom_pointer = {}
     chrom_counts = {}
     for allc_file,sample in zip(query_allc_files,samples):
-        cp_dict = {}
-        with open_allc_file(allc_file) as f:
-            cur_chrom = ""
-            cur_pointer = 0
-            while True:
-                line = f.readline()
-                if not line: break
-                fields = line.split("\t")
-                if fields[0] != cur_chrom:
-                    cp_dict[fields[0]] = cur_pointer
-                    chrom_counts[fields[0]] = chrom_counts.get(fields[0],0) + 1
-                    cur_chrom = fields[0]
-                cur_pointer = f.tell()
-        chrom_pointer[sample] = cp_dict
-
+        chrom_pointer[sample] = read_allc_index(allc_file)
+        for chrom in chrom_pointer[sample].keys():
+            chrom_counts[chrom] = chrom_counts.get(chrom,0) + 1
+        remove_allc_index(allc_file)
     if chroms is None:
-        chroms = [chrom for chrom in chrom_counts if chrom_counts[chrom] == len(samples)]
-    
+        chroms = [chrom for chrom in chrom_counts
+                  if chrom_counts[chrom] == len(samples)]
+
     chroms = list(map(str,chroms))
     try:
         for chr_key in chroms:
@@ -200,14 +196,15 @@ def DMRfind(allc_files, samples,
                 for chunk in range(0,num_procs):
                     filenames = []
                     for allc_file in query_allc_files:
-                        filenames.extend(glob(allc_file+"_"+chrom+"_"+str(chunk)))
+                        filenames.extend(glob(allc_file+"_"+chrom+"_"+str(chunk)+".tsv"))
                     if len(filenames) == 0:
                         print("Nothing to run for chunk "+str(chunk))
                         continue
                     pool.apply_async(run_rms_tests,
                                      (filenames,
                                       output_prefix+"_rms_results_for_"+str(chrom)+
-                                      "_chunk_"+str(chunk)+".tsv",samples),
+                                      "_chunk_"+str(chunk)+".tsv",
+                                      samples),
                                      {"min_cov":min_cov,
                                       "num_sims":num_sims,
                                       "num_sig_tests":num_sig_tests,
@@ -215,7 +212,7 @@ def DMRfind(allc_files, samples,
             else:
                 filenames = []
                 for allc_file in query_allc_files:
-                    filenames.extend(glob(allc_file+"_"+chrom+"_0"))
+                    filenames.extend(glob(allc_file+"_"+chrom+"_0.tsv"))
                 if len(filenames) == 0:
                     print("Nothing to run for chunk "+str(chunk))
                     continue
@@ -293,8 +290,13 @@ def DMRfind(allc_files, samples,
                                    mc_type=mc_type,
                                    num_procs=num_procs,
                                    buffer_line_number=buffer_line_number)
+
     subprocess.check_call(shlex.split("mv "+output_prefix+"_rms_results_collapsed_with_levels.tsv "+
                                       output_prefix+"_rms_results_collapsed.tsv"))
+
+    # remove filtered allc files
+    subprocess.check_call(["rm"]+query_allc_files)
+
     print_checkpoint("Done")
 
 def merge_DMS_to_DMR(input_rms_file,
@@ -602,8 +604,8 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
     while line and (fields[column].find("<")== -1 and float(fields[column]) > sig_cutoff):
         line = f.readline()
         fields = line.split("\t")
-    #Edge case, need to be sure we haven't just read through the whole file (i.e., there are no
-    #significant results)
+    # Edge case, need to be sure we haven't just read through the whole file (i.e., there are no
+    # significant results)
     if line:
         #chromosome, start, end, number of mCs, hypermethylated samples, hypomethylated samples
         block = [fields[0],fields[1],fields[1],1,[],[]]
@@ -618,26 +620,41 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
         fields = line.split("\t")
         #try:
         if True:
-            #some fields may contain a less than sign because of the permutation procedure used to
-            #generate the p-values. These sites are automatically assumed to be significant
+            # some fields may contain a less than sign because of the permutation procedure used to
+            # generate the p-values. These sites are automatically assumed to be significant
             if fields[column].find("<")!= -1 or float(fields[column]) <= sig_cutoff:
                 #Check that block is within a certain distance and that the methylation level order is the same
                 if block[0] == fields[0] and int(block[2]) + max_dist >= int(fields[1]):
-                    #check that either the hypermethylated residual is contributing significantly and positively to the chisquare or the hypomethylated residual is contributing
-                    #significantly and negatively. This checks not only significance but the direction of the significance as well
-                    hypermethylated_samples = [sample for index,sample in enumerate(samples) if (collapse_samples==False or sample in collapse_samples) and\
-                         fields[fields_offset+index+num_samples*3] != "NA" and fields[fields_offset+index+num_samples*4] != "NA" \
-                         and ((float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and float(fields[fields_offset+index+num_samples*4]) < resid_cutoff)\
-                          or (-1 * float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and -1 * float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
-                         ]
-                    hypomethylated_samples = [sample for index,sample in enumerate(samples) if (collapse_samples==False or sample in collapse_samples) and\
-                         fields[fields_offset+index+num_samples*3] != "NA" and fields[fields_offset+index+num_samples*4] != "NA" \
-                         and ((-1 * float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and -1 * float(fields[fields_offset+index+num_samples*4]) < resid_cutoff)\
-                          or (float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
-                         ]                    
-                    #If one of the hypermethylated/hypomethylated samples is in the wrong list, the list comrehension will return a non-empty list
-                    #which has a bool value of True. This will be not'ed to False and fail the if statement
-                    if resid_cutoff != False and not([i for i in hypomethylated_samples if (collapse_samples == False or i in collapse_samples) and i in block[4]]) and not([i for i in hypermethylated_samples if (collapse_samples == False or i in collapse_samples) and i in block[5]]):
+                    # check that either the hypermethylated residual is contributing significantly and
+                    # positively to the chisquare or the hypomethylated residual is contributing
+                    # significantly and negatively. This checks not only significance but
+                    # the direction of the significance as well
+                    hypermethylated_samples = [sample for index,sample in enumerate(samples) \
+                                               if (collapse_samples==False or sample in collapse_samples) and \
+                                               fields[fields_offset+index+num_samples*3] != "NA" and \
+                                               fields[fields_offset+index+num_samples*4] != "NA" and \
+                                               ((float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and \
+                                                 float(fields[fields_offset+index+num_samples*4]) < resid_cutoff) or \
+                                                (-1 * float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and \
+                                                 -1 * float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
+                    ]
+                    hypomethylated_samples = [sample for index,sample in enumerate(samples) \
+                                              if (collapse_samples==False or sample in collapse_samples) and \
+                                              fields[fields_offset+index+num_samples*3] != "NA" and \
+                                              fields[fields_offset+index+num_samples*4] != "NA" and \
+                                              ((-1 * float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and \
+                                                -1 * float(fields[fields_offset+index+num_samples*4]) < resid_cutoff) or \
+                                               (float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and \
+                                                float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
+                    ]
+                    # If one of the hypermethylated/hypomethylated samples is in the wrong list,
+                    # the list comrehension will return a non-empty list
+                    # which has a bool value of True. This will be not'ed to False and fail the if statement
+                    if resid_cutoff != False and \
+                       not([i for i in hypomethylated_samples \
+                            if (collapse_samples == False or i in collapse_samples) and i in block[4]]) and \
+                               not([i for i in hypermethylated_samples \
+                                    if (collapse_samples == False or i in collapse_samples) and i in block[5]]):
                         block[2] = fields[1]
                         block[3]+=1
                         
@@ -650,46 +667,71 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
                         block[2] = fields[1]
                         block[3]+=1
                     else:
-                        #check to make sure all the samples aren't shoved into one category
-                        #no sense in reporting that. Could happen if collapse_samples is being used
-                        if (collapse_samples and len(block[4]) != len(collapse_samples) and len(block[5]) != len(collapse_samples)) or (not collapse_samples and len(block[4]) != num_samples and len(block[5]) != num_samples):
+                        # check to make sure all the samples aren't shoved into one category
+                        # no sense in reporting that. Could happen if collapse_samples is being used
+                        if (collapse_samples and \
+                            len(block[4]) != len(collapse_samples) and \
+                            len(block[5]) != len(collapse_samples)) or \
+                            (not collapse_samples and len(block[4]) != num_samples and len(block[5]) != num_samples):
                             block[4] = ",".join(block[4])
                             block[5] = ",".join(block[5])
                             if block[3] >= min_num_dms:
                                 if not sample_category or check_clusters(category_dict, min_cluster, block):
                                     g.write("\t".join(map(str,block))+"\n")
                                     block_count+=1                                        
-                        hypermethylated_samples = [sample for index,sample in enumerate(samples) if (collapse_samples==False or sample in collapse_samples) and\
-                             fields[fields_offset+index+num_samples*3] != "NA" and fields[fields_offset+index+num_samples*4] != "NA" \
-                             and ((float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and float(fields[fields_offset+index+num_samples*4]) < resid_cutoff)\
-                              or (-1 * float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and -1 * float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
-                             ]
-                        hypomethylated_samples = [sample for index,sample in enumerate(samples) if (collapse_samples==False or sample in collapse_samples) and\
-                             fields[fields_offset+index+num_samples*3] != "NA" and fields[fields_offset+index+num_samples*4] != "NA" \
-                             and ((-1 * float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and -1 * float(fields[fields_offset+index+num_samples*4]) < resid_cutoff)\
-                              or (float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
-                             ] 
+                        hypermethylated_samples = [
+                            sample for index,sample in enumerate(samples) \
+                            if (collapse_samples==False or sample in collapse_samples) and \
+                            fields[fields_offset+index+num_samples*3] != "NA" and \
+                            fields[fields_offset+index+num_samples*4] != "NA" and \
+                            ((float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and \
+                              float(fields[fields_offset+index+num_samples*4]) < resid_cutoff) or \
+                             (-1 * float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff \
+                              and -1 * float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
+                        ]
+                        hypomethylated_samples = [
+                            sample for index,sample in enumerate(samples) \
+                            if (collapse_samples==False or sample in collapse_samples) and \
+                            fields[fields_offset+index+num_samples*3] != "NA" and \
+                            fields[fields_offset+index+num_samples*4] != "NA" and \
+                            ((-1 * float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and \
+                              -1 * float(fields[fields_offset+index+num_samples*4]) < resid_cutoff) or \
+                             (float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and \
+                              float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
+                        ] 
                         block = [fields[0],fields[1],fields[1],1,hypermethylated_samples,hypomethylated_samples]
                 else:
                     #check to make sure all the samples aren't shoved into one category
                     #no sense in reporting that. Could happen if collapse_samples is being used
-                    if (collapse_samples and len(block[4]) != len(collapse_samples) and len(block[5]) != len(collapse_samples)) or (not collapse_samples and len(block[4]) != num_samples and len(block[5]) != num_samples):
+                    if (collapse_samples and len(block[4]) != len(collapse_samples) \
+                        and len(block[5]) != len(collapse_samples)) or \
+                        (not collapse_samples and len(block[4]) != num_samples and len(block[5]) != num_samples):
                         block[4] = ",".join(block[4])
                         block[5] = ",".join(block[5])
                         if block[3] >= min_num_dms:
-                            if not sample_category or check_clusters(category_dict, min_cluster, block):                                                    
+                            if not sample_category or check_clusters(category_dict, min_cluster, block):
                                 g.write("\t".join(map(str,block))+"\n")
                                 block_count+=1                                    
-                    hypermethylated_samples = [sample for index,sample in enumerate(samples) if (collapse_samples==False or sample in collapse_samples) and\
-                         fields[fields_offset+index+num_samples*3] != "NA" and fields[fields_offset+index+num_samples*4] != "NA"\
-                         and ((float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and float(fields[fields_offset+index+num_samples*4]) < resid_cutoff)\
-                          or (-1 * float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and -1 * float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
-                         ]
-                    hypomethylated_samples = [sample for index,sample in enumerate(samples) if (collapse_samples==False or sample in collapse_samples) and\
-                         fields[fields_offset+index+num_samples*3] != "NA" and fields[fields_offset+index+num_samples*4] != "NA" \
-                         and ((-1 * float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and -1 * float(fields[fields_offset+index+num_samples*4]) < resid_cutoff)\
-                          or (float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
-                         ] 
+                    hypermethylated_samples = [
+                        sample for index,sample in enumerate(samples) \
+                        if (collapse_samples==False or sample in collapse_samples) and \
+                        fields[fields_offset+index+num_samples*3] != "NA" and \
+                        fields[fields_offset+index+num_samples*4] != "NA" and \
+                        ((float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and \
+                          float(fields[fields_offset+index+num_samples*4]) < resid_cutoff) or \
+                         (-1 * float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and \
+                          -1 * float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
+                    ]
+                    hypomethylated_samples = [
+                        sample for index,sample in enumerate(samples) \
+                        if (collapse_samples==False or sample in collapse_samples) and \
+                         fields[fields_offset+index+num_samples*3] != "NA" and \
+                        fields[fields_offset+index+num_samples*4] != "NA" and \
+                        ((-1 * float(fields[fields_offset+index+num_samples*3]) >= resid_cutoff and \
+                          -1 * float(fields[fields_offset+index+num_samples*4]) < resid_cutoff) or \
+                         (float(fields[fields_offset+index+num_samples*4]) >= resid_cutoff and \
+                          float(fields[fields_offset+index+num_samples*3]) < resid_cutoff))
+                    ] 
                     block = [fields[0],fields[1],fields[1],1,hypermethylated_samples,hypomethylated_samples]               
                      
             line = f.readline()

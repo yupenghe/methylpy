@@ -14,6 +14,7 @@ import gzip
 import collections
 from pkg_resources import parse_version
 
+
 def get_executable_version(exec_name):
     try:
         out = subprocess.check_output(shlex.split(exec_name+" --version"))
@@ -170,6 +171,7 @@ def filter_allc_file(allc_file,
                      mc_type="CGN",
                      chroms = None,
                      compress_output=True,
+                     min_cov=0,
                      buffer_line_number=100000):
 
     mc_class = expand_nucleotide_code(mc_type)
@@ -184,7 +186,9 @@ def filter_allc_file(allc_file,
     out = ""
     for line in f:
         fields = line.split("\t")
-        if (chroms is None or fields[0] in chroms) and fields[3] in mc_class:
+        if (chroms is None or fields[0] in chroms) \
+           and fields[3] in mc_class \
+           and int(fields[5]) >= min_cov:
             line_counts += 1
             out += line
         if line_counts > buffer_line_number:
@@ -206,10 +210,19 @@ def merge_allc_files_minibatch(allc_files,
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
 
+    try:
+        merge_allc_files(allc_files=allc_files,
+                         output_file=output_file,
+                         compress_output=compress_output)
+        index_allc_file(output_file)
+        return 0
+    except:
+        print("Failed to merge all allc files once. Do minibatch merging")
+        
     # init
-    remaining_allc_files = list(allc_files[2:])
+    remaining_allc_files = list(allc_files[mini_batch:])
     output_tmp_file = output_file + ".tmp"
-    merge_allc_files(allc_files=allc_files[:2],
+    merge_allc_files(allc_files=allc_files[:mini_batch],
                      output_file=output_file,
                      compress_output=compress_output)
     # batch merge
@@ -222,107 +235,156 @@ def merge_allc_files_minibatch(allc_files,
                          output_file=output_tmp_file,
                          compress_output=compress_output)
         subprocess.check_call(["mv",output_tmp_file,output_file])
+    # index output allc file
+    index_allc_file(output_file)
     return 0
 
 def merge_allc_files(allc_files,
                      output_file,
-                     compress_output=True):
+                     compress_output=True,
+                     buffer_line_number=100000):
     #User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
 
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes
-    fhandles = {}
-    chrom_pointer = {}
+    fhandles = []
+    chrom_pointer = []
     chroms = set([])
-    for allc_file in allc_files:
-        cp_dict = {}
-        fhandles[allc_file] = open_allc_file(allc_file)
-        cur_chrom = ""
-        # check header
-        line = fhandles[allc_file].readline()
-        try:
-            fields = line.split("\t")
-            int(fields[1])
-            int(fields[4])
-            int(fields[5])
-            # no header, continue to start from the beginning of allc file
-            fhandles[allc_file].seek(0)
-            cur_pointer = 0
-        except:
-            # find header, skip it
-            cur_pointer = fhandles[allc_file].tell()
-        # find chrom pointer
-        while True:
-            line = fhandles[allc_file].readline()
-            if not line: break
-            fields = line.split("\t")
-            if fields[0] != cur_chrom:
-                cp_dict[fields[0]] = cur_pointer
-                chroms.add(fields[0])
-                cur_chrom = fields[0]
-            cur_pointer = fhandles[allc_file].tell()
-        chrom_pointer[allc_file] = cp_dict
+    for index,allc_file in enumerate(allc_files):
+        fhandles.append(open_allc_file(allc_file))
+        chrom_pointer.append(read_allc_index(allc_file))
+        for chrom in chrom_pointer[index].keys():
+            chroms.add(chrom)
     # output
     if compress_output:
         g = gzip.open(output_file,'wt')
     else:
         g = open(output_file,'w')
-
     # merge allc files
     chroms = list(map(str,chroms))
     for chrom in chroms:
-        cur_pos = {}
-        cur_fields = {}
+        cur_pos = np.array([np.nan for index in range(len(allc_files))])
+        cur_fields = []
+        num_remaining_allc = 0
         # init
-        for allc_file in allc_files:
-            fhandles[allc_file].seek(chrom_pointer[allc_file].get(chrom,0))
-            line = fhandles[allc_file].readline()
+        for index,allc_file in enumerate(allc_files):
+            fhandles[index].seek(chrom_pointer[index].get(chrom,0))
+            line = fhandles[index].readline()
             fields = line.split("\t")
-            cur_pos[allc_file] = None
-            cur_fields[allc_file] = None
+            cur_fields.append(None)
             if fields[0] == chrom:
-                cur_pos[allc_file] = int(fields[1])
-                cur_fields[allc_file] = fields
+                cur_pos[index] = int(fields[1])
+                cur_fields[index] = fields
+                num_remaining_allc += 1
         # merge
-        query_allc_files = list(allc_files)
-        while len(query_allc_files) > 0:
-            min_pos = min([cur_pos[allc_file]
-                           for allc_file in query_allc_files
-                           if cur_pos[allc_file] is not None])
+        out = ""
+        line_counts = 0
+        while num_remaining_allc > 0:
             mc, h = 0, 0
             c_info = None
-            prev_allc_file = ""
-            for allc_file in query_allc_files:
-                if cur_pos[allc_file] == min_pos:
-                    mc += int(cur_fields[allc_file][4])
-                    h += int(cur_fields[allc_file][5])
-                    c_info_tmp = "\t".join(cur_fields[allc_file][:4])
-                    #if c_info is not None:
-                        # check
-                    #    if c_info != c_info_tmp:
-                    #        print("Warning! Inconsistent cytosine info:\n"
-                    #              +prev_allc_file+"\n"
-                    #              +c_info+"\n"
-                    #              +allc_file+"\n"
-                    #              +c_info_tmp+"\n")
-                    prev_allc_file = allc_file
-                    c_info = c_info_tmp
-                    # update
-                    line = fhandles[allc_file].readline()
-                    fields = line.split("\t")
-                    if fields[0] == chrom:
-                        cur_pos[allc_file] = int(fields[1])
-                        cur_fields[allc_file] = fields
-                    else:
-                        cur_pos[allc_file] = None
+            for index in np.where(cur_pos == np.nanmin(cur_pos))[0]:
+                mc += int(cur_fields[index][4])
+                h += int(cur_fields[index][5])
+                if c_info is None:
+                    c_info = "\t".join(cur_fields[index][:4])
+                # update
+                line = fhandles[index].readline()
+                fields = line.split("\t")
+                if fields[0] == chrom:
+                    cur_pos[index] = int(fields[1])
+                    cur_fields[index] = fields
+                else:
+                    cur_pos[index] = np.nan
+                    num_remaining_allc -= 1
             # output
-            g.write(c_info+"\t"+str(mc)+"\t"+str(h)+"\t1\n")
-            # update query_allc_files
-            query_allc_files = [allc_file for allc_file in query_allc_files
-                                if cur_pos[allc_file] is not None]
+            out += c_info+"\t"+str(mc)+"\t"+str(h)+"\t1\n"
+            line_counts += 1
+            if line_counts > buffer_line_number:
+                g.write(out)
+                line_counts = 0
+                out = ""
+    if line_counts > 0:
+        g.write(out)
+        out = ""
+    g.close()
+    for index in range(len(allc_files)):
+        fhandles[index].close()
     return 0
+
+def get_index_file_name(allc_file):
+    if allc_file[-4:] == ".tsv":
+        index_file = allc_file[:-4]+".idx"
+    elif allc_file[-7:] == ".tsv.gz":
+        index_file = allc_file[:-7]+".idx"
+    else:
+        index_file = allc_file+".idx"
+    return index_file
+
+def index_allc_file_batch(allc_files,num_procs=1,no_reindex=False):
+    if num_procs == 1:
+        for allc_file in allc_files:
+            index_allc_file(allc_file,no_reindex)
+    else:
+        pool = multiprocessing.Pool(min(num_procs,len(allc_files),100))
+        for allc_file in allc_files:
+            pool.apply_async(index_allc_file,(allc_file,no_reindex))
+        pool.close()
+        pool.join()
+    return 0
+
+def index_allc_file(allc_file,no_reindex=False):
+    index_file = get_index_file_name(allc_file)
+    # do not reindex if the index file is available
+    if no_reindex and os.path.exists(index_file):
+        return 0
+    g = open(index_file,'w')
+    f = open_allc_file(allc_file)
+    cur_chrom = ""
+    # check header
+    line = f.readline()
+    try:
+        fields = line.split("\t")
+        int(fields[1])
+        int(fields[4])
+        int(fields[5])
+        # no header, continue to start from the beginning of allc file
+        f.seek(0)
+        cur_pointer = 0
+    except:
+        # find header, skip it
+        cur_pointer = f.tell()
+    # find chrom pointer
+    while True:
+        line = f.readline()
+        if not line: break
+        fields = line.split("\t")
+        if fields[0] != cur_chrom:
+            g.write(fields[0]+"\t"+str(cur_pointer)+"\n")
+            cur_chrom = fields[0]
+        cur_pointer = f.tell()
+    f.close()
+    g.close()
+    return 0
+
+def read_allc_index(allc_file):
+    index_file = get_index_file_name(allc_file)
+    try:
+        f = open(index_file,'r')
+    except:
+        index_allc_file(allc_file)
+        f = open(index_file,'r')
+    chrom_pointer = {}
+    for line in f:
+        fields = line.rstrip().split("\t")
+        chrom_pointer[fields[0]] = int(fields[1])
+    f.close()
+    return(chrom_pointer)
+
+def remove_allc_index(allc_file):
+    index_file = get_index_file_name(allc_file)
+    subprocess.check_call(["rm",index_file])
 
 def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],
@@ -669,7 +731,7 @@ def parallel_split_files_by_position(filen,cutoffs,
     #it must be a header
     fields_deque = collections.deque()
     added_values_deque = collections.deque()
-    g = open(filen+"_"+chrom+"_"+str(chunk_num),'w')
+    g = open(filen+"_"+chrom+"_"+str(chunk_num)+".tsv",'w')
     for line in f:
         line = line.rstrip("\n")
         fields = line.split("\t")
@@ -683,7 +745,7 @@ def parallel_split_files_by_position(filen,cutoffs,
         if int(fields[1]) >= cutoffs[chunk_num]:
             g.close()
             chunk_num += 1
-            g = open(filen+"_"+chrom+"_"+str(chunk_num),'w')
+            g = open(filen+"_"+chrom+"_"+str(chunk_num)+".tsv",'w')
         if fields[3] in mc_class and int(fields[5]) >= min_cov:
             fields_deque.append(fields)
             mc = int(fields[4])

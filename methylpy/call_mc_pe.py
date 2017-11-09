@@ -873,7 +873,8 @@ def merge_sorted_multimap_pe_max_mapq(current_library,files,prefix,reference_fas
             subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
             f = open(reference_fasta+".fai",'r')
         except:
-            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. Please try indexing it manually and running methylpy again.")
+            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. "
+                     +"Please try indexing it manually and running methylpy again.")
     #Create sam header based on reference genome
     output_handle.write("@HD\tVN:1.0\tSO:unsorted\n")
     for line in f:
