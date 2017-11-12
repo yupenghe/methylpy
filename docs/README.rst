@@ -316,8 +316,8 @@ format and available options.
         --mc-type CGN \
         --num-procs 4
 
-Merge allc files (of replicates)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Merge allc files
+^^^^^^^^^^^^^^^^
 
 The ``merge-allc`` function can merge multiple allc files into a single
 allc file. It is useful when separate allc files are generated for
@@ -330,7 +330,23 @@ information.
     methylpy merge-allc \
         --allc-files allc/allc_AD_HT_1.tsv.gz allc/allc_AD_HT_2.tsv.gz \
         --output-file allc/allc_AD_HT.tsv.gz \
+        --num-procs 1 \
         --compress-output True
+
+Index allc files
+^^^^^^^^^^^^^^^^
+
+The ``index-allc`` function allows creating index file for each allc
+file. The index file can be used for speeding up allc file reading
+similar to the .fai file for .fasta file. See ``methylpy index-allc -h``
+for more information.
+
+::
+
+    methylpy index-allc \
+        --allc-files allc/allc_AD_HT_1.tsv.gz allc/allc_AD_HT_2.tsv.gz \
+        --num-procs 2 \
+        --no-reindex False
 
 Convert allc file to bigwig format
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
