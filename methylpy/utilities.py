@@ -178,6 +178,8 @@ def filter_allc_file(allc_file,
     # input & output
     f = open_allc_file(allc_file)
     if compress_output:
+        if output_file[-3:] != ".gz":
+            output_file += ".gz"                                
         output_fhandler = gzip.open(output_file,'wt')
     else:
         output_fhandler = open(output_file,'w')
@@ -211,6 +213,9 @@ def merge_allc_files(allc_files,
     # User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
+    # add .gz suffix
+    if compress_output and  output_file[-3:] != ".gz":
+        output_file += ".gz"
 
     # check index
     index_allc_file_batch(allc_files,
@@ -293,7 +298,7 @@ def merge_allc_files_minibatch(allc_files,
                                output_file,
                                query_chroms=None,
                                mini_batch=100,
-                               compress_output=True):
+                               compress_output=False):
     
     # User input checks
     if not isinstance(allc_files, list):
@@ -331,7 +336,7 @@ def merge_allc_files_minibatch(allc_files,
 def merge_allc_files_worker(allc_files,
                             output_file,
                             query_chroms=None,
-                            compress_output=True,
+                            compress_output=False,
                             buffer_line_number=100000):
     #User input checks
     if not isinstance(allc_files, list):

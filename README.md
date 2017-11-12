@@ -233,6 +233,7 @@ allc file for that tissue/cell type. See `methylpy merge-allc -h` for more infor
 methylpy merge-allc \
 	--allc-files allc/allc_AD_HT_1.tsv.gz allc/allc_AD_HT_2.tsv.gz \
 	--output-file allc/allc_AD_HT.tsv.gz \
+	--num-procs 1 \
 	--compress-output True
 ```
 

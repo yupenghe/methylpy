@@ -1881,6 +1881,8 @@ def filter_files_by_pvalue_combined(input_files,output_file,
                 shlex.split("sort" + sort_option + " -k 1,1 -k 2,2g -o "+input_file+" "+input_file))
     # output file
     if compress_output:
+        if output_file[-3:] != ".gz":
+            output_file += ".gz"
         g = gzip.open(output_file,'wt')
     else:
         g = open(output_file,'w')
