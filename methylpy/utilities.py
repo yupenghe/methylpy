@@ -13,7 +13,7 @@ import bz2
 import gzip
 import collections
 from pkg_resources import parse_version
-
+import glob
 
 def get_executable_version(exec_name):
     try:
@@ -201,8 +201,97 @@ def filter_allc_file(allc_file,
     f.close()
     output_fhandler.close()
 
+def merge_allc_files(allc_files,
+                     output_file,
+                     num_procs=1,
+                     mini_batch=100,
+                     compress_output=True,
+                     buffer_line_number=100000):
+
+    # User input checks
+    if not isinstance(allc_files, list):
+        exit("allc_files must be a list of string(s)")
+
+    # check index
+    index_allc_file_batch(allc_files,
+                          num_procs=num_procs,
+                          no_reindex=True)
+    print_checkpoint("Start merging")
+    if not(num_procs > 1):
+        merge_allc_files_minibatch(allc_files,
+                                   output_file,
+                                   query_chroms=None,
+                                   mini_batch=mini_batch,
+                                   compress_output=compress_output)
+        index_allc_file(output_file)
+        return 0
+        
+    # parallel merging
+    print_checkpoint("Getting chromosome names")
+    chroms = set([])
+    for allc_file in allc_files:
+        c_p = read_allc_index(allc_file)
+        for chrom in c_p.keys():
+            chroms.add(chrom)
+    try:
+        pool = multiprocessing.Pool(min(num_procs,
+                                        len(chroms)))#,
+        #int(float(mini_batch)/float(len(allc_files)))))
+        print_checkpoint("Merging allc files")
+        for chrom in chroms:
+            pool.apply_async(merge_allc_files_minibatch,
+                             (),
+                             {"allc_files":allc_files,
+                              "output_file":output_file+"_"+str(chrom)+".tsv",
+                              "query_chroms":chrom,
+                              "mini_batch":mini_batch,
+                              "compress_output":False}
+            )
+        pool.close()
+        pool.join()
+        # output
+        print_checkpoint("Merging outputs")
+        if compress_output:
+            g = gzip.open(output_file,'wt')
+        else:
+            g = open(output_file,'w')
+        out = ""
+        line_counts = 0
+        for chrom in chroms:
+            f = open(output_file+"_"+chrom+".tsv",'r')
+            for line in f:
+                out += line
+                line_counts += 1
+                if line_counts > buffer_line_number:
+                    g.write(out)
+                    out = ""
+                    line_counts = 0
+            f.close()
+        if line_counts > 0:
+            g.write(out)
+            out = ""
+        g.close()
+    except:
+        print("Failed to merge using multiple processors. "+
+              "Do minibatch merging using single processor.")
+        merge_allc_files_minibatch(allc_files,
+                                   output_file,
+                                   mini_batch,
+                                   compress_output)
+    # remove temporary files
+    for chrom in set(chroms):
+        tmp_file = glob.glob(output_file+"_"+str(chrom)+".tsv")
+        if tmp_file:
+            tmp_file = tmp_file[0]
+            subprocess.check_call(["rm",tmp_file])
+            remove_allc_index(tmp_file)
+    # index output allc file
+    index_allc_file(output_file)
+    return 0
+
 def merge_allc_files_minibatch(allc_files,
                                output_file,
+                               query_chroms=None,
                                mini_batch=100,
                                compress_output=True):
     
@@ -211,37 +300,39 @@ def merge_allc_files_minibatch(allc_files,
         exit("allc_files must be a list of string(s)")
     # merge all files at once
     try:
-        merge_allc_files(allc_files=allc_files,
-                         output_file=output_file,
-                         compress_output=compress_output)
-        index_allc_file(output_file)
+        merge_allc_files_worker(allc_files=allc_files,
+                                output_file=output_file,
+                                query_chroms=query_chroms,
+                                compress_output=compress_output)
         return 0
     except:
         print("Failed to merge all allc files at once. Do minibatch merging")
     # init
     remaining_allc_files = list(allc_files[mini_batch:])
     output_tmp_file = output_file + ".tmp"
-    merge_allc_files(allc_files=allc_files[:mini_batch],
-                     output_file=output_file,
-                     compress_output=compress_output)
+    merge_allc_files_worker(allc_files=allc_files[:mini_batch],
+                            output_file=output_file,
+                            query_chroms=query_chroms,
+                            compress_output=compress_output)
     # batch merge
     while len(remaining_allc_files) > 0:
         processing_allc_files = [output_file]
         while len(remaining_allc_files) > 0 \
               and len(processing_allc_files) < mini_batch:
             processing_allc_files.append(remaining_allc_files.pop())
-        merge_allc_files(allc_files=processing_allc_files,
-                         output_file=output_tmp_file,
-                         compress_output=compress_output)
+        merge_allc_files_worker(allc_files=processing_allc_files,
+                                output_file=output_tmp_file,
+                                query_chroms=query_chroms,
+                                compress_output=compress_output)
         subprocess.check_call(["mv",output_tmp_file,output_file])
-    # index output allc file
-    index_allc_file(output_file)
+        index_allc_file(output_file)
     return 0
 
-def merge_allc_files(allc_files,
-                     output_file,
-                     compress_output=True,
-                     buffer_line_number=100000):
+def merge_allc_files_worker(allc_files,
+                            output_file,
+                            query_chroms=None,
+                            compress_output=True,
+                            buffer_line_number=100000):
     #User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
@@ -251,18 +342,28 @@ def merge_allc_files(allc_files,
     fhandles = []
     chrom_pointer = []
     chroms = set([])
-    for index,allc_file in enumerate(allc_files):
-        fhandles.append(open_allc_file(allc_file))
-        chrom_pointer.append(read_allc_index(allc_file))
-        for chrom in chrom_pointer[index].keys():
-            chroms.add(chrom)
+    try:
+        for index,allc_file in enumerate(allc_files):
+            fhandles.append(open_allc_file(allc_file))
+            chrom_pointer.append(read_allc_index(allc_file))
+            for chrom in chrom_pointer[index].keys():
+                chroms.add(chrom)
+    except:
+        for f in fhandles:
+            f.close()
+        exit() # exit due to failure of openning all allc files at once
+    if query_chroms is not None:
+        if isinstance(query_chroms,list):
+            chroms = query_chroms
+        else:
+            chroms = [query_chroms]
+    chroms = list(map(str,chroms))
     # output
     if compress_output:
         g = gzip.open(output_file,'wt')
     else:
         g = open(output_file,'w')
     # merge allc files
-    chroms = list(map(str,chroms))
     for chrom in chroms:
         cur_pos = np.array([np.nan for index in range(len(allc_files))])
         cur_fields = []
@@ -313,6 +414,7 @@ def merge_allc_files(allc_files,
     return 0
 
 def get_index_file_name(allc_file):
+    return allc_file+".idx"
     if allc_file[-4:] == ".tsv":
         index_file = allc_file[:-4]+".idx"
     elif allc_file[-7:] == ".tsv.gz":
@@ -383,7 +485,8 @@ def read_allc_index(allc_file):
 
 def remove_allc_index(allc_file):
     index_file = get_index_file_name(allc_file)
-    subprocess.check_call(["rm",index_file])
+    if glob.glob(index_file):
+        subprocess.check_call(["rm",index_file])
 
 def expand_nucleotide_code(mc_type):
     iub_dict = {"N":["A","C","G","T"],

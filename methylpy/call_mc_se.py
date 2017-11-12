@@ -191,12 +191,6 @@ def run_methylation_pipeline(read_files, sample,
                 os.makedirs(path_to_output)
             except:
                 print_error("Failed to create output folder!")
-                
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
-    else:
-        sort_mem = ""
 
     expanded_file_list = []
     expanded_library_list = []
@@ -814,11 +808,11 @@ def run_bowtie(current_library,library_read_files,
 
     prefix = path_to_output+sample+"_"+str(current_library)
 
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
+    if not sort_mem:
+        sort_option = ""
     else:
-        sort_mem = ""
+        sort_option = " -S "+sort_mem
+
     if " ".join(options).find(" -p ") == -1:
         options.append("-p "+str(num_procs))
     
@@ -861,12 +855,12 @@ def run_bowtie(current_library,library_read_files,
     if num_procs > 1:
         pool = multiprocessing.Pool(num_procs)
         for file_num in range(0,num_procs):
-            pool.apply_async(subprocess.check_call,(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)),))
+            pool.apply_async(subprocess.check_call,(shlex.split("env LC_COLLATE=C sort" + sort_option + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)),))
         pool.close()
         pool.join()
     else:
         for file_num in range(0,num_procs):
-            subprocess.check_call(shlex.split("env LC_COLLATE=C sort" + sort_mem + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)))
+            subprocess.check_call(shlex.split("env LC_COLLATE=C sort" + sort_option + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)))
 
     print_checkpoint("Finding multimappers")
 
@@ -884,8 +878,26 @@ def run_bowtie(current_library,library_read_files,
             prefix,
             reference_fasta,
             path_to_samtools="")
-        
-    subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)])))
+
+    subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num)
+                                                      for file_num in range(0,num_procs)])))
+
+    output_bam_file = prefix+"_processed_reads.bam"
+    if not sort_mem:
+        sort_option = ""
+    else:
+        sort_option = " -m "+sort_mem
+
+    try:
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+
+                                          " -@ " + str(num_procs) +
+                                          sort_option + " " +
+                                          " -o "+output_bam_file + " " +
+                                          output_bam_file ))
+    except:
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+
+                                          " -o "+output_bam_file + " " +
+                                          output_bam_file ))
     return total_unique
  
 def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=False):
@@ -1012,11 +1024,7 @@ def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_s
     f = open(output_bam_file,'w')
     subprocess.check_call(shlex.split(path_to_samtools+"samtools view -S -b -h "+output_sam_file),stdout=f)
     f.close()
-
     subprocess.check_call(shlex.split("rm "+output_sam_file))
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
-                                      " -o "+output_bam_file))
-    
     return total_unique
 
 def merge_sorted_multimap_max_mapq(current_library,files,prefix,reference_fasta,path_to_samtools=""):
@@ -1097,9 +1105,6 @@ def merge_sorted_multimap_max_mapq(current_library,files,prefix,reference_fasta,
     f.close()
 
     subprocess.check_call(shlex.split("rm "+output_sam_file))
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
-                                      " -o "+output_bam_file))
-    
     return total_unique
 
 def quality_trim(inputf, output = None, quality_base = None, min_qual_score = None, min_read_len = None, 
@@ -1812,10 +1817,9 @@ def allc_run_binom_tests(filen,output_file,non_conversion,min_cov=1,sort_mem="50
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
     if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
+        sort_option = " -S " + sort_mem
     else:
-        sort_mem = ""
+        sort_option = ""
 
     mc_class_counts = {}
     obs_pvalues = {}
@@ -1845,7 +1849,7 @@ def allc_run_binom_tests(filen,output_file,non_conversion,min_cov=1,sort_mem="50
 
     f.close()
     g.close()
-    subprocess.check_call(shlex.split("sort" + sort_mem + " -k 7g,7g -o "+output_file+" "+output_file))
+    subprocess.check_call(shlex.split("sort" + sort_option + " -k 7g,7g -o "+output_file+" "+output_file))
     return mc_class_counts
 
 def filter_files_by_pvalue_combined(input_files,output_file,
@@ -1856,10 +1860,9 @@ def filter_files_by_pvalue_combined(input_files,output_file,
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
     if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
+        sort_option = " -S " + sort_mem
     else:
-        sort_mem = ""
+        sort_option = ""
         
     print_checkpoint("Begin sorting file by position")
     # sort input files
@@ -1868,14 +1871,14 @@ def filter_files_by_pvalue_combined(input_files,output_file,
         for input_file in input_files:
             pool.apply_async(subprocess.check_call,
                              (shlex.split(
-                                 "sort" + sort_mem + " -k 1,1 -k 2,2g -o "+input_file+" "+input_file),
+                                 "sort" + sort_option + " -k 1,1 -k 2,2g -o "+input_file+" "+input_file),
                              ))
         pool.close()
         pool.join()
     else:
         for input_file in input_files:
             subprocess.check_call(
-                shlex.split("sort" + sort_mem + " -k 1,1 -k 2,2g -o "+input_file+" "+input_file))
+                shlex.split("sort" + sort_option + " -k 1,1 -k 2,2g -o "+input_file+" "+input_file))
     # output file
     if compress_output:
         g = gzip.open(output_file,'wt')

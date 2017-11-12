@@ -207,12 +207,6 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
             except:
                 print_error("Failed to create output folder!")
 
-    if sort_mem:
-        if sort_mem.find("-S") == -1:
-            sort_mem = " -S " + sort_mem
-    else:
-        sort_mem = ""
-
     # This code allows the user to supply paths with "*" in them rather than listing
     # out every single file
     total_input = 0
@@ -619,6 +613,11 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
     if " ".join(options).find(" -p ") == -1:
         options.append("-p "+str(num_procs))
 
+    if not sort_mem:
+        sort_option = ""
+    else:
+        sort_option = " -S "+sort_mem
+
     if len(path_to_output) !=0:
         path_to_output+="/"
         
@@ -675,14 +674,14 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
         pool = multiprocessing.Pool(num_procs)
         for file_num in range(0,num_procs):
             pool.apply_async(subprocess.check_call,(
-                shlex.split("env LC_COLLATE=C sort" + sort_mem +
+                shlex.split("env LC_COLLATE=C sort" + sort_option +
                             " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+
                             prefix+"_sorted_"+str(file_num)),))
         pool.close()
         pool.join()
     else:
         for file_num in range(0,num_procs):
-            subprocess.check_call(shlex.split("env LC_COLLATE=C sort" + sort_mem +
+            subprocess.check_call(shlex.split("env LC_COLLATE=C sort" + sort_option +
                                               " -t '\t' -k 1 -o "+
                                               prefix+"_sorted_"+str(file_num)+" "+
                                               prefix+"_sorted_"+str(file_num)))
@@ -703,7 +702,25 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
             reference_fasta,
             path_to_samtools="")
 
-    subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num) for file_num in range(0,num_procs)])))
+    subprocess.check_call(shlex.split("rm "+" ".join([prefix+"_sorted_"+str(file_num)
+                                                      for file_num in range(0,num_procs)])))
+    
+    if not sort_mem:
+        sort_option = ""
+    else:
+        sort_option = " -m "+sort_mem
+        
+    output_bam_file = prefix+"_processed_reads.bam"
+    try:
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+
+                                          " -@ " + str(num_procs) +
+                                          sort_option + " " +
+                                          " -o "+output_bam_file + " " + 
+                                          output_bam_file))
+    except:
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+
+                                          " -o "+output_bam_file + " " +
+                                          output_bam_file ))
     return total_unique
 
 
@@ -842,9 +859,6 @@ def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_t
     f.close()
 
     subprocess.check_call(shlex.split("rm "+output_sam_file))
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
-                                      " -o "+output_bam_file))
-    
     return total_unique
 
 def merge_sorted_multimap_pe_max_mapq(current_library,files,prefix,reference_fasta,path_to_samtools=""):
@@ -935,9 +949,6 @@ def merge_sorted_multimap_pe_max_mapq(current_library,files,prefix,reference_fas
     f.close()
 
     subprocess.check_call(shlex.split("rm "+output_sam_file))
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools sort "+output_bam_file+
-                                      " -o "+output_bam_file))
-    
     return total_unique
 
 def convert_reads_pe(inputf,output,is_read2=False):

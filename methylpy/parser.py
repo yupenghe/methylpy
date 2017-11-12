@@ -18,6 +18,7 @@ def parse_args():
      add_get_methylation_level_subparser(subparsers)
      add_allc2bw_subparser(subparsers)
      add_merge_allc_subparser(subparsers)
+     add_index_allc_subparser(subparsers)
 
      if len(sys.argv) > 1:
           args = parser.parse_args()
@@ -222,11 +223,18 @@ def parse_args():
                                          input_no_header=args.input_no_header)
 
      elif args.command == "merge-allc":
-          from methylpy.utilities import merge_allc_files_minibatch
-          merge_allc_files_minibatch(allc_files=args.allc_files,
-                                     output_file=args.output_file,
-                                     mini_batch=args.mini_batch,
-                                     compress_output=args.compress_output)
+          from methylpy.utilities import merge_allc_files
+          merge_allc_files(allc_files=args.allc_files,
+                           output_file=args.output_file,
+                           num_procs=args.num_procs,
+                           mini_batch=args.mini_batch,
+                           compress_output=args.compress_output)
+
+     elif args.command == "index-allc":
+          from methylpy.utilities import index_allc_file_batch
+          index_allc_file_batch(allc_files=args.allc_files,
+                                num_procs=args.num_procs,
+                                no_reindex=args.no_reindex)
 
      elif args.command == "allc-to-bigwig":
           from methylpy.utilities import convert_allc_to_bigwig
@@ -269,7 +277,7 @@ def add_DMRfind_subparser(subparsers):
      
      parser_dmrfind_opt = parser_dmrfind.add_argument_group("optional inputs")
 
-     parser_dmrfind_req.add_argument("--chroms",
+     parser_dmrfind_opt.add_argument("--chroms",
                                      type=str,
                                      nargs="+",
                                      required=False,
@@ -658,33 +666,33 @@ def add_se_pipeline_subparser(subparsers):
                                 help="float indicating the adjusted p-value cutoff you wish to use for "
                                 + "determining whether or not a site is methylated")
 
-     parser_se_opt.add_argument("--min_cov",
+     parser_se_opt.add_argument("--min-cov",
                                 type=int,
                                 default=0,
                                 help="Integer indicating the minimum number of reads for a site to be tested.")
      
-     parser_se_opt.add_argument("--max_adapter_removal",
+     parser_se_opt.add_argument("--max-adapter-removal",
                                 type=int,
                                 help="Indicates the maximum number of times to try to remove adapters. Useful "
                                 +"when an adapter gets appended multiple times.")
      
-     parser_se_opt.add_argument("--overlap_length",
+     parser_se_opt.add_argument("--overlap-length",
                                 type=int,
                                 help="Minimum overlap length. If the overlap between the read and the adapter "
                                 +"is shorter than LENGTH, the read is not modified. This reduces the no. of "
                                 +"bases trimmed purely due to short random adapter matches.")
      
-     parser_se_opt.add_argument("--zero_cap",
+     parser_se_opt.add_argument("--zero-cap",
                                 type=str2bool,
                                 help="Flag that causes negative quality values to be set to zero (workaround "
                                 +"to avoid segmentation faults in BWA)")
      
-     parser_se_opt.add_argument("--error_rate",
+     parser_se_opt.add_argument("--error-rate",
                                 type=float,
                                 help="maximum allowed error rate (no. of errors divided by the length of "
                                 +"the matching region)")
      
-     parser_se_opt.add_argument("--min_qual_score",
+     parser_se_opt.add_argument("--min-qual-score",
                                 type=int,
                                 default=10,
                                 help="allows you to trim low-quality ends from reads before adapter removal. "
@@ -692,7 +700,7 @@ def add_se_pipeline_subparser(subparsers):
                                 +"qualities; compute partial sums from all indices to the end of the sequence; "
                                 +" cut sequence at the index at which the sum is minimal).")
      
-     parser_se_opt.add_argument("--min_read_len",
+     parser_se_opt.add_argument("--min-read-len",
                                 type=int,
                                 default=30,
                                 help="indicates the minimum length a read must be to be kept. Reads that "
@@ -706,7 +714,7 @@ def add_se_pipeline_subparser(subparsers):
                                 +"included in the mpileup file (and subsequently to be considered for "
                                 +"methylation calling).")
      
-     parser_se_opt.add_argument("--keep_temp_files",
+     parser_se_opt.add_argument("--keep-temp-files",
                                 type=str2bool,
                                 default=False,
                                 help="Boolean indicating that you would like to keep the intermediate files "
@@ -935,33 +943,33 @@ def add_pe_pipeline_subparser(subparsers):
                                 help="float indicating the adjusted p-value cutoff you wish to use for "
                                 + "determining whether or not a site is methylated")
 
-     parser_pe_opt.add_argument("--min_cov",
+     parser_pe_opt.add_argument("--min-cov",
                                 type=int,
                                 default=0,
                                 help="Integer indicating the minimum number of reads for a site to be tested.")
      
-     parser_pe_opt.add_argument("--max_adapter_removal",
+     parser_pe_opt.add_argument("--max-adapter-removal",
                                 type=int,
                                 help="Indicates the maximum number of times to try to remove adapters. Useful "
                                 +"when an adapter gets appended multiple times.")
      
-     parser_pe_opt.add_argument("--overlap_length",
+     parser_pe_opt.add_argument("--overlap-length",
                                 type=int,
                                 help="Minimum overlap length. If the overlap between the read and the adapter "
                                 +"is shorter than LENGTH, the read is not modified. This reduces the no. of "
                                 +"bases trimmed purely due to short random adapter matches.")
      
-     parser_pe_opt.add_argument("--zero_cap",
+     parser_pe_opt.add_argument("--zero-cap",
                                 type=str2bool,
                                 help="Flag that causes negative quality values to be set to zero (workaround "
                                 +"to avoid segmentation faults in BWA)")
      
-     parser_pe_opt.add_argument("--error_rate",
+     parser_pe_opt.add_argument("--error-rate",
                                 type=float,
                                 help="maximum allowed error rate (no. of errors divided by the length of "
                                 +"the matching region)")
      
-     parser_pe_opt.add_argument("--min_qual_score",
+     parser_pe_opt.add_argument("--min-qual-score",
                                 type=int,
                                 default=10,
                                 help="allows you to trim low-quality ends from reads before adapter removal. "
@@ -969,7 +977,7 @@ def add_pe_pipeline_subparser(subparsers):
                                 +"qualities; compute partial sums from all indices to the end of the sequence; "
                                 +" cut sequence at the index at which the sum is minimal).")
      
-     parser_pe_opt.add_argument("--min_read_len",
+     parser_pe_opt.add_argument("--min-read-len",
                                 type=int,
                                 default=30,
                                 help="indicates the minimum length a read must be to be kept. Reads that "
@@ -983,7 +991,7 @@ def add_pe_pipeline_subparser(subparsers):
                                 +"included in the mpileup file (and subsequently to be considered for "
                                 +"methylation calling).")
      
-     parser_pe_opt.add_argument("--keep_temp_files",
+     parser_pe_opt.add_argument("--keep-temp-files",
                                 type=str2bool,
                                 default=False,
                                 help="Boolean indicating that you would like to keep the intermediate files "
@@ -1198,12 +1206,12 @@ def add_call_mc_subparser(subparsers):
                               help="float indicating the adjusted p-value cutoff you wish to use for "
                               + "determining whether or not a site is methylated")
 
-     call_mc_opt.add_argument("--min_cov",
+     call_mc_opt.add_argument("--min-cov",
                               type=int,
                               default=0,
                               help="Integer indicating the minimum number of reads for a site to be tested.")
      
-     call_mc_opt.add_argument("--min_mc",
+     call_mc_opt.add_argument("--min-mc",
                               type=int,
                               default=0,
                               help="Minimum number of mCs that must be observed for cytosine to be called as "
@@ -1318,7 +1326,7 @@ def add_allc2bw_subparser(subparsers):
                               help="Minimum total coverage of all sites in a bin for methylation level "
                               +"to be calculated.")
 
-     allc2bw_opt.add_argument("--path_to_wigToBigWig",
+     allc2bw_opt.add_argument("--path-to-wigToBigWig",
                               type=str,
                               default="",
                               help="Path to wigToBigWig executable ")
@@ -1352,6 +1360,11 @@ def add_merge_allc_subparser(subparsers):
                                  help="String indicating the name of output file")
      
      merge_allc_opt = merge_allc.add_argument_group("optional inputs")
+     merge_allc_opt.add_argument("--num-procs",
+                                 type=int,
+                                 default=1,
+                                 help="Number of processors to use")
+
      merge_allc_opt.add_argument("--compress-output",
                                  type=str2bool,
                                  default=True,
@@ -1363,6 +1376,30 @@ def add_merge_allc_subparser(subparsers):
                                  help="The maximum number of allc files to be merged at the same time. Since "
                                  +"OS or python may limit the number of files that can be open at once, value "
                                  +"larger than 200 is not recommended")
+
+def add_index_allc_subparser(subparsers):
+     index_allc = subparsers.add_parser("index-allc",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     help="Index allc files")
+
+     index_allc_req = index_allc.add_argument_group("required inputs")
+     index_allc_req.add_argument("--allc-files",
+                             type=str,
+                             nargs="+",
+                             required=True,
+                             help="List of allc files to merge.")
+     
+     index_allc_opt = index_allc.add_argument_group("optional inputs")
+     index_allc_opt.add_argument("--num-procs",
+                                 type=int,
+                                 default=1,
+                                 help="Number of processors to use")
+
+     index_allc_opt.add_argument("--no-reindex",
+                                 type=str2bool,
+                                 default=False,
+                                 help="Boolean indicating whether to skip indexing "
+                                 +"for files whose index files already exist.")
 
 def str2bool(v):
      ## adapted from the answer by Maxim at
