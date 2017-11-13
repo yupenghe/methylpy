@@ -247,7 +247,8 @@ def parse_args():
                                  path_to_samtools=args.path_to_samtools,
                                  min_sites=args.min_sites,
                                  min_cov=args.min_cov,
-                                 remove_chr_prefix=args.remove_chr_prefix)
+                                 remove_chr_prefix=args.remove_chr_prefix,
+                                 add_chr_prefix=args.add_chr_prefix)
 
 def add_DMRfind_subparser(subparsers):
      # create the parser for the "DMRfind" command
@@ -606,7 +607,7 @@ def add_se_pipeline_subparser(subparsers):
 
      parser_se_opt.add_argument("--remove-clonal",
                                 type=str2bool,
-                                default=True,
+                                default=False,
                                 help="Boolean indicates whether to remove clonal reads or not")
      
      parser_se_opt.add_argument("--path-to-picard",
@@ -877,7 +878,7 @@ def add_pe_pipeline_subparser(subparsers):
 
      parser_pe_opt.add_argument("--remove-clonal",
                                 type=str2bool,
-                                default=True,
+                                default=False,
                                 help="Boolean indicates whether to remove clonal reads or not")
      
      parser_pe_opt.add_argument("--path-to-picard",
@@ -1341,6 +1342,13 @@ def add_allc2bw_subparser(subparsers):
                               default=True,
                               help="Boolean indicates whether to remove \"chr\" in the chromosome names in "
                               +"genome sequence file to match chromosome names in input allc file.")
+
+     allc2bw_opt.add_argument("--add-chr-prefix",
+                              type=str2bool,
+                              default=False,
+                              help="Boolean indicates whether to add \"chr\" in the chromosome names in "
+                              +"input allc file to match chromosome names in genome sequence file. This option "
+                              +"overrides --remove-chr-prefix.")
 
 def add_merge_allc_subparser(subparsers):
      merge_allc = subparsers.add_parser("merge-allc",

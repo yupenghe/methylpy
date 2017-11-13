@@ -88,7 +88,8 @@ def convert_allc_to_bigwig(input_allc_file,
                            path_to_samtools="",
                            min_sites = 0,
                            min_cov = 0,
-                           remove_chr_prefix=False
+                           remove_chr_prefix=True,
+                           add_chr_prefix=False
                            ):
     if not isinstance(mc_type, list):
         if isinstance(mc_type, str):
@@ -115,10 +116,16 @@ def convert_allc_to_bigwig(input_allc_file,
             if cur_chrom != fields[0] or pos >= bin_end:
                 if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
                     mc_level = str(float(bin_mc)/float(bin_h))
-                    g.write("\t".join([cur_chrom,
-                                       str(bin_end-bin_size),
-                                       str(bin_end),
-                                       mc_level])+"\n")
+                    if add_chr_prefix and not cur_chrom.startswith("chr"):
+                        g.write("\t".join(["chr"+cur_chrom,
+                                           str(bin_end-bin_size),
+                                           str(bin_end),
+                                           mc_level])+"\n")
+                    else:
+                        g.write("\t".join([cur_chrom,
+                                           str(bin_end-bin_size),
+                                           str(bin_end),
+                                           mc_level])+"\n")
                 # reset
                 cur_chrom = fields[0]
                 bin_end = int(pos/100+1) * bin_size
@@ -131,10 +138,16 @@ def convert_allc_to_bigwig(input_allc_file,
 
     if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
         mc_level = str(float(bin_mc)/float(bin_h))
-        g.write("\t".join([cur_chrom,
-                           str(bin_end-bin_size),
-                           str(bin_end),
-                           mc_level])+"\n")
+        if add_chr_prefix and not cur_chrom.startswith("chr"):
+            g.write("\t".join(["chr"+cur_chrom,
+                               str(bin_end-bin_size),
+                               str(bin_end),
+                               mc_level])+"\n")
+        else:
+            g.write("\t".join([cur_chrom,
+                               str(bin_end-bin_size),
+                               str(bin_end),
+                               mc_level])+"\n")
     g.close()
 
     # chromosome size
@@ -153,7 +166,10 @@ def convert_allc_to_bigwig(input_allc_file,
     g = open(output_file+".chrom_size",'w')
     for line in f:
         fields = line.split("\t")
-        if remove_chr_prefix and fields[0].startswith("chr"):
+        if add_chr_prefix:
+            if not fields[0].startswith("chr"):
+                fields[0] = "chr"+fields[0]
+        elif remove_chr_prefix and fields[0].startswith("chr"):
             fields[0] = fields[0][3:]
         g.write(fields[0]+"\t"+fields[1]+"\n")
     g.close()
