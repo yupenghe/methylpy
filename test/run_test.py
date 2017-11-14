@@ -347,6 +347,22 @@ try:
 except:
     sys.stdout.write("failed\n")
 
+# 10 - filter allc
+sys.stdout.write("\nTest filter-allc: ")
+try:
+    subprocess.check_call(
+        shlex.split("methylpy filter-allc "
+                    +"--allc-file data/allc_P0_FB_1.tsv.gz "
+                    +"--output-file results/allCG_P0_FB_1.tsv.gz "
+                    +"--mc-type CGN "
+                    +"--compress-output True "
+                    +"--min-cov 2 "),
+        stdout=f_stdout,
+        stderr=f_stderr)
+    sys.stdout.write("pass\n")
+except:
+    sys.stdout.write("failed\n")
+
 # successful
 print("\nAll tests are done!")
 print(time.asctime(time.localtime(time.time())))

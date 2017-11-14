@@ -186,7 +186,7 @@ def filter_allc_file(allc_file,
                      output_file,
                      mc_type="CGN",
                      chroms = None,
-                     compress_output=True,
+                     compress_output=False,
                      min_cov=0,
                      buffer_line_number=100000):
 
@@ -195,7 +195,7 @@ def filter_allc_file(allc_file,
     f = open_allc_file(allc_file)
     if compress_output:
         if output_file[-3:] != ".gz":
-            output_file += ".gz"                                
+            output_file += ".gz"
         output_fhandler = gzip.open(output_file,'wt')
     else:
         output_fhandler = open(output_file,'w')
@@ -510,17 +510,17 @@ def remove_allc_index(allc_file):
         subprocess.check_call(["rm",index_file])
 
 def expand_nucleotide_code(mc_type):
-    iub_dict = {"N":["A","C","G","T"],
-                "H":["A","C","T"],
-                "D":["A","G","T"],
-                "B":["C","G","T"],
-                "A":["A","C","G"],
-                "R":["A","G"],
-                "Y":["C","T"],
-                "K":["G","T"],
-                "M":["A","C"],
-                "S":["G","C"],
-                "W":["A","T"],
+    iub_dict = {"N":["A","C","G","T","N"],
+                "H":["A","C","T","H"],
+                "D":["A","G","T","D"],
+                "B":["C","G","T","B"],
+                "A":["A","C","G","A"],
+                "R":["A","G","R"],
+                "Y":["C","T","Y"],
+                "K":["G","T","K"],
+                "M":["A","C","M"],
+                "S":["G","C","S"],
+                "W":["A","T","W"],
                 "C":["C"],
                 "G":["G"],
                 "T":["T"],

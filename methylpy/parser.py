@@ -19,7 +19,8 @@ def parse_args():
      add_allc2bw_subparser(subparsers)
      add_merge_allc_subparser(subparsers)
      add_index_allc_subparser(subparsers)
-
+     add_filter_allc_subparser(subparsers)
+     
      if len(sys.argv) > 1:
           args = parser.parse_args()
      else:
@@ -235,10 +236,18 @@ def parse_args():
           index_allc_file_batch(allc_files=args.allc_files,
                                 num_procs=args.num_procs,
                                 no_reindex=args.no_reindex)
+     elif args.command == "filter-allc":
+          from methylpy.utilities import filter_allc_file
+          filter_allc_file(allc_file=args.allc_file,
+                           output_file=args.output_file,
+                           mc_type=args.mc_type,
+                           chroms=args.chroms,
+                           compress_output=args.compress_output,
+                           min_cov=args.min_cov)
 
      elif args.command == "allc-to-bigwig":
           from methylpy.utilities import convert_allc_to_bigwig
-          convert_allc_to_bigwig(input_allc_file=args.input_allc_file,
+          convert_allc_to_bigwig(input_allc_file=args.allc_file,
                                  output_file=args.output_file,
                                  reference_fasta=args.ref_fasta,
                                  mc_type=args.mc_type,
@@ -1286,7 +1295,7 @@ def add_allc2bw_subparser(subparsers):
                                          help="Get bigwig file from allc file")
 
      allc2bw_req = allc2bw.add_argument_group("required inputs")
-     allc2bw_req.add_argument("--input-allc-file",
+     allc2bw_req.add_argument("--allc-file",
                               type=str,
                               help="input allc file to be converted to bigwig format")
 
@@ -1395,7 +1404,7 @@ def add_index_allc_subparser(subparsers):
                              type=str,
                              nargs="+",
                              required=True,
-                             help="List of allc files to merge.")
+                             help="List of allc files to index.")
      
      index_allc_opt = index_allc.add_argument_group("optional inputs")
      index_allc_opt.add_argument("--num-procs",
@@ -1408,6 +1417,51 @@ def add_index_allc_subparser(subparsers):
                                  default=False,
                                  help="Boolean indicating whether to skip indexing "
                                  +"for files whose index files already exist.")
+
+def add_filter_allc_subparser(subparsers):
+     filter_allc = subparsers.add_parser("filter-allc",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     help="Filter allc file")
+
+     filter_allc_req = filter_allc.add_argument_group("required inputs")
+     filter_allc_req.add_argument("--allc-file",
+                             type=str,
+                             required=True,
+                             help="Allc file to filter.")
+
+     filter_allc_req.add_argument("--output-file",
+                             type=str,
+                             required=True,
+                             help="Name of output file.")
+     
+     filter_allc_opt = filter_allc.add_argument_group("optional inputs")
+
+     filter_allc_opt.add_argument("--mc-type",
+                                  type=str,
+                                  nargs="+",
+                                  default=["CGN"],
+                                  help="List of space separated cytosine nucleotide contexts for "
+                                  + "sites to be included in output file. These classifications "
+                                  + "may use the wildcards H (indicating anything but a G) and "
+                                  + "N (indicating any nucleotide).")
+
+     filter_allc_opt.add_argument("--min-cov",
+                                  type=int,
+                                  default=0,
+                                  help="Minimum number of reads that must cover a site for it to be "
+                                  + "included in output file.")
+
+     filter_allc_opt.add_argument("--compress-output",
+                                  type=str2bool,
+                                  default=True,
+                                  help="Boolean indicating whether to compress (by gzip) the final output")
+
+     filter_allc_opt.add_argument("--chroms",
+                                  type=str,
+                                  nargs="+",
+                                  default=None,
+                                  help="Space separated listing of chromosomes to be included in the output. "
+                                  +"By default, data of all chromosomes in input allc file will be included.")
 
 def str2bool(v):
      ## adapted from the answer by Maxim at

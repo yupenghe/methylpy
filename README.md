@@ -2,7 +2,7 @@
 Welcome to the home page of methylpy, a pyhton-based analysis pipeline for
 
 * (single-cell) (whole-genome) bisulfite sequencing data
-* (single-cell)  NOMe-seq data
+* (single-cell) NOMe-seq data
 * differential methylation analysis
 
 methylpy is available at [github](https://github.com/yupenghe/methylpy)
@@ -234,6 +234,18 @@ methylpy merge-allc \
 	--allc-files allc/allc_AD_HT_1.tsv.gz allc/allc_AD_HT_2.tsv.gz \
 	--output-file allc/allc_AD_HT.tsv.gz \
 	--num-procs 1 \
+	--compress-output True
+```
+
+#### Filter allc files
+The `filter-allc` function is for filtering sites by cytosine context, coverage etc. 
+See `methylpy filter-allc -h` for more information. 
+```
+methylpy filter-allc \
+	--allc-file allc/allc_AD_HT_1.tsv.gz \
+	--output-file allc/allCG_AD_HT_1.tsv.gz \
+	--mc-type CGN \
+	--min-cov 2 \
 	--compress-output True
 ```
 
