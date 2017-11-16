@@ -927,7 +927,7 @@ def print_error(error_message=""):
     sys.exit(1)
 
 def print_warning(error_message=""):
-    sys.stderr.write("Error:\n" + error_message)
+    sys.stderr.write("Warning:\n" + error_message)
     #sys.exit(1)
 
 if __name__ == '__main__':

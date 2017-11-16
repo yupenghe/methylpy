@@ -4,7 +4,7 @@ import multiprocessing
 import subprocess
 import scipy.stats as sci
 from scipy.stats.mstats import mquantiles
-from methylpy.utilities import print_checkpoint, print_error, split_fastq_file,print_warning
+from methylpy.utilities import print_checkpoint, print_error, split_fastq_file, print_warning
 import pdb
 import shlex
 import itertools
@@ -778,7 +778,7 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
             file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+
                                             "\t"+seq+"\t"+"\t".join(fields[10:]))
         except:
-            print_warning("Warnings! Failed to recover unconverted sequence for:\n"+line)
+            print_warning("Warnings! Failed to recover unconverted sequence for:\n"+line+"\n")
     f.close()
     if keep_temp_files == False:
         subprocess.check_call(shlex.split("rm "+inputf))
