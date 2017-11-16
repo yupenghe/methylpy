@@ -647,9 +647,11 @@ def encode_c_positions(seq,is_read2=False):
         while True:
             if index < 0:
                 break
-            while offset > 255:
+            while offset >= 255:
                 indexes += chr(255)
                 offset -= 255
+            if offset < 34:
+                offset += 34
             indexes += chr(offset)
             prev_index = index + 1
             index = seq.find("C",prev_index)
@@ -660,9 +662,11 @@ def encode_c_positions(seq,is_read2=False):
         while True:
             if index < 0:
                 break
-            while offset > 255:
+            while offset >= 255:
                 indexes += chr(255)
                 offset -= 255
+            if offset < 34:
+                offset += 34
             indexes += chr(offset)                
             prev_index = index + 1
             index = seq.find("G",prev_index)
@@ -683,18 +687,24 @@ def decode_c_positions(seq,indexes,strand,is_read2=False):
 
     is_read2 indicates whether the read to be deconverted is a read2.
     """
-    
+
     prev_index = 0
     new_seq=""
     index = 0
+    saturated = False
     if is_read2 == False:
         if strand == "-":
             seq = seq[::-1]
         for char in indexes:
-            offset = ord(char)-34
-            while offset == 255:
-                index+=offset
-                offset=ord(char)-34
+            offset = ord(char)
+            if offset == 255:
+                index += 255
+                saturated = True
+                continue
+            if saturated and (offset - 34) < 34:
+                offset -= 68
+            else:
+                offset -= 34
             index += offset
             if strand == "+":
                 new_seq += seq[prev_index:index]+"C"
@@ -702,14 +712,20 @@ def decode_c_positions(seq,indexes,strand,is_read2=False):
                 new_seq += seq[prev_index:index]+"G"
             prev_index = index + 1
             index = prev_index
+            saturated = False
     else:
         if strand == "-":
             seq = seq[::-1]
         for char in indexes:
-            offset = ord(char)-34
-            while offset == 255:
-                index+=offset
-                offset=ord(char)-34
+            offset = ord(char)
+            if offset == 255:
+                index += 255
+                saturated = True
+                continue
+            if saturated and (offset - 34) < 34:
+                offset -= 68
+            else:
+                offset -= 34
             index += offset
             if strand == "+":
                 new_seq += seq[prev_index:index]+"G"
@@ -717,6 +733,7 @@ def decode_c_positions(seq,indexes,strand,is_read2=False):
                 new_seq += seq[prev_index:index]+"C"
             prev_index = index + 1
             index = prev_index
+            saturated = False
     new_seq += seq[prev_index:]
     if strand == "-":
         new_seq = new_seq[::-1]
