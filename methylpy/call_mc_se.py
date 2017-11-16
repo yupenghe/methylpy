@@ -892,9 +892,12 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
                 strand = "-"
             elif (int(fields[1]) & 16) == 0:
                 strand = "+"
+        try:
             seq = decode_c_positions(fields[9],header[-1],strand)
             file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])
                                             +"\t"+seq+"\t"+"\t".join(fields[10:]))
+        except:
+            print_warning("Warnings! Failed to recover unconverted sequence for:\n"+line)
     f.close()
     if keep_temp_files == False:
         subprocess.check_call(shlex.split("rm "+inputf))
