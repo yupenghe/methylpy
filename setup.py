@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='methylpy',
-    version='1.1.3',
+    version='1.1.4',
     author='Yupeng He',
     author_email='yupeng.he.bioinfo@gmail.com',
     packages=['methylpy'], 
@@ -16,7 +16,7 @@ setup(
     ],
     package_data = {
         'methylpy.test':['test/*'],        
-	'methylpy':['rms.cpp', 'run_rms_tests.out', 'docs/README.rst']
+	'methylpy':['rms.cpp', 'run_rms_tests.out']
     },
     keywords = ["Bioinformatics pipeline",
                 "DNA methylation",
