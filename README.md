@@ -64,19 +64,19 @@ on hard drive with sufficient space (e.g. `/YOUR/TMP/DIR/`). This can be done by
 below command to ~/.bashrc file: `export TMPDIR=/YOUR/TMP/DIR/`.
 
 #### Step 2 - Install dependencies
-methylpy is written in python so obviously python2/3 needs to be installed.
+python is required for running methylpy. Both python2 (>=2.7.9) and python3 (>=3.6.2) will work.
 methylpy also depends on two python modules, [numpy](http://www.numpy.org/) 
 and [scipy](https://www.scipy.org/).
-The easiest way to resolve these dependencies is to install [anaconda](https://www.anaconda.com/download/)
+The easiest way to get these dependencies is to install [anaconda](https://www.anaconda.com/download/).
 
 In addition, some features of methylpy depend on several publicly available tools (not all of them are required
 if you only use a subset of methylpy functions).
 * [cutadapt](http://cutadapt.readthedocs.io/en/stable/installation.html) (>=1.9) for raw read trimming
 * [bowtie](http://bowtie-bio.sourceforge.net/index.shtml) and/or 
 [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
-* [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment results manipulation
-* [Picard](https://broadinstitute.github.io/picard/index.html) (>=2.10.8) for removal of PCR duplicates
-* java (its path included in `PATH` environment variable) for running Picard
+* [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment result manipulation
+* [Picard](https://broadinstitute.github.io/picard/index.html) (>=2.10.8) for  PCR duplicate removal
+* java for running Picard (its path needs to be included in `PATH` environment variable) .
 * [wigToBigWig](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig) for converting methylpy output 
 to bigwig format
 
@@ -178,8 +178,8 @@ with `--add-snp-info` option when using `single-end-pipeline`, `paired-end-pipel
 |5|mc|18|count of reads supporting methylation|
 |6|cov|21|read coverage|
 |7|methylated|1|indicator of significant methylation|
-|8|(optional) num_matches|3,2,3|number of match basecalls at context nucleotides|
-|9|(optional) num_mismatches|0,1,0|number of mismatches at context nucleotides|
+|8|(optional) num\_matches|3,2,3|number of match basecalls at context nucleotides|
+|9|(optional) num\_mismatches|0,1,0|number of mismatches at context nucleotides|
 
 # Call DMRs
 This function will take a list of compressed/uncompressed allc files (output files from methylpy pipeline) as input

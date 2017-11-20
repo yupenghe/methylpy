@@ -97,12 +97,12 @@ This can be done by adding the below command to ~/.bashrc file:
 Step 2 - Install dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-methylpy is written in python so obviously python2/3 needs to be
-installed. methylpy also depends on two python modules,
-`numpy <http://www.numpy.org/>`__ and
-`scipy <https://www.scipy.org/>`__. The easiest way to resolve these
+python is required for running methylpy. Both python2 (>=2.7.9) and
+python3 (>=3.6.2) will work. methylpy also depends on two python
+modules, `numpy <http://www.numpy.org/>`__ and
+`scipy <https://www.scipy.org/>`__. The easiest way to get these
 dependencies is to install
-`anaconda <https://www.anaconda.com/download/>`__
+`anaconda <https://www.anaconda.com/download/>`__.
 
 In addition, some features of methylpy depend on several publicly
 available tools (not all of them are required if you only use a subset
@@ -112,10 +112,10 @@ of methylpy functions). \*
 `bowtie <http://bowtie-bio.sourceforge.net/index.shtml>`__ and/or
 `bowtie2 <http://bowtie-bio.sourceforge.net/bowtie2/index.shtml>`__ for
 alignment \* `samtools <https://github.com/samtools/samtools>`__ (>=1.3)
-for alignment results manipulation \*
+for alignment result manipulation \*
 `Picard <https://broadinstitute.github.io/picard/index.html>`__
-(>=2.10.8) for removal of PCR duplicates \* java (its path included in
-``PATH`` environment variable) for running Picard \*
+(>=2.10.8) for PCR duplicate removal \* java for running Picard (its
+path needs to be included in ``PATH`` environment variable) . \*
 `wigToBigWig <http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig>`__
 for converting methylpy output to bigwig format
 
