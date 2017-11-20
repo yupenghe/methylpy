@@ -35,6 +35,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                 path_to_picard="",java_options="-Xmx20g",
                                 path_to_samtools="",
                                 remove_chr_prefix=True,
+                                add_snp_info=False,
                                 adapter_seq_read1="AGATCGGAAGAGCACACGTCTGAAC",
                                 adapter_seq_read2="AGATCGGAAGAGCGTCGTGTAGGGA",
                                 max_adapter_removal=None,
@@ -206,7 +207,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
             try:
                 os.makedirs(path_to_output)
             except:
-                print_error("Failed to create output folder!")
+                print_error("  Failed to create output folder!")
 
     # This code allows the user to supply paths with "*" in them rather than listing
     # out every single file
@@ -778,7 +779,8 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,keep_temp_files=False,append
             file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])+
                                             "\t"+seq+"\t"+"\t".join(fields[10:]))
         except:
-            print_warning("Warnings! Failed to recover unconverted sequence for:\n"+line+"\n")
+            print_warning("  Failed to recover unconverted sequence for:\n"+line+"\n")
+            print_warning(header[-1]+"\n")
     f.close()
     if keep_temp_files == False:
         subprocess.check_call(shlex.split("rm "+inputf))
@@ -1198,8 +1200,10 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                              num_upstr_bases=0,num_downstr_bases=2,
                              generate_mpileup_file=True,compress_output=True,
                              buffer_line_number = 100000,
-                             min_cov=1,binom_test=True,min_mc=0,path_to_samtools="",
+                             min_cov=1,binom_test=True,
+                             path_to_samtools="",
                              remove_chr_prefix=True,
+                             add_snp_info=False,
                              sort_mem="500M",
                              path_to_files="",min_base_quality=1):
 
@@ -1253,12 +1257,12 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                           buffer_line_number = buffer_line_number,
                           min_cov = min_cov,
                           binom_test = binom_test,
-                          min_mc = min_mc,
                           path_to_samtools = path_to_samtools,
                           sort_mem=sort_mem,
                           path_to_files = path_to_files,
                           min_base_quality = min_base_quality,
-                          remove_chr_prefix = remove_chr_prefix)
+                          remove_chr_prefix = remove_chr_prefix,
+                          add_snp_info  = add_snp_info)
 
     #Remove intermediate bam file
     try:

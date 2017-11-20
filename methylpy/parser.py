@@ -102,6 +102,7 @@ def parse_args():
                                    java_options=args.java_options,
                                    path_to_samtools=args.path_to_samtools,
                                    remove_chr_prefix=args.remove_chr_prefix,
+                                   add_snp_info=args.add_snp_info,
                                    adapter_seq=args.adapter_seq,
                                    unmethylated_control=args.unmethylated_control,
                                    binom_test=args.binom_test,
@@ -147,6 +148,7 @@ def parse_args():
                                       java_options=args.java_options,
                                       path_to_samtools=args.path_to_samtools,
                                       remove_chr_prefix=args.remove_chr_prefix,
+                                      add_snp_info=args.add_snp_info,
                                       adapter_seq_read1=args.adapter_seq_read1,
                                       adapter_seq_read2=args.adapter_seq_read2,
                                       unmethylated_control=args.unmethylated_control,                                   
@@ -188,9 +190,9 @@ def parse_args():
                                         compress_output=args.compress_output,
                                         min_cov=args.min_cov,
                                         binom_test=args.binom_test,
-                                        min_mc=args.min_mc,
                                         path_to_samtools=args.path_to_samtools,
                                         remove_chr_prefix=args.remove_chr_prefix,
+                                        add_snp_info=args.add_snp_info,
                                         path_to_files=args.path_to_output,
                                         min_base_quality=args.min_base_quality)
           else:
@@ -207,8 +209,9 @@ def parse_args():
                                      compress_output=args.compress_output,
                                      min_cov=args.min_cov,
                                      binom_test=args.binom_test,
-                                     min_mc=args.min_mc,
                                      path_to_samtools=args.path_to_samtools,
+                                     remove_chr_prefix=args.remove_chr_prefix,
+                                     add_snp_info=args.add_snp_info,
                                      path_to_files=args.path_to_output,
                                      min_base_quality=args.min_base_quality)
 
@@ -557,7 +560,7 @@ def add_se_pipeline_subparser(subparsers):
                                 default=2,
                                 help="Number of base(s) downstream of each cytosine that you wish to include "
                                 + "in output file. Recommend value to be at least 1 to separate cytosines at "
-                                + "different sequence contexts.")
+                                + "different sequence context.")
 
      parser_se_opt.add_argument("--generate-allc-file",
                                 type=str2bool,
@@ -652,6 +655,14 @@ def add_se_pipeline_subparser(subparsers):
                                 default=True,
                                 help="Boolean indicates whether to remove in the final output the \"chr\" prefix "
                                 +"in the chromosome name")
+
+     parser_se_opt.add_argument("--add-snp-info",
+                                type=str2bool,
+                                default=False,
+                                help="Boolean indicates whether to add extra two columns in the output (allc) file "
+                                +"regarding the genotype information of each site. The first (second) column contain "
+                                +"the number of basecalls that support the reference gentype (variant) for nucleotides "
+                                "in the sequence context.")
      
      parser_se_opt.add_argument("--unmethylated-control",
                                 type=str,
@@ -929,7 +940,15 @@ def add_pe_pipeline_subparser(subparsers):
                                 default=True,
                                 help="Boolean indicates whether to remove in the final output the \"chr\" prefix "
                                 +"in the chromosome name")
-     
+
+     parser_pe_opt.add_argument("--add-snp-info",
+                                type=str2bool,
+                                default=False,
+                                help="Boolean indicates whether to add extra two columns in the output (allc) file "
+                                +"regarding the genotype information of each site. The first (second) column contain "
+                                +"the number of basecalls that support the reference gentype (variant) for nucleotides "
+                                "in the sequence context.")
+
      parser_pe_opt.add_argument("--unmethylated-control",
                                 type=str,
                                 default=None,
@@ -1193,6 +1212,14 @@ def add_call_mc_subparser(subparsers):
                               help="Boolean indicates whether to remove in the final output the \"chr\" prefix "
                               +"in the chromosome name")
 
+     call_mc_opt.add_argument("--add-snp-info",
+                              type=str2bool,
+                              default=False,
+                              help="Boolean indicates whether to add extra two columns in the output (allc) file "
+                              +"regarding the genotype information of each site. The first (second) column contain "
+                              +"the number of basecalls that support the reference gentype (variant) for nucleotides "
+                              "in the sequence context.")
+
      call_mc_opt.add_argument("--unmethylated-control",
                               type=str,
                               default=None,
@@ -1220,13 +1247,7 @@ def add_call_mc_subparser(subparsers):
                               type=int,
                               default=0,
                               help="Integer indicating the minimum number of reads for a site to be tested.")
-     
-     call_mc_opt.add_argument("--min-mc",
-                              type=int,
-                              default=0,
-                              help="Minimum number of mCs that must be observed for cytosine to be called as "
-                              +"methylated.")
-     
+          
      call_mc_opt.add_argument("--min-base-quality",
                               type=int,
                               default=1,

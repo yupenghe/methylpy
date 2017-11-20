@@ -38,6 +38,7 @@ def run_methylation_pipeline(read_files, sample,
                              path_to_picard="",java_options="-Xmx20g",
                              path_to_samtools="",
                              remove_chr_prefix=True,
+                             add_snp_info=False,
                              adapter_seq="AGATCGGAAGAGCACACGTCTG",
                              max_adapter_removal=None,
                              overlap_length=None, zero_cap=None,
@@ -190,7 +191,7 @@ def run_methylation_pipeline(read_files, sample,
             try:
                 os.makedirs(path_to_output)
             except:
-                print_error("Failed to create output folder!")
+                print_error("  Failed to create output folder!")
 
     expanded_file_list = []
     expanded_library_list = []
@@ -304,6 +305,7 @@ def run_methylation_pipeline(read_files, sample,
                               sort_mem=sort_mem,
                               path_to_files=path_to_output,
                               path_to_samtools=path_to_samtools,
+                              add_snp_info=add_snp_info,
                               min_base_quality=min_base_quality)
     print_checkpoint("Done")
 
@@ -918,21 +920,22 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
             continue
 
         fields = line.split("\t")
-        #fields[2] = fields[2].replace("_f","")
-        #fields[2] = fields[2].replace("_r","")
-        if fields[2] != "*" and int(fields[4]) >= 2:
-            header = fields[0].split("!")
-            #BIG ASSUMPTION!! NO TABS IN FASTQ HEADER LINES EXCEPT THE ONES I ADD!
-            if (int(fields[1]) & 16) == 16:
-                strand = "-"
-            elif (int(fields[1]) & 16) == 0:
-                strand = "+"
+        # minimum QC
+        if fields[2] == "*" or int(fields[4]) < 2:
+            continue
+        header = fields[0].split("!")
+        #BIG ASSUMPTION!! NO TABS IN FASTQ HEADER LINES EXCEPT THE ONES I ADD!
+        if (int(fields[1]) & 16) == 16:
+            strand = "-"
+        elif (int(fields[1]) & 16) == 0:
+            strand = "+"
         try:
             seq = decode_c_positions(fields[9],header[-1],strand)
             file_handles[next(cycle)].write(" ".join(header[:-1])+"\t"+"\t".join(fields[1:9])
                                             +"\t"+seq+"\t"+"\t".join(fields[10:]))
         except:
-            print_warning("Warnings! Failed to recover unconverted sequence for:\n"+line+"\n")
+            print_warning("  Failed to recover unconverted sequence for:\n"+line+"\n")
+            print_warning(header[-1]+"\n")
     f.close()
     if keep_temp_files == False:
         subprocess.check_call(shlex.split("rm "+inputf))
@@ -1288,11 +1291,327 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                           generate_mpileup_file=True,
                           compress_output=True,
                           buffer_line_number = 100000,
-                          min_cov=1,binom_test=True,min_mc=0,
+                          min_cov=1,binom_test=True,
                           path_to_samtools="",
                           remove_chr_prefix=True,
                           sort_mem="500M",
+                          add_snp_info=False,
                           path_to_files="",min_base_quality=1):
+
+    """
+    inputf is the path to a bam file that contains mapped bisulfite sequencing reads
+    
+    sample is the name you'd like for the allc files. The files will be named like so:
+        allc_<sample>_<chrom>.tsv
+    
+    reference is the path to a samtools indexed fasta file
+    
+    control is the name of the chromosome/region that you want to use to estimate the non-conversion rate of your 
+        sample, or the non-conversion rate you'd like to use. Consequently, control is either a string, or a decimal
+        If control is a string then it should be in the following format: "chrom:start-end". 
+        If you'd like to specify an entire chromosome simply use "chrom:"
+    
+    sig_cutoff is a float indicating the adjusted p-value cutoff you wish to use for determining whether or not
+        a site is methylated
+    
+    num_procs is an integer indicating how many num_procs you'd like to run this function over
+    
+    min_cov is an integer indicating the minimum number of reads for a site to be tested.
+    
+    path_to_files is a string indicating the path for the output and the input bam, mpileup, or allc files
+        for methylation calling.
+    min_base_quality is an integer indicating the minimum PHRED quality score for a base to be included in the
+        mpileup file (and subsequently to be considered for methylation calling)
+    """
+
+    if add_snp_info:
+        return call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
+                                                   unmethylated_control=unmethylated_control,
+                                                   sig_cutoff=sig_cutoff,
+                                                   num_procs=num_procs,
+                                                   num_upstr_bases=num_upstr_bases,
+                                                   num_downstr_bases=num_downstr_bases,
+                                                   generate_mpileup_file=generate_mpileup_file,
+                                                   compress_output=compress_output,
+                                                   buffer_line_number=buffer_line_number,
+                                                   min_cov=min_cov,
+                                                   binom_test=binom_test,
+                                                   path_to_samtools=path_to_samtools,
+                                                   remove_chr_prefix=remove_chr_prefix,
+                                                   sort_mem=sort_mem,
+                                                   path_to_files=path_to_files,
+                                                   min_base_quality=min_base_quality)
+
+    
+    if binom_test and unmethylated_control is None:
+        print_error("Please specify unmethylated_control if you would like to do binomial test!\n")
+
+    #Figure out all the correct quality options based on the offset or CASAVA version given
+    # quality_version >= 1.8:
+    quality_base = 33
+    if len(path_to_files)!=0:
+        path_to_files+="/"
+    if len(path_to_samtools)!=0:
+        path_to_samtools+="/"
+
+    try:
+        num_procs = int(num_procs)
+    except:
+        sys.exit("num_procs must be an integer")
+        
+    try:
+        #make sure bam file is indexed
+        open(inputf+".bai",'r')
+    except:
+        print_checkpoint("Input not indexed. Indexing...")
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools index "+inputf))
+
+    ## Check fasta index
+    try:
+        f = open(reference_fasta+".fai",'r')
+    except:
+        print("Reference fasta not indexed. Indexing.")
+        try:
+            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
+            f = open(reference_fasta+".fai",'r')
+        except:
+            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. "
+                     +"Please try indexing it manually and running methylpy again.")
+
+    ## Input
+    if not generate_mpileup_file:
+        cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf
+        pipes = subprocess.Popen(shlex.split(cmd),
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE,
+                                 universal_newlines=True)
+        fhandle = pipes.stdout
+    else:
+        with open(path_to_files+sample+"_mpileup_output.tsv",'w') as f:
+            subprocess.check_call(
+                shlex.split(
+                    path_to_samtools+"samtools mpileup -Q "+
+                    str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf),
+                stdout=f)
+        fhandle = open(path_to_files+sample+"_mpileup_output.tsv" ,'r')
+
+    ## Output
+    if compress_output:
+        output_filehandler = gzip.open(path_to_files+"allc_"+sample+".tsv.gz",'wt')
+        output_file = path_to_files+"allc_"+sample+".tsv.gz"
+    else:
+        output_filehandler = open(path_to_files+"allc_"+sample+".tsv",'w')
+        output_file = path_to_files+"allc_"+sample+".tsv"
+        
+    complement = {"A":"T","C":"G","G":"C","T":"A","N":"N"}
+    context_len = num_upstr_bases+1+num_downstr_bases
+    cur_chrom = ""
+    #cur_chrom_nochr = ""
+    line_counts = 0
+    out = ""
+    for line in fhandle:
+        fields = line.split("\t")
+        if fields[0] != cur_chrom:
+            cur_chrom = fields[0]
+            cur_chrom_nochr = cur_chrom
+            if remove_chr_prefix and cur_chrom.startswith("chr"):
+                cur_chrom_nochr = cur_chrom_nochr[3:]
+            seq = get_chromosome_sequence(reference_fasta,cur_chrom)
+            if seq != None:
+                seq = seq.upper()
+
+        if seq == None:
+            continue
+        if (not fields[2] == "C") and (not fields[2] == "G"):
+            continue
+
+        # indels
+        read_bases = fields[4]
+        incons_basecalls = read_bases.count("+") + read_bases.count("-")
+        if incons_basecalls > 0:
+            read_bases_no_indel = ""
+            index = 0
+            prev_index = 0
+            while index < len(read_bases):
+                if read_bases[index] == "+" or read_bases[index] == "-":
+                    # get insert size
+                    indel_size = ""
+                    ind = index+1
+                    while True:
+                        try:
+                            int(read_bases[ind])
+                            indel_size += read_bases[ind]
+                            ind += 1
+                        except:                    
+                            break
+                    try:
+                        # sometimes +/- does not follow by a number and
+                        # it should be ignored
+                        indel_size = int(indel_size)
+                    except:
+                        index += 1
+                        continue
+                    read_bases_no_indel += read_bases[prev_index:index]
+                    index = ind + indel_size
+                    prev_index = index
+                else:
+                    index += 1
+            read_bases_no_indel += read_bases[prev_index:index]
+            fields[4] = read_bases_no_indel
+
+        # count converted and unconverted bases
+        if fields[2] == "C":            
+            pos = int(fields[1])-1
+            try:
+                context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
+            except: # complete context is not available, skip
+                continue
+            unconverted_c = fields[4].count(".")
+            converted_c = fields[4].count("T")
+            cov = unconverted_c+converted_c
+            if cov > 0 and len(context) == context_len:
+                line_counts += 1
+                out += "\t".join([cur_chrom_nochr,str(pos+1),"+",context,
+                                  str(unconverted_c),str(cov),"1"])+"\n"
+        elif fields[2] == "G":
+            pos = int(fields[1])-1
+            try:
+                context = "".join([complement[base]
+                                   for base in reversed(
+                                           seq[(pos-num_downstr_bases):(pos+num_upstr_bases+1)]
+                                   )]
+                )
+            except: # complete context is not available, skip
+                continue
+            unconverted_c = fields[4].count(",")
+            converted_c = fields[4].count("a")
+            cov = unconverted_c+converted_c
+            if cov > 0 and len(context) == context_len:
+                line_counts += 1
+                out += "\t".join([cur_chrom_nochr,str(pos+1),"-",context,
+                                  str(unconverted_c),str(cov),"1"])+"\n"
+        if line_counts > buffer_line_number:
+            output_filehandler.write(out)
+            line_counts = 0
+            out = ""
+
+    if line_counts > 0:
+        output_filehandler.write(out)
+        line_counts = 0
+        out = ""
+    fhandle.close()
+    output_filehandler.close()
+
+    if generate_mpileup_file:
+        subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output.tsv"))
+
+    if binom_test:
+        print_checkpoint('Perform binomial test')
+        perform_binomial_test(allc_file=output_file,
+                              sample=sample,
+                              path_to_output=path_to_files,
+                              unmethylated_control=unmethylated_control,
+                              min_cov=min_cov,
+                              sig_cutoff=sig_cutoff,
+                              num_procs=num_procs,
+                              sort_mem=sort_mem,
+                              compress_output=compress_output,
+                              buffer_line_number=buffer_line_number,
+                              remove_chr_prefix=remove_chr_prefix)
+    elif not unmethylated_control is None:
+        non_conversion = calculate_non_conversion_rate(unmethylated_control,
+                                                       output_file,
+                                                       chrom_pointer=None,
+                                                       remove_chr_prefix=remove_chr_prefix)
+    index_allc_file(output_file,no_reindex=False)
+    return(0)
+
+
+def analyze_read_basecalls(ref,read_bases):
+    # indels
+    incons_basecalls = read_bases.count("+") + read_bases.count("-")
+    if incons_basecalls > 0:
+        read_bases_no_indel = ""
+        index = 0
+        prev_index = 0
+        while index < len(read_bases):
+            if read_bases[index] == "+" or read_bases[index] == "-":
+                # get insert size
+                indel_size = ""
+                ind = index+1
+                while True:
+                    try:
+                        int(read_bases[ind])
+                        indel_size += read_bases[ind]
+                        ind += 1
+                    except:                    
+                        break
+                try:
+                    indel_size = int(indel_size)
+                except:
+                    indel_size = 0
+                read_bases_no_indel += read_bases[prev_index:index]
+                index = ind + indel_size
+                prev_index = index
+            else:
+                index += 1
+        read_bases_no_indel += read_bases[prev_index:index]
+        read_bases = read_bases_no_indel
+    # counting matches and mismatches
+    if ref == "C":
+        incons_basecalls += read_bases.count('a') + \
+                            read_bases.count('g') + \
+                            read_bases.count('t') + \
+                            read_bases.count('G') + \
+                            read_bases.count('A')
+        unconverted_c = read_bases.count(".")
+        converted_c = read_bases.count("T")
+        cons_basecalls = read_bases.count(',') + unconverted_c               
+        return (str(cons_basecalls),str(incons_basecalls),unconverted_c,converted_c)
+    elif ref == "G":
+        incons_basecalls += read_bases.count('A') + \
+                            read_bases.count('C') + \
+                            read_bases.count('T') + \
+                            read_bases.count('c') + \
+                            read_bases.count('t')
+        unconverted_c = read_bases.count(",")
+        converted_c = read_bases.count("a")
+        cons_basecalls = read_bases.count('.') + unconverted_c
+        return (str(cons_basecalls),str(incons_basecalls),unconverted_c,converted_c)
+    elif ref == "T":
+        incons_basecalls += read_bases.count('a') + \
+                            read_bases.count('c') + \
+                            read_bases.count('g') + \
+                            read_bases.count('A') + \
+                            read_bases.count('C') + \
+                            read_bases.count('G')
+        cons_basecalls = read_bases.count(',')
+        return (str(cons_basecalls),str(incons_basecalls))
+    elif ref == "A":
+        incons_basecalls += read_bases.count('T') + \
+                            read_bases.count('C') + \
+                            read_bases.count('G') + \
+                            read_bases.count('t')+ \
+                            read_bases.count('c')+ \
+                            read_bases.count('g')
+        cons_basecalls = read_bases.count(',')
+        return (str(cons_basecalls),str(incons_basecalls))
+    else:
+        return ('0',str(incons_basecalls))
+
+def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
+                                        unmethylated_control=None,
+                                        sig_cutoff=.01,num_procs = 1,
+                                        num_upstr_bases=0,num_downstr_bases=2,
+                                        generate_mpileup_file=True,
+                                        compress_output=True,
+                                        buffer_line_number = 100000,
+                                        min_cov=1,binom_test=True,
+                                        path_to_samtools="",
+                                        remove_chr_prefix=True,
+                                        sort_mem="500M",
+                                        add_snp_info=False,
+                                        path_to_files="",min_base_quality=1):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads
@@ -1386,8 +1705,15 @@ def call_methylated_sites(inputf, sample, reference_fasta,
     #cur_chrom_nochr = ""
     line_counts = 0
     out = ""
-    for line in fhandle:
+    SNP_info = {}
+    SNP_info_end = 0
+    to_chrom_end = False
+    #for line in fhandle:
+    line = True
+    while line:
+        line = fhandle.readline()
         fields = line.split("\t")
+        # get reference genome information
         if fields[0] != cur_chrom:
             cur_chrom = fields[0]
             cur_chrom_nochr = cur_chrom
@@ -1396,25 +1722,50 @@ def call_methylated_sites(inputf, sample, reference_fasta,
             seq = get_chromosome_sequence(reference_fasta,cur_chrom)
             if seq != None:
                 seq = seq.upper()
-
+                to_chrom_end = False
+                SNP_info_end = 0
         if seq == None:
             continue
-    
+        # get SNP information
+        pos = int(fields[1])-1
+        if pos > SNP_info_end-context_len-1 and not to_chrom_end:
+            anchor = fhandle.tell()
+            SNP_info_end = pos + 100000
+            new_SNP_info = {}
+            for tmp_pos in range(pos-context_len,pos+1):
+                new_SNP_info[tmp_pos] = SNP_info.get(tmp_pos,('0','0'))
+            SNP_info = new_SNP_info
+            # make sure the current position is corrected analyzed
+            # Otherwise, error happens if there is a region that has zero coverage
+            SNP_info[pos] = analyze_read_basecalls(fields[2],fields[4])
+            for line in fhandle:
+                tmp_fields = line.split("\t")
+                tmp_pos = int(tmp_fields[1])-1
+                if tmp_pos > SNP_info_end:
+                    break
+                if tmp_fields[0] != cur_chrom:
+                    to_chrom_end = True
+                    break
+                SNP_info[tmp_pos] = analyze_read_basecalls(tmp_fields[2],tmp_fields[4])
+            fhandle.seek(anchor)
+        # generate allc line
         if fields[2] == "C":
-            pos = int(fields[1])-1
+            strand = "+"
             try:
                 context = seq[(pos-num_upstr_bases):(pos+num_downstr_bases+1)]
             except: # complete context is not available, skip
                 continue
-            unconverted_c = fields[4].count(".")
-            converted_c = fields[4].count("T")
-            cov = unconverted_c+converted_c
-            if cov > 0 and len(context) == context_len:
-                line_counts += 1
-                out += "\t".join([cur_chrom_nochr,str(pos+1),"+",context,
-                                  str(unconverted_c),str(cov),"1"])+"\n"
+            incons_bases = ",".join(
+                    [SNP_info.get(tmp_pos,('0','0'))[0]
+                     for tmp_pos in range(pos-num_downstr_bases,pos+num_upstr_bases+1)]
+                )
+            incons_bases_cov = ",".join(
+                    [SNP_info.get(tmp_pos,('0','0'))[1]
+                     for tmp_pos in range(pos-num_downstr_bases,pos+num_upstr_bases+1)]
+                )
+            incons_base, incons_base_cov, unconverted_c, converted_c  = SNP_info[pos]
         elif fields[2] == "G":
-            pos = int(fields[1])-1
+            strand = "-"
             try:
                 context = "".join([complement[base]
                                    for base in reversed(
@@ -1423,13 +1774,26 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                 )
             except: # complete context is not available, skip
                 continue
-            unconverted_c = fields[4].count(",")
-            converted_c = fields[4].count("a")
-            cov = unconverted_c+converted_c
-            if cov > 0 and len(context) == context_len:
-                line_counts += 1
-                out += "\t".join([cur_chrom_nochr,str(pos+1),"-",context,
-                                  str(unconverted_c),str(cov),"1"])+"\n"
+            incons_bases = ",".join([SNP_info.get(tmp_pos,('0','0'))[0]
+                                     for tmp_pos in reversed(
+                                             range(pos-num_downstr_bases,pos+num_upstr_bases+1)
+                                     )]
+            )
+            incons_bases_cov = ",".join([SNP_info.get(tmp_pos,('0','0'))[1]
+                                         for tmp_pos in reversed(
+                                                 range(pos-num_downstr_bases,pos+num_upstr_bases+1)
+                                         )]
+            )
+            incons_base, incons_base_cov, unconverted_c, converted_c  = SNP_info[pos]
+        else:
+            continue
+
+        cov = unconverted_c+converted_c    
+        if cov > 0 and len(context) == context_len:
+            line_counts += 1
+            out += "\t".join([cur_chrom_nochr,str(pos+1),strand,context,
+                              str(unconverted_c),str(cov),"1",
+                              incons_bases,incons_bases_cov])+"\n"
         if line_counts > buffer_line_number:
             output_filehandler.write(out)
             line_counts = 0
@@ -1464,7 +1828,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                                                        chrom_pointer=None,
                                                        remove_chr_prefix=remove_chr_prefix)
     index_allc_file(output_file,no_reindex=False)
-    return(0)
+    return 0
 
 def do_split_allc_file(allc_file,
                        sample,

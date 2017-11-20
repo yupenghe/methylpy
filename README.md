@@ -145,7 +145,6 @@ methylpy single-end-pipeline \
 
 An command example for processing paired-end data.
 Run `methylpy paired-end-pipeline -h` to get more information. 
-
 ```
 methylpy paired-end-pipeline \
 	--read1-files raw/mESC_R1.fastq.gz \
@@ -159,10 +158,16 @@ methylpy paired-end-pipeline \
 	--path-to-picard="picard/"
 ```
 
+If you would like methylpy to perform binomial test for teasing out sites that show
+methylation above noise level (which is mainly due to sodium bisulfite non-conversion),
+please check options `--binom-test` and `--unmethylated-control`.
+
 #### Output format
 Output file(s) are (compressed) tab-separated text file(s) in allc format. "allc" stands
 for all cytosine (C). Each row in an allc file corresponds to one cytosine in the genome. 
-An allc file contain 7 columns and no header:
+An allc file contain 7 mandatory columns and no header. Two additional columns may be added
+with `--add-snp-info` option when using `single-end-pipeline`, `paired-end-pipeline` or
+`call-methylation-state` methods.
 
 |index|column name|example|note|
 |:----:|:-----:|:-----:|:---:|
@@ -173,6 +178,8 @@ An allc file contain 7 columns and no header:
 |5|mc|18|count of reads supporting methylation|
 |6|cov|21|read coverage|
 |7|methylated|1|indicator of significant methylation|
+|8|(optional) num_matches|3,2,3|number of match basecalls at context nucleotides|
+|9|(optional) num_mismatches|0,1,0|number of mismatches at context nucleotides|
 
 # Call DMRs
 This function will take a list of compressed/uncompressed allc files (output files from methylpy pipeline) as input
