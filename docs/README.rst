@@ -220,31 +220,81 @@ An command example for processing paired-end data. Run
         --remove-clonal True \
         --path-to-picard="picard/"
 
+If you would like methylpy to perform binomial test for teasing out
+sites that show methylation above noise level (which is mainly due to
+sodium bisulfite non-conversion), please check options ``--binom-test``
+and ``--unmethylated-control``.
+
 Output format
 ^^^^^^^^^^^^^
 
 Output file(s) are (compressed) tab-separated text file(s) in allc
 format. "allc" stands for all cytosine (C). Each row in an allc file
 corresponds to one cytosine in the genome. An allc file contain 7
-columns and no header:
+mandatory columns and no header. Two additional columns may be added
+with ``--add-snp-info`` option when using ``single-end-pipeline``,
+``paired-end-pipeline`` or ``call-methylation-state`` methods.
 
-+---------+--------------------+------------+-----------------------------------------+
-| index   | column name        | example    | note                                    |
-+=========+====================+============+=========================================+
-| 1       | chromosome         | 12         | with no "chr"                           |
-+---------+--------------------+------------+-----------------------------------------+
-| 2       | position           | 18283342   | 1-based                                 |
-+---------+--------------------+------------+-----------------------------------------+
-| 3       | strand             | +          | either + or -                           |
-+---------+--------------------+------------+-----------------------------------------+
-| 4       | sequence context   | CGT        | can be more than 3 bases                |
-+---------+--------------------+------------+-----------------------------------------+
-| 5       | mc                 | 18         | count of reads supporting methylation   |
-+---------+--------------------+------------+-----------------------------------------+
-| 6       | cov                | 21         | read coverage                           |
-+---------+--------------------+------------+-----------------------------------------+
-| 7       | methylated         | 1          | indicator of significant methylation    |
-+---------+--------------------+------------+-----------------------------------------+
++---------+----------+----------+--------+
+| index   | column   | example  | note   |
+|         | name     |          |        |
++=========+==========+==========+========+
+| 1       | chromoso | 12       | with   |
+|         | me       |          | no     |
+|         |          |          | "chr"  |
++---------+----------+----------+--------+
+| 2       | position | 18283342 | 1-base |
+|         |          |          | d      |
++---------+----------+----------+--------+
+| 3       | strand   | +        | either |
+|         |          |          | + or - |
++---------+----------+----------+--------+
+| 4       | sequence | CGT      | can be |
+|         | context  |          | more   |
+|         |          |          | than 3 |
+|         |          |          | bases  |
++---------+----------+----------+--------+
+| 5       | mc       | 18       | count  |
+|         |          |          | of     |
+|         |          |          | reads  |
+|         |          |          | suppor |
+|         |          |          | ting   |
+|         |          |          | methyl |
+|         |          |          | ation  |
++---------+----------+----------+--------+
+| 6       | cov      | 21       | read   |
+|         |          |          | covera |
+|         |          |          | ge     |
++---------+----------+----------+--------+
+| 7       | methylat | 1        | indica |
+|         | ed       |          | tor    |
+|         |          |          | of     |
+|         |          |          | signif |
+|         |          |          | icant  |
+|         |          |          | methyl |
+|         |          |          | ation  |
++---------+----------+----------+--------+
+| 8       | (optiona | 3,2,3    | number |
+|         | l)       |          | of     |
+|         | num\_mat |          | match  |
+|         | ches     |          | baseca |
+|         |          |          | lls    |
+|         |          |          | at     |
+|         |          |          | contex |
+|         |          |          | t      |
+|         |          |          | nucleo |
+|         |          |          | tides  |
++---------+----------+----------+--------+
+| 9       | (optiona | 0,1,0    | number |
+|         | l)       |          | of     |
+|         | num\_mis |          | mismat |
+|         | matches  |          | ches   |
+|         |          |          | at     |
+|         |          |          | contex |
+|         |          |          | t      |
+|         |          |          | nucleo |
+|         |          |          | tides  |
++---------+----------+----------+--------+
 
 Call DMRs
 =========
@@ -331,6 +381,21 @@ information.
         --allc-files allc/allc_AD_HT_1.tsv.gz allc/allc_AD_HT_2.tsv.gz \
         --output-file allc/allc_AD_HT.tsv.gz \
         --num-procs 1 \
+        --compress-output True
+
+Filter allc files
+^^^^^^^^^^^^^^^^^
+
+The ``filter-allc`` function is for filtering sites by cytosine context,
+coverage etc. See ``methylpy filter-allc -h`` for more information.
+
+::
+
+    methylpy filter-allc \
+        --allc-file allc/allc_AD_HT_1.tsv.gz \
+        --output-file allc/allCG_AD_HT_1.tsv.gz \
+        --mc-type CGN \
+        --min-cov 2 \
         --compress-output True
 
 Index allc files
