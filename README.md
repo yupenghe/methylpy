@@ -167,7 +167,7 @@ Output file(s) are (compressed) tab-separated text file(s) in allc format. "allc
 for all cytosine (C). Each row in an allc file corresponds to one cytosine in the genome. 
 An allc file contain 7 mandatory columns and no header. Two additional columns may be added
 with `--add-snp-info` option when using `single-end-pipeline`, `paired-end-pipeline` or
-`call-methylation-state` methods.
+`call-methylation-state` methods. 
 
 |index|column name|example|note|
 |:----:|:-----:|:-----:|:---:|
@@ -177,7 +177,7 @@ with `--add-snp-info` option when using `single-end-pipeline`, `paired-end-pipel
 |4|sequence context|CGT|can be more than 3 bases|
 |5|mc|18|count of reads supporting methylation|
 |6|cov|21|read coverage|
-|7|methylated|1|indicator of significant methylation|
+|7|methylated|1|indicator of significant methylation (1 if no test is performed)|
 |8|(optional) num\_matches|3,2,3|number of match basecalls at context nucleotides|
 |9|(optional) num\_mismatches|0,1,0|number of mismatches at context nucleotides|
 
