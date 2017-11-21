@@ -128,7 +128,7 @@ def convert_allc_to_bigwig(input_allc_file,
                                            mc_level])+"\n")
                 # reset
                 cur_chrom = fields[0]
-                bin_end = int(pos/100+1) * bin_size
+                bin_end = int(float(pos)/float(bin_size)+1) * bin_size
                 bin_mc, bin_h, bin_site = 0, 0, 0
 
             # update
