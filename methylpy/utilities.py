@@ -102,53 +102,7 @@ def convert_allc_to_bigwig(input_allc_file,
 
     mc_class = expand_nucleotide_code(mc_type)
 
-    # prepare wig file
-    cur_chrom = ""
-    bin_end = bin_size
-    bin_mc, bin_h, bin_site = 0, 0, 0
-    g = open(output_file+".wig",'w')
-    with open_allc_file(input_allc_file) as f:
-        for line in f:
-            fields = line.split("\t")
-            if fields[3] not in mc_class:
-                continue
-            pos = int(fields[1])
-            if cur_chrom != fields[0] or pos >= bin_end:
-                if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
-                    mc_level = str(float(bin_mc)/float(bin_h))
-                    if add_chr_prefix and not cur_chrom.startswith("chr"):
-                        g.write("\t".join(["chr"+cur_chrom,
-                                           str(bin_end-bin_size),
-                                           str(bin_end),
-                                           mc_level])+"\n")
-                    else:
-                        g.write("\t".join([cur_chrom,
-                                           str(bin_end-bin_size),
-                                           str(bin_end),
-                                           mc_level])+"\n")
-                # reset
-                cur_chrom = fields[0]
-                bin_end = int(float(pos)/float(bin_size)+1) * bin_size
-                bin_mc, bin_h, bin_site = 0, 0, 0
-
-            # update
-            bin_mc += int(fields[4])
-            bin_h += int(fields[5])
-            bin_site += 1
-
-    if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
-        mc_level = str(float(bin_mc)/float(bin_h))
-        if add_chr_prefix and not cur_chrom.startswith("chr"):
-            g.write("\t".join(["chr"+cur_chrom,
-                               str(bin_end-bin_size),
-                               str(bin_end),
-                               mc_level])+"\n")
-        else:
-            g.write("\t".join([cur_chrom,
-                               str(bin_end-bin_size),
-                               str(bin_end),
-                               mc_level])+"\n")
-    g.close()
+    chrom_end = {}
 
     # chromosome size
     try:
@@ -171,11 +125,66 @@ def convert_allc_to_bigwig(input_allc_file,
                 fields[0] = "chr"+fields[0]
         elif remove_chr_prefix and fields[0].startswith("chr"):
             fields[0] = fields[0][3:]
+        chrom_end[fields[0]] = int(fields[1])
         g.write(fields[0]+"\t"+fields[1]+"\n")
     g.close()
 
+    # prepare wig file
+    cur_chrom = ""
+    bin_start, bin_end = 0, 0
+    bin_mc, bin_h, bin_site = 0, 0, 0
+    g = open(output_file+".wig",'w')
+    with open_allc_file(input_allc_file) as f:
+        for line in f:
+            fields = line.split("\t")
+            if fields[3] not in mc_class:
+                continue
+            pos = int(fields[1]) - 1
+            if cur_chrom != fields[0] or pos >= bin_end:
+                if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
+                    mc_level = str(float(bin_mc)/float(bin_h))
+                    if add_chr_prefix and not cur_chrom.startswith("chr"):
+                        g.write("\t".join(["chr"+cur_chrom,
+                                           str(bin_start),
+                                           str(bin_end),
+                                           mc_level])+"\n")
+                    else:
+                        g.write("\t".join([cur_chrom,
+                                           str(bin_start),
+                                           str(bin_end),
+                                           mc_level])+"\n")
+                if pos >= chrom_end[fields[0]]:
+                    print_warning("Skip site beyond chromosome boundary: "+line)
+                    cur_chrom = fields[0]
+                    bin_mc, bin_h, bin_site = 0, 0, 0
+                    continue
+                # reset
+                cur_chrom = fields[0]
+                bin_mc, bin_h, bin_site = 0, 0, 0
+                bin_end = int(float(pos)/float(bin_size)+1) * bin_size
+                bin_start = bin_end - bin_size
+                if bin_end > chrom_end[fields[0]]:
+                    bin_end = chrom_end[fields[0]]
+            # update mc, h and site
+            bin_mc += int(fields[4])
+            bin_h += int(fields[5])
+            bin_site += 1
+    if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
+        mc_level = str(float(bin_mc)/float(bin_h))
+        if add_chr_prefix and not cur_chrom.startswith("chr"):
+            g.write("\t".join(["chr"+cur_chrom,
+                               str(bin_start),
+                               str(bin_end),
+                               mc_level])+"\n")
+        else:
+            g.write("\t".join([cur_chrom,
+                               str(bin_start),
+                               str(bin_end),
+                               mc_level])+"\n")
+    g.close()
+
     # generate bigwig file
-    subprocess.check_call(shlex.split(path_to_wigToBigWig + "wigToBigWig -clip "
+    subprocess.check_call(shlex.split(path_to_wigToBigWig + "wigToBigWig "
                                       +"%s.wig " %(output_file)
                                       +"%s.chrom_size " %(output_file)
                                       +output_file),stderr=subprocess.PIPE)
