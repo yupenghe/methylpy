@@ -1698,7 +1698,7 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
     ## Input
     if not generate_mpileup_file:
         cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+\
-              +" -q "+min_mapq+" -B -f "+reference_fasta+" "+inputf
+              +" -q "+str(min_mapq)+" -B -f "+reference_fasta+" "+inputf
         pipes = subprocess.Popen(shlex.split(cmd),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
@@ -1709,7 +1709,7 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
             subprocess.check_call(
                 shlex.split(
                     path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)
-                    +" -q "+min_mapq
+                    +" -q "+str(min_mapq)
                     +" -B -f "+reference_fasta+" "+inputf),
                 stdout=f)
         fhandle = open(path_to_files+sample+"_mpileup_output.tsv" ,'r')
