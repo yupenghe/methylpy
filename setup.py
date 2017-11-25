@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='methylpy',
-    version='1.1.7',
+    version='1.1.8',
     author='Yupeng He',
     author_email='yupeng.he.bioinfo@gmail.com',
     packages=['methylpy'], 

@@ -96,6 +96,7 @@ def parse_args():
                                    path_to_aligner=args.path_to_aligner,
                                    aligner_options=args.aligner_options,
                                    merge_by_max_mapq=args.merge_by_max_mapq,
+                                   min_mapq=args.min_mapq,
                                    remove_clonal=args.remove_clonal,
                                    path_to_picard=args.path_to_picard,
                                    keep_clonal_stats=args.keep_clonal_stats,
@@ -142,6 +143,7 @@ def parse_args():
                                       path_to_aligner=args.path_to_aligner,
                                       aligner_options=args.aligner_options,
                                       merge_by_max_mapq=args.merge_by_max_mapq,
+                                      min_mapq=args.min_mapq,
                                       remove_clonal=args.remove_clonal,
                                       path_to_picard=args.path_to_picard,
                                       keep_clonal_stats=args.keep_clonal_stats,
@@ -169,7 +171,7 @@ def parse_args():
           bam_quality_mch_filter(inputf=args.input_file,
                                  outputf=args.output_file,
                                  reference_fasta=args.ref_fasta,
-                                 quality_cutoff=args.quality_cutoff,
+                                 min_mapq=args.min_mapq,
                                  min_ch=args.min_num_ch,
                                  max_mch_level=args.max_mch_level,
                                  buffer_line_number=args.buffer_line_number,
@@ -188,6 +190,7 @@ def parse_args():
                                         num_downstr_bases=args.num_downstream_bases,
                                         generate_mpileup_file=args.generate_mpileup_file,
                                         compress_output=args.compress_output,
+                                        min_mapq=args.min_mapq,
                                         min_cov=args.min_cov,
                                         binom_test=args.binom_test,
                                         path_to_samtools=args.path_to_samtools,
@@ -207,6 +210,7 @@ def parse_args():
                                      num_downstr_bases=args.num_downstream_bases,
                                      generate_mpileup_file=args.generate_mpileup_file,
                                      compress_output=args.compress_output,
+                                     min_mapq=args.min_mapq,
                                      min_cov=args.min_cov,
                                      binom_test=args.binom_test,
                                      path_to_samtools=args.path_to_samtools,
@@ -687,6 +691,11 @@ def add_se_pipeline_subparser(subparsers):
                                 help="float indicating the adjusted p-value cutoff you wish to use for "
                                 + "determining whether or not a site is methylated")
 
+     parser_se_opt.add_argument("--min-mapq",
+                                type=int,
+                                default=2,
+                                help="Minimum MAPQ for reads to be included.")
+
      parser_se_opt.add_argument("--min-cov",
                                 type=int,
                                 default=0,
@@ -972,6 +981,11 @@ def add_pe_pipeline_subparser(subparsers):
                                 help="float indicating the adjusted p-value cutoff you wish to use for "
                                 + "determining whether or not a site is methylated")
 
+     parser_pe_opt.add_argument("--min-mapq",
+                                type=int,
+                                default=2,
+                                help="Minimum MAPQ for reads to be included.")
+
      parser_pe_opt.add_argument("--min-cov",
                                 type=int,
                                 default=0,
@@ -1100,7 +1114,7 @@ def add_bam_filter_subparser(subparsers):
                                     +"sequences you used for mapping")
      
      parser_filter_opt = parser_filter.add_argument_group("optional inputs")
-     parser_filter_opt.add_argument("--quality-cutoff",
+     parser_filter_opt.add_argument("--min-mapq",
                                     type=int,
                                     default=30,
                                     help="Minimum MAPQ for reads to be included.")
@@ -1243,6 +1257,11 @@ def add_call_mc_subparser(subparsers):
                               help="float indicating the adjusted p-value cutoff you wish to use for "
                               + "determining whether or not a site is methylated")
 
+     call_mc_opt.add_argument("--min-mapq",
+                              type=int,
+                              default=2,
+                              help="Minimum MAPQ for reads to be included.")
+     
      call_mc_opt.add_argument("--min-cov",
                               type=int,
                               default=0,

@@ -33,7 +33,7 @@ def run_methylation_pipeline(read_files, sample,
                              trim_reads=True, path_to_cutadapt="",
                              pbat=False,check_dependency=True,
                              bowtie2=True, path_to_aligner="", aligner_options=None,
-                             merge_by_max_mapq=False,
+                             merge_by_max_mapq=False,min_mapq=2,
                              remove_clonal=False,keep_clonal_stats=True,
                              path_to_picard="",java_options="-Xmx20g",
                              path_to_samtools="",
@@ -219,6 +219,7 @@ def run_methylation_pipeline(read_files, sample,
                                             aligner_options=aligner_options,
                                             merge_by_max_mapq=merge_by_max_mapq,
                                             pbat=pbat,
+                                            min_mapq=min_mapq,
                                             num_procs=num_procs,
                                             trim_reads=trim_reads,
                                             path_to_cutadapt=path_to_cutadapt,
@@ -299,6 +300,7 @@ def run_methylation_pipeline(read_files, sample,
                               num_downstr_bases=num_downstr_bases,
                               generate_mpileup_file=generate_mpileup_file,
                               compress_output=compress_output,
+                              min_mapq=min_mapq,
                               min_cov=min_cov,
                               binom_test=binom_test,
                               remove_chr_prefix=remove_chr_prefix,
@@ -314,7 +316,7 @@ def run_mapping(current_library, library_files, sample,
                 path_to_output="",
                 path_to_samtools="", path_to_aligner="",
                 aligner_options=None,merge_by_max_mapq=False,
-                pbat=False,
+                min_mapq=2,pbat=False,
                 num_procs=1, trim_reads=True, path_to_cutadapt="",
                 adapter_seq="AGATCGGAAGAGCACACGTCTG",
                 max_adapter_removal=None, overlap_length=None, zero_cap=None,
@@ -490,6 +492,7 @@ def run_mapping(current_library, library_files, sample,
                               path_to_output=path_to_output,
                               aligner_options=aligner_options,
                               merge_by_max_mapq=merge_by_max_mapq,
+                              min_mapq=min_mapq,
                               path_to_aligner=path_to_aligner, num_procs=num_procs,
                               keep_temp_files=keep_temp_files,
                               bowtie2=bowtie2, sort_mem=sort_mem)
@@ -746,7 +749,8 @@ def run_bowtie(current_library,library_read_files,
                forward_reference,reverse_reference,reference_fasta,
                path_to_output="",
                path_to_samtools="",
-               path_to_aligner="",aligner_options="",merge_by_max_mapq=False,
+               path_to_aligner="",aligner_options="",
+               merge_by_max_mapq=False,min_mapq=2,
                num_procs=1,keep_temp_files=False, bowtie2=False, sort_mem="500M"):
     """
     This function runs bowtie on the forward and reverse converted bisulfite references 
@@ -817,7 +821,12 @@ def run_bowtie(current_library,library_read_files,
         args.append(prefix+"_forward_strand_hits.sam")
     subprocess.check_call(shlex.split(" ".join(args)))
     print_checkpoint("Processing forward strand hits")
-    find_multi_mappers(prefix+"_forward_strand_hits.sam",prefix,num_procs=num_procs,keep_temp_files=keep_temp_files)
+    find_multi_mappers(prefix+"_forward_strand_hits.sam",
+                       prefix,
+                       num_procs=num_procs,
+                       min_mapq=min_mapq,
+                       append=False,
+                       keep_temp_files=keep_temp_files)
 
     if bowtie2:
         args = [path_to_aligner+"bowtie2"]
@@ -835,7 +844,12 @@ def run_bowtie(current_library,library_read_files,
         args.append(prefix+"_reverse_strand_hits.sam")
     subprocess.check_call(shlex.split(" ".join(args)))    
     print_checkpoint("Processing reverse strand hits")
-    sam_header = find_multi_mappers(prefix+"_reverse_strand_hits.sam",prefix,num_procs=num_procs,append=True,keep_temp_files=keep_temp_files)
+    sam_header = find_multi_mappers(prefix+"_reverse_strand_hits.sam",
+                                    prefix,
+                                    num_procs=num_procs,
+                                    min_mapq=min_mapq,
+                                    append=True,
+                                    keep_temp_files=keep_temp_files)
     ## Clear temporary files
     if num_procs > 1:
         pool = multiprocessing.Pool(num_procs)
@@ -885,7 +899,8 @@ def run_bowtie(current_library,library_read_files,
                                           output_bam_file ))
     return total_unique
  
-def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=False):
+def find_multi_mappers(inputf,output,num_procs=1,min_mapq=2,
+                       keep_temp_files=False,append=False):
     """
     This function takes a sam file generated by bowtie and pulls out any mapped reads.
     It splits these mapped reads into num_procs number of files.
@@ -905,6 +920,7 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
         mapped reads) and True for the second. This option is mainly for safety. It ensures that files from
         previous runs are erased.
     """
+    min_mapq = max(2,min_mapq)
     sam_header = []
     file_handles = {}
     f = open(inputf,'r')
@@ -921,7 +937,7 @@ def find_multi_mappers(inputf,output,num_procs=1,keep_temp_files=False,append=Fa
 
         fields = line.split("\t")
         # minimum QC
-        if fields[2] == "*" or int(fields[4]) < 2:
+        if fields[2] == "*" or int(fields[4]) < min_mapq:
             continue
         header = fields[0].split("!")
         #BIG ASSUMPTION!! NO TABS IN FASTQ HEADER LINES EXCEPT THE ONES I ADD!
@@ -1291,6 +1307,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                           generate_mpileup_file=True,
                           compress_output=True,
                           buffer_line_number = 100000,
+                          min_mapq=2,
                           min_cov=1,binom_test=True,
                           path_to_samtools="",
                           remove_chr_prefix=True,
@@ -1334,6 +1351,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                                                    generate_mpileup_file=generate_mpileup_file,
                                                    compress_output=compress_output,
                                                    buffer_line_number=buffer_line_number,
+                                                   min_mapq=min_mapq,
                                                    min_cov=min_cov,
                                                    binom_test=binom_test,
                                                    path_to_samtools=path_to_samtools,
@@ -1380,7 +1398,8 @@ def call_methylated_sites(inputf, sample, reference_fasta,
 
     ## Input
     if not generate_mpileup_file:
-        cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf
+        cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+\
+              +" -q "+str(min_mapq)+" -B -f "+reference_fasta+" "+inputf
         pipes = subprocess.Popen(shlex.split(cmd),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
@@ -1390,8 +1409,9 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         with open(path_to_files+sample+"_mpileup_output.tsv",'w') as f:
             subprocess.check_call(
                 shlex.split(
-                    path_to_samtools+"samtools mpileup -Q "+
-                    str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf),
+                    path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)
+                    +" -q "+str(min_mapq)
+                    +" -B -f "+reference_fasta+" "+inputf),
                 stdout=f)
         fhandle = open(path_to_files+sample+"_mpileup_output.tsv" ,'r')
 
@@ -1594,7 +1614,7 @@ def analyze_read_basecalls(ref,read_bases):
                             read_bases.count('t')+ \
                             read_bases.count('c')+ \
                             read_bases.count('g')
-        cons_basecalls = read_bases.count(',')
+        cons_basecalls = read_bases.count('.')
         return (str(cons_basecalls),str(incons_basecalls))
     else:
         return ('0',str(incons_basecalls))
@@ -1606,6 +1626,7 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
                                         generate_mpileup_file=True,
                                         compress_output=True,
                                         buffer_line_number = 100000,
+                                        min_mapq=20,
                                         min_cov=1,binom_test=True,
                                         path_to_samtools="",
                                         remove_chr_prefix=True,
@@ -1676,7 +1697,8 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
 
     ## Input
     if not generate_mpileup_file:
-        cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf
+        cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+\
+              +" -q "+min_mapq+" -B -f "+reference_fasta+" "+inputf
         pipes = subprocess.Popen(shlex.split(cmd),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
@@ -1686,8 +1708,9 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
         with open(path_to_files+sample+"_mpileup_output.tsv",'w') as f:
             subprocess.check_call(
                 shlex.split(
-                    path_to_samtools+"samtools mpileup -Q "+
-                    str(min_base_quality)+" -B -f "+reference_fasta+" "+inputf),
+                    path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)
+                    +" -q "+min_mapq
+                    +" -B -f "+reference_fasta+" "+inputf),
                 stdout=f)
         fhandle = open(path_to_files+sample+"_mpileup_output.tsv" ,'r')
 
@@ -2253,7 +2276,7 @@ def filter_files_by_pvalue_combined(input_files,output_file,
 def bam_quality_mch_filter(inputf,
                            outputf,
                            reference_fasta,
-                           quality_cutoff = 30,
+                           min_mapq = 30,
                            min_ch = 3,
                            max_mch_level = 0.7,
                            buffer_line_number = 100000,
@@ -2278,7 +2301,7 @@ def bam_quality_mch_filter(inputf,
     max_mch_level = float(max_mch_level)
     
     # quality filter
-    cmd = path_to_samtools+"samtools view -q"+str(quality_cutoff)+" "+inputf
+    cmd = path_to_samtools+"samtools view -q"+str(min_mapq)+" "+inputf
     pipes = subprocess.Popen(shlex.split(cmd),
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE,

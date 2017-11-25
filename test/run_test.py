@@ -270,7 +270,7 @@ if bowtie:
                     +"--output-file results/se_bt_processed_reads.filtered.bam "
                     +"--ref-fasta data/chrL.fa "
                     +"--path-to-samtools "+path_to_samtools+" "
-                    +"--quality-cutoff 30 "
+                    +"--min-mapq 30 "
                     +"--min-num-ch 3 "
                     +"--max-mch-level 0.7 "
                     +"--buffer-line-number 100"),
@@ -283,7 +283,7 @@ if bowtie2:
                     +"--output-file results/se_bt2_processed_reads.filtered.bam "
                     +"--ref-fasta data/chrL.fa "
                     +"--path-to-samtools "+path_to_samtools+" "
-                    +"--quality-cutoff 30 "
+                    +"--min-mapq 30 "
                     +"--min-num-ch 3 "
                     +"--max-mch-level 0.7 "
                     +"--buffer-line-number 100"),

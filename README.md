@@ -294,7 +294,7 @@ methylpy bam-quality-filter \
 	--input-file mESC_processed_reads_no_clonal.bam \
 	--output-file mESC_processed_reads_no_clonal.filtered.bam \
 	--ref-fasta mm10_bt2/mm10.fa \
-	--quality-cutoff 30 \
+	--min-mapq 30 \
 	--min-num-ch 3 \
 	--max-mch-level 0.7 \
 	--buffer-line-number 100
