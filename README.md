@@ -273,7 +273,7 @@ calculated in equally divided non-overlapping genomic bins and the output will b
 file. See `methylpy allc-to-bigwig -h` for more information. 
 ```
 methylpy allc-to-bigwig \
-	--input-allc-file results/allc_mESC.tsv.gz \
+	--allc-file results/allc_mESC.tsv.gz \
 	--output-file results/allc_mESC.bw \
 	--ref-fasta mm10_bt2/mm10.fa \
 	--mc-type CGN \
