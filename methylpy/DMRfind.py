@@ -793,9 +793,13 @@ def get_methylation_levels_DMRfind(input_tsv_file,
         line = line.rstrip("\n")
         fields = line.split("\t")
         if input_no_header:
-            g.write("\t".join(["chr","start","end"])+"\t"+
-                    "\t".join(["col_"+str(ind) for ind in range(3,len(fields))])+"\t"+
-                    "\t".join(["methylation_level_"+sample for sample in samples])+"\n")            
+            if len(fields) != 3:
+                g.write("\t".join(["chr","start","end"])+"\t"+
+                        "\t".join(["col_"+str(ind) for ind in range(3,len(fields))])+"\t"+
+                        "\t".join(["methylation_level_"+sample for sample in samples])+"\n")
+            elif len(fields) == 3:
+                g.write("\t".join(["chr","start","end"])+"\t"+
+                        "\t".join(["methylation_level_"+sample for sample in samples])+"\n")
             f.seek(0)
         else:
             g.write("\t".join(fields)+"\t"+
