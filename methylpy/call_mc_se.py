@@ -308,7 +308,8 @@ def run_methylation_pipeline(read_files, sample,
                               path_to_files=path_to_output,
                               path_to_samtools=path_to_samtools,
                               add_snp_info=add_snp_info,
-                              min_base_quality=min_base_quality)
+                              min_base_quality=min_base_quality,
+                              keep_temp_files=keep_temp_files)
     print_checkpoint("Done")
 
 def run_mapping(current_library, library_files, sample,
@@ -1313,7 +1314,8 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                           remove_chr_prefix=True,
                           sort_mem="500M",
                           add_snp_info=False,
-                          path_to_files="",min_base_quality=1):
+                          path_to_files="",min_base_quality=1,
+                          keep_temp_files=False):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads
@@ -1358,7 +1360,8 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                                                    remove_chr_prefix=remove_chr_prefix,
                                                    sort_mem=sort_mem,
                                                    path_to_files=path_to_files,
-                                                   min_base_quality=min_base_quality)
+                                                   min_base_quality=min_base_quality,
+                                                   keep_temp_files=keep_temp_files)
 
     
     if binom_test and unmethylated_control is None:
@@ -1632,7 +1635,8 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
                                         remove_chr_prefix=True,
                                         sort_mem="500M",
                                         add_snp_info=False,
-                                        path_to_files="",min_base_quality=1):
+                                        path_to_files="",min_base_quality=1,
+                                        keep_temp_files=False):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads

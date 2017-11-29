@@ -329,7 +329,8 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                  sort_mem=sort_mem,
                                  path_to_files=path_to_output,
                                  path_to_samtools=path_to_samtools,
-                                 min_base_quality=min_base_quality)
+                                 min_base_quality=min_base_quality,
+                                 keep_temp_files=keep_temp_files)
     print_checkpoint("Done")
 
 def run_mapping_pe(current_library, library_read1_files, library_read2_files,
@@ -1217,7 +1218,8 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                              remove_chr_prefix=True,
                              add_snp_info=False,
                              sort_mem="500M",
-                             path_to_files="",min_base_quality=1):
+                             path_to_files="",min_base_quality=1,
+                             keep_temp_files=False):
 
     """
     inputf is the path to a bam file that contains mapped bisulfite sequencing reads
@@ -1275,7 +1277,8 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                           path_to_files = path_to_files,
                           min_base_quality = min_base_quality,
                           remove_chr_prefix = remove_chr_prefix,
-                          add_snp_info  = add_snp_info)
+                          add_snp_info  = add_snp_info,
+                          keep_temp_files = keep_temp_files)
 
     #Remove intermediate bam file
     try:
