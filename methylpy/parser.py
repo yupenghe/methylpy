@@ -696,7 +696,7 @@ def add_se_pipeline_subparser(subparsers):
 
      parser_se_opt.add_argument("--min-mapq",
                                 type=int,
-                                default=2,
+                                default=30,
                                 help="Minimum MAPQ for reads to be included.")
 
      parser_se_opt.add_argument("--min-cov",
@@ -986,7 +986,7 @@ def add_pe_pipeline_subparser(subparsers):
 
      parser_pe_opt.add_argument("--min-mapq",
                                 type=int,
-                                default=2,
+                                default=30,
                                 help="Minimum MAPQ for reads to be included.")
 
      parser_pe_opt.add_argument("--min-cov",
@@ -1262,7 +1262,7 @@ def add_call_mc_subparser(subparsers):
 
      call_mc_opt.add_argument("--min-mapq",
                               type=int,
-                              default=2,
+                              default=30,
                               help="Minimum MAPQ for reads to be included.")
      
      call_mc_opt.add_argument("--min-cov",
