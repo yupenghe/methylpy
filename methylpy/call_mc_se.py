@@ -953,8 +953,8 @@ def find_multi_mappers(inputf,output,num_procs=1,min_mapq=2,
             print_warning("  Failed to recover unconverted sequence for:\n"+line+"\n")
             print_warning(header[-1]+"\n")
     f.close()
-    if keep_temp_files == False:
-        subprocess.check_call(shlex.split("rm "+inputf))
+
+    subprocess.check_call(shlex.split("rm "+inputf))
     for file_num in range(0,num_procs):
         file_handles[file_num].close()
     
@@ -1522,7 +1522,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
     fhandle.close()
     output_filehandler.close()
 
-    if generate_mpileup_file:
+    if generate_mpileup_file and not keep_temp_files:
         subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output.tsv"))
 
     if binom_test:
@@ -1829,7 +1829,7 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
     fhandle.close()
     output_filehandler.close()
 
-    if generate_mpileup_file:
+    if generate_mpileup_file and not keep_temp_files:
         subprocess.check_call(shlex.split("rm -f "+path_to_files+sample+"_mpileup_output.tsv"))
 
     if binom_test:
