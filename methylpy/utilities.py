@@ -191,15 +191,68 @@ def convert_allc_to_bigwig(input_allc_file,
     subprocess.check_call(shlex.split("rm "+output_file+".wig "+output_file+".chrom_size"))
 
 
-def filter_allc_file(allc_file,
-                     output_file,
-                     mc_type="CGN",
+def filter_allc_file(allc_files,
+                     output_files,
+                     num_procs=1,
+                     mc_type=None,
                      chroms = None,
                      compress_output=False,
                      min_cov=0,
+                     max_mismatch=None,
+                     max_mismatch_frac=None,
                      buffer_line_number=100000):
 
-    mc_class = expand_nucleotide_code(mc_type)
+    # User input checks
+    if not isinstance(allc_files, list):
+        exit("allc files must be a list of string(s)")
+    if not isinstance(output_files, list):
+        exit("output files must be a list of string(s)")
+    if len(allc_files) != len(output_files):
+        exit("Number of allc files does not match number of output files")
+
+    if num_procs > 1:
+        pool = multiprocessing.Pool(min(num_procs,len(allc_files)))
+        print_checkpoint("Filtering allc files using "
+                         +str(min(num_procs,len(allc_files)))
+                         +" node(s).")
+        for allc_file,output_file in zip(allc_files,output_files):
+            pool.apply_async(filter_allc_file_worker,
+                             (),
+                             {"allc_file":allc_file,
+                              "output_file":output_file,
+                              "mc_type":mc_type,
+                              "chroms":chroms,
+                              "compress_output":compress_output,
+                              "min_cov":min_cov,
+                              "max_mismatch":max_mismatch,
+                              "max_mismatch_frac":max_mismatch_frac
+                             })
+        pool.close()
+        pool.join()
+    else:
+        print_checkpoint("Filtering allc files using single node.")
+        for allc_file,output_file in zip(allc_files,output_files):
+            filter_allc_file_worker(allc_file=allc_file,
+                                    output_file=output_file,
+                                    mc_type=mc_type,
+                                    chroms=chroms,
+                                    compress_output=compress_output,
+                                    min_cov=min_cov,
+                                    max_mismatch=max_mismatch,
+                                    max_mismatch_frac=max_mismatch_frac)
+    
+def filter_allc_file_worker(allc_file,
+                            output_file,
+                            mc_type=None,
+                            chroms = None,
+                            compress_output=False,
+                            min_cov=0,
+                            max_mismatch=None,
+                            max_mismatch_frac=None,
+                            buffer_line_number=100000):
+
+    if mc_type is not None:
+        mc_class = expand_nucleotide_code(mc_type)
     # input & output
     f = open_allc_file(allc_file)
     if compress_output:
@@ -214,14 +267,48 @@ def filter_allc_file(allc_file,
     for line in f:
         fields = line.split("\t")
         if (chroms is None or fields[0] in chroms) \
-           and fields[3] in mc_class \
+           and (mc_type is None or fields[3] in mc_class) \
            and int(fields[5]) >= min_cov:
-            line_counts += 1
-            out += line
+            pass
+        else:
+            continue
+        
+        if max_mismatch is not None or max_mismatch_frac is not None:
+            try:
+                matches = map(int,fields[7].split(","))
+                mismatches = map(int,fields[8].split(","))
+            except:
+                print_error("allc file "+allc_file+"does not contain SNP information used "
+                            +"for applying mismatch-based filtering!\n")
+            pass_snp_filter = True
+            if max_mismatch is not None:
+                try:
+                    for index,cutoff in enumerate(max_mismatch):
+                        if mismatches[index] > cutoff:
+                            pass_snp_filter = False
+                            break
+                except:
+                    pass
+            if max_mismatch_frac is not None:
+                try:
+                    for index,cutoff in enumerate(max_mismatch_frac):
+                        cov = mismatches[index] + matches[index]
+                        if cov > 0 and float(mismatches[index])/float(cov) > cutoff:
+                            pass_snp_filter = False
+                            break
+                except:
+                    pass
+            if not pass_snp_filter:
+                continue
+            
+        line_counts += 1
+        out += line
+        # print out once reach buffer limit
         if line_counts > buffer_line_number:
             output_fhandler.write(out)
             line_counts = 0
             out = ""
+    # clear buffer
     if line_counts > 0:
         output_fhandler.write(out)
         out = ""
@@ -382,16 +469,17 @@ def merge_allc_files_worker(allc_files,
     fhandles = []
     chrom_pointer = []
     chroms = set([])
-    try:
+    #try:
+    if True:
         for index,allc_file in enumerate(allc_files):
             fhandles.append(open_allc_file(allc_file))
             chrom_pointer.append(read_allc_index(allc_file))
             for chrom in chrom_pointer[index].keys():
                 chroms.add(chrom)
-    except:
-        for f in fhandles:
-            f.close()
-        exit() # exit due to failure of openning all allc files at once
+   # except:
+   #     for f in fhandles:
+   #         f.close()
+   #     exit() # exit due to failure of openning all allc files at once
     if query_chroms is not None:
         if isinstance(query_chroms,list):
             chroms = query_chroms

@@ -246,11 +246,14 @@ def parse_args():
                                 no_reindex=args.no_reindex)
      elif args.command == "filter-allc":
           from methylpy.utilities import filter_allc_file
-          filter_allc_file(allc_file=args.allc_file,
-                           output_file=args.output_file,
+          filter_allc_file(allc_files=args.allc_files,
+                           output_files=args.output_files,
+                           num_procs=args.num_procs,
                            mc_type=args.mc_type,
                            chroms=args.chroms,
                            compress_output=args.compress_output,
+                           max_mismatch=args.max_mismatch,
+                           max_mismatch_frac=args.max_mismatch_frac,
                            min_cov=args.min_cov)
 
      elif args.command == "allc-to-bigwig":
@@ -1480,22 +1483,29 @@ def add_filter_allc_subparser(subparsers):
                                      help="Filter allc file")
 
      filter_allc_req = filter_allc.add_argument_group("required inputs")
-     filter_allc_req.add_argument("--allc-file",
-                             type=str,
-                             required=True,
-                             help="Allc file to filter.")
+     filter_allc_req.add_argument("--allc-files",
+                                  type=str,
+                                  required=True,
+                                  nargs="+",
+                                  help="allc files to filter.")
 
-     filter_allc_req.add_argument("--output-file",
-                             type=str,
-                             required=True,
-                             help="Name of output file.")
-     
+     filter_allc_req.add_argument("--output-files",
+                                  type=str,
+                                  required=True,
+                                  nargs="+",
+                                  help="Name of output files. Each output file matches each allc file.")
+
+     filter_allc_req.add_argument("--num-procs",
+                                  type=int,
+                                  default=1,
+                                  help="Number of processors you wish to use to parallelize this function")
+
      filter_allc_opt = filter_allc.add_argument_group("optional inputs")
 
      filter_allc_opt.add_argument("--mc-type",
                                   type=str,
                                   nargs="+",
-                                  default=["CGN"],
+                                  default=None,
                                   help="List of space separated cytosine nucleotide contexts for "
                                   + "sites to be included in output file. These classifications "
                                   + "may use the wildcards H (indicating anything but a G) and "
@@ -1506,6 +1516,28 @@ def add_filter_allc_subparser(subparsers):
                                   default=0,
                                   help="Minimum number of reads that must cover a site for it to be "
                                   + "included in output file.")
+
+     filter_allc_opt.add_argument("--max-mismatch",
+                                  type=int,
+                                  nargs="+",
+                                  default=None,
+                                  help="Maximum numbers of mismatch basecalls allowed in each nucleotide in "
+                                  +"the sequence context of a site for it to be included in output file. If "
+                                  +"the sequence context has three nucleotides, an example of this option is \"0 1 2\". "
+                                  +"It requires no mismatch basecall at the first nucleotide, at most one mismatch "
+                                  +"basecall at the second nucleotide, and at most two at the third nucleotide for a site "
+                                  +"to be reported.")
+
+     filter_allc_opt.add_argument("--max-mismatch-frac",
+                                  type=float,
+                                  nargs="+",
+                                  default=None,
+                                  help="Maximum fraction of mismatch basecalls out of unambiguous basecalls allowed "
+                                  +"in each nucleotide in the sequence context of a site for it to be included "
+                                  +" in output file. If the sequence context has three nucleotides, an example "
+                                  +"of this option is \"0 0 0.1\". It requires no mismatch basecall at the first "
+                                  +"and second nucleotide, and at most 10% mismatches out of unambiguous basecalls "
+                                  +"at the third nucleotide for a site to be reported.")
 
      filter_allc_opt.add_argument("--compress-output",
                                   type=str2bool,
