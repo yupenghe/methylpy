@@ -236,7 +236,8 @@ def parse_args():
                            output_file=args.output_file,
                            num_procs=args.num_procs,
                            mini_batch=args.mini_batch,
-                           compress_output=args.compress_output)
+                           compress_output=args.compress_output,
+                           skip_snp_info=args.skip_snp_info)
 
      elif args.command == "index-allc":
           from methylpy.utilities import index_allc_file_batch
@@ -1437,6 +1438,11 @@ def add_merge_allc_subparser(subparsers):
                                  default=True,
                                  help="Boolean indicating whether to compress (by gzip) the final output")
 
+     merge_allc_opt.add_argument("--skip-snp-info",
+                                 type=str2bool,
+                                 default=True,
+                                 help="Boolean indicating whether to skip the merging of SNP information")
+     
      merge_allc_opt.add_argument("--mini-batch",
                                  type=int,
                                  default=100,

@@ -233,6 +233,7 @@ def merge_allc_files(allc_files,
                      num_procs=1,
                      mini_batch=100,
                      compress_output=True,
+                     skip_snp_info=True,
                      buffer_line_number=100000):
 
     # User input checks
@@ -252,7 +253,8 @@ def merge_allc_files(allc_files,
                                    output_file,
                                    query_chroms=None,
                                    mini_batch=mini_batch,
-                                   compress_output=compress_output)
+                                   compress_output=compress_output,
+                                   skip_snp_info=skip_snp_info)
         index_allc_file(output_file)
         return 0
         
@@ -275,7 +277,9 @@ def merge_allc_files(allc_files,
                               "output_file":output_file+"_"+str(chrom)+".tsv",
                               "query_chroms":chrom,
                               "mini_batch":mini_batch,
-                              "compress_output":False}
+                              "compress_output":False,
+                              "skip_snp_info":skip_snp_info,
+                             }
             )
         pool.close()
         pool.join()
@@ -306,8 +310,9 @@ def merge_allc_files(allc_files,
               "Do minibatch merging using single processor.")
         merge_allc_files_minibatch(allc_files,
                                    output_file,
-                                   mini_batch,
-                                   compress_output)
+                                   mini_batch=mini_batch,
+                                   compress_output=compress_output,
+                                   skip_snp_info=skip_snp_info)
     # remove temporary files
     for chrom in set(chroms):
         tmp_file = glob.glob(output_file+"_"+str(chrom)+".tsv")
@@ -323,7 +328,8 @@ def merge_allc_files_minibatch(allc_files,
                                output_file,
                                query_chroms=None,
                                mini_batch=100,
-                               compress_output=False):
+                               compress_output=False,
+                               skip_snp_info=True):
     
     # User input checks
     if not isinstance(allc_files, list):
@@ -333,7 +339,8 @@ def merge_allc_files_minibatch(allc_files,
         merge_allc_files_worker(allc_files=allc_files,
                                 output_file=output_file,
                                 query_chroms=query_chroms,
-                                compress_output=compress_output)
+                                compress_output=compress_output,
+                                skip_snp_info=skip_snp_info)
         return 0
     except:
         print("Failed to merge all allc files at once. Do minibatch merging")
@@ -343,7 +350,8 @@ def merge_allc_files_minibatch(allc_files,
     merge_allc_files_worker(allc_files=allc_files[:mini_batch],
                             output_file=output_file,
                             query_chroms=query_chroms,
-                            compress_output=compress_output)
+                            compress_output=compress_output,
+                            skip_snp_info=skip_snp_info)
     # batch merge
     while len(remaining_allc_files) > 0:
         processing_allc_files = [output_file]
@@ -353,7 +361,8 @@ def merge_allc_files_minibatch(allc_files,
         merge_allc_files_worker(allc_files=processing_allc_files,
                                 output_file=output_tmp_file,
                                 query_chroms=query_chroms,
-                                compress_output=compress_output)
+                                compress_output=compress_output,
+                                skip_snp_info=skip_snp_info)
         subprocess.check_call(["mv",output_tmp_file,output_file])
         index_allc_file(output_file)
     return 0
@@ -362,6 +371,7 @@ def merge_allc_files_worker(allc_files,
                             output_file,
                             query_chroms=None,
                             compress_output=False,
+                            skip_snp_info=True,
                             buffer_line_number=100000):
     #User input checks
     if not isinstance(allc_files, list):
@@ -393,7 +403,9 @@ def merge_allc_files_worker(allc_files,
         g = gzip.open(output_file,'wt')
     else:
         g = open(output_file,'w')
+
     # merge allc files
+    out = ""
     for chrom in chroms:
         cur_pos = np.array([np.nan for index in range(len(allc_files))])
         cur_fields = []
@@ -408,15 +420,45 @@ def merge_allc_files_worker(allc_files,
                 cur_pos[index] = int(fields[1])
                 cur_fields[index] = fields
                 num_remaining_allc += 1
+
+        # check consistency of SNP information
+        context_len = None
+        if not skip_snp_info:
+            for index,allc_file in enumerate(allc_files):
+                # skip allc with no data in this chromosome
+                if cur_fields[index] is None:
+                    continue
+                # SNP information is missing
+                if len(cur_fields[index]) < 9:
+                    print_warning("SNP information not found in "+allc_file+"!\n"
+                                  +"Skip SNP information\n")
+                    skip_snp_info = True
+                    break
+                # init contex_len
+                if context_len is None:
+                    context_len = len(cur_fields[index][7].split(","))
+                # check whether contex length are the same
+                if context_len != len(cur_fields[index][7].split(",")) or \
+                   context_len != len(cur_fields[index][8].split(",")):
+                    print_error("Inconsistent sequence context length: "
+                                +allc_file+"\n")
         # merge
-        out = ""
         line_counts = 0
         while num_remaining_allc > 0:
             mc, h = 0, 0
+            if not skip_snp_info:
+                matches = [0 for index in range(context_len)]
+                mismatches = list(matches)
             c_info = None
             for index in np.where(cur_pos == np.nanmin(cur_pos))[0]:
                 mc += int(cur_fields[index][4])
                 h += int(cur_fields[index][5])
+                if not skip_snp_info:
+                    for ind,match,mismatch in zip(range(context_len),
+                                                  cur_fields[index][7].split(","),
+                                                  cur_fields[index][8].split(",")):
+                        matches[ind] += int(match)
+                        mismatches[ind] += int(mismatch)
                 if c_info is None:
                     c_info = "\t".join(cur_fields[index][:4])
                 # update
@@ -429,7 +471,11 @@ def merge_allc_files_worker(allc_files,
                     cur_pos[index] = np.nan
                     num_remaining_allc -= 1
             # output
-            out += c_info+"\t"+str(mc)+"\t"+str(h)+"\t1\n"
+            if not skip_snp_info:
+                out += c_info+"\t"+str(mc)+"\t"+str(h)+"\t1"+"\t" \
+                       +",".join(map(str,matches))+"\t"+",".join(map(str,mismatches))+"\n"
+            else:
+                out += c_info+"\t"+str(mc)+"\t"+str(h)+"\t1\n"
             line_counts += 1
             if line_counts > buffer_line_number:
                 g.write(out)
