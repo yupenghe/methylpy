@@ -7,7 +7,7 @@ from math import ceil, log10
 from multiprocessing import Pool
 from methylpy.utilities import print_checkpoint,expand_nucleotide_code
 from methylpy.utilities import open_allc_file,split_files_by_position
-from methylpy.utilities import filter_allc_file,index_allc_file_batch
+from methylpy.utilities import filter_allc_files,index_allc_file_batch
 from methylpy.utilities import read_allc_index,remove_allc_index
 from scipy.stats import scoreatpercentile
 import subprocess
@@ -129,35 +129,19 @@ def DMRfind(allc_files, samples,
 
 
     # filter allc file
-    if num_procs > 1:
-        pool = Pool(min(num_procs,len(samples)))
-    else:
-        pool = False
     query_allc_files = []
     for allc_file,sample in zip(allc_files,samples):
         query_allc_files.append(output_prefix+"_filtered_allc_"+sample+".tsv")
-        if pool:
-            pool.apply_async(filter_allc_file,
-                             (),
-                             {"allc_file":allc_file,
-                              "output_file":output_prefix+"_filtered_allc_"+sample+".tsv",
-                              "mc_type":mc_type,
-                              "chroms":chroms,
-                              "compress_output":False,
-                              "min_cov":min_cov,
-                              "buffer_line_number":buffer_line_number}
-            )
-        else:
-            filter_allc_file(allc_file=allc_file,
-                             output_file=output_prefix+"_filtered_allc_"+sample+".tsv",
-                             mc_type=mc_type,
-                             chroms=chroms,
-                             compress_output=False,
-                             min_cov=min_cov,
-                             buffer_line_number=buffer_line_number)
-    if pool:
-        pool.close()
-        pool.join()
+
+    filter_allc_files(allc_files=allc_files,
+                      output_files=[output_prefix+"_filtered_allc_"+sample+".tsv" \
+                                    for sample in samples],
+                      num_procs=num_procs,
+                      mc_type=mc_type,
+                      chroms=chroms,
+                      compress_output=False,
+                      min_cov=min_cov,
+                      buffer_line_number=buffer_line_number)
             
     # scan allc file to set up a table for fast look-up of lines belong
     # to different chromosomes

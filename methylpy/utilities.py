@@ -191,16 +191,16 @@ def convert_allc_to_bigwig(input_allc_file,
     subprocess.check_call(shlex.split("rm "+output_file+".wig "+output_file+".chrom_size"))
 
 
-def filter_allc_file(allc_files,
-                     output_files,
-                     num_procs=1,
-                     mc_type=None,
-                     chroms = None,
-                     compress_output=False,
-                     min_cov=0,
-                     max_mismatch=None,
-                     max_mismatch_frac=None,
-                     buffer_line_number=100000):
+def filter_allc_files(allc_files,
+                      output_files,
+                      num_procs=1,
+                      mc_type=None,
+                      chroms = None,
+                      compress_output=False,
+                      min_cov=0,
+                      max_mismatch=None,
+                      max_mismatch_frac=None,
+                      buffer_line_number=100000):
 
     # User input checks
     if not isinstance(allc_files, list):

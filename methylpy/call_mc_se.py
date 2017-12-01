@@ -855,12 +855,18 @@ def run_bowtie(current_library,library_read_files,
     if num_procs > 1:
         pool = multiprocessing.Pool(num_procs)
         for file_num in range(0,num_procs):
-            pool.apply_async(subprocess.check_call,(shlex.split("env LC_COLLATE=C sort" + sort_option + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)),))
+            pool.apply_async(subprocess.check_call,
+                             (shlex.split(
+                                 "env LC_COLLATE=C sort"+sort_option+ \
+                                 " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+ \
+                                 " "+prefix+"_sorted_"+str(file_num)),))
         pool.close()
         pool.join()
     else:
         for file_num in range(0,num_procs):
-            subprocess.check_call(shlex.split("env LC_COLLATE=C sort" + sort_option + " -t '\t' -k 1 -o "+prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)))
+            subprocess.check_call(shlex.split(
+                "env LC_COLLATE=C sort"+sort_option + " -t '\t' -k 1 -o "+ \
+                prefix+"_sorted_"+str(file_num)+" "+prefix+"_sorted_"+str(file_num)))
 
     print_checkpoint("Finding multimappers")
 

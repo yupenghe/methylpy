@@ -245,16 +245,16 @@ def parse_args():
                                 num_procs=args.num_procs,
                                 no_reindex=args.no_reindex)
      elif args.command == "filter-allc":
-          from methylpy.utilities import filter_allc_file
-          filter_allc_file(allc_files=args.allc_files,
-                           output_files=args.output_files,
-                           num_procs=args.num_procs,
-                           mc_type=args.mc_type,
-                           chroms=args.chroms,
-                           compress_output=args.compress_output,
-                           max_mismatch=args.max_mismatch,
-                           max_mismatch_frac=args.max_mismatch_frac,
-                           min_cov=args.min_cov)
+          from methylpy.utilities import filter_allc_files
+          filter_allc_files(allc_files=args.allc_files,
+                            output_files=args.output_files,
+                            num_procs=args.num_procs,
+                            mc_type=args.mc_type,
+                            chroms=args.chroms,
+                            compress_output=args.compress_output,
+                            max_mismatch=args.max_mismatch,
+                            max_mismatch_frac=args.max_mismatch_frac,
+                            min_cov=args.min_cov)
 
      elif args.command == "allc-to-bigwig":
           from methylpy.utilities import convert_allc_to_bigwig
