@@ -524,7 +524,13 @@ def check_clusters(category_dict, min_cluster, block):
     cond_unmeth = [count for category,count in unmeth_count.items()
                    if count >= min_cluster or
                    (total_category[category] < min_cluster and total_category[category] == count)]
-    if len(cond_meth) > 0 or len(cond_unmeth) > 0:
+    # check
+    num_cond_meth = len(cond_meth)
+    num_cond_unmeth = len(cond_meth)
+    num_category = len(total_category.keys())
+    if (num_cond_meth > 0 or num_cond_unmeth > 0) \
+       and num_cond_meth < num_category \
+       and num_cond_unmeth < num_category:
         return True
 
     return False

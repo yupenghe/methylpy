@@ -430,7 +430,7 @@ genomic bins and the output will be stored in a bigwig file. See
 ::
 
     methylpy allc-to-bigwig \
-        --input-allc-file results/allc_mESC.tsv.gz \
+        --allc-file results/allc_mESC.tsv.gz \
         --output-file results/allc_mESC.bw \
         --ref-fasta mm10_bt2/mm10.fa \
         --mc-type CGN \
