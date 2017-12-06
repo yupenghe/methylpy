@@ -927,7 +927,7 @@ def find_multi_mappers(inputf,output,num_procs=1,min_mapq=30,
         mapped reads) and True for the second. This option is mainly for safety. It ensures that files from
         previous runs are erased.
     """
-    min_mapq = max(2,min_mapq)
+    min_mapq = max(3,min_mapq)
     sam_header = []
     file_handles = {}
     f = open(inputf,'r')
@@ -1790,11 +1790,11 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
                 continue
             incons_bases = ",".join(
                     [SNP_info.get(tmp_pos,('0','0'))[0]
-                     for tmp_pos in range(pos-num_downstr_bases,pos+num_upstr_bases+1)]
+                     for tmp_pos in range(pos-num_upstr_bases,pos+num_downstr_bases+1)]
                 )
             incons_bases_cov = ",".join(
                     [SNP_info.get(tmp_pos,('0','0'))[1]
-                     for tmp_pos in range(pos-num_downstr_bases,pos+num_upstr_bases+1)]
+                     for tmp_pos in range(pos-num_upstr_bases,pos+num_downstr_bases+1)]
                 )
             incons_base, incons_base_cov, unconverted_c, converted_c  = SNP_info[pos]
         elif fields[2] == "G":
