@@ -1536,9 +1536,9 @@ def add_filter_allc_subparser(subparsers):
                                   +"in each nucleotide in the sequence context of a site for it to be included "
                                   +" in output file. If the sequence context has three nucleotides, an example "
                                   +"of this option is \"0 0 0.1\". It requires no mismatch basecall at the first "
-                                  +"and second nucleotide, and at most 10% mismatches out of unambiguous basecalls "
+                                  +"and second nucleotide, and at most 10%% mismatches out of unambiguous basecalls "
                                   +"at the third nucleotide for a site to be reported.")
-
+     
      filter_allc_opt.add_argument("--compress-output",
                                   type=str2bool,
                                   default=True,
