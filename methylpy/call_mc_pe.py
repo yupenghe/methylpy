@@ -757,7 +757,7 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,
         mapped reads) and True for the second. This option is mainly for safety. It ensures that files from
         previous runs are erased.
     """
-    min_mapq = max(2,min_mapq)
+    min_mapq = max(3,min_mapq)
     sam_header = []
     file_handles = {}
     f = open(inputf,'r')
