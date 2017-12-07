@@ -579,7 +579,7 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
     #Collapse DMRs into windows
     f = gzip.open(inputf,'rt')
     g = open(output,'w')
-    g.write("chr\tstart\tend\tnumber_of_dms\thypermethylated_samples\thypomethylated_samples\n")
+    g.write("#chr\tstart\tend\tnumber_of_dms\thypermethylated_samples\thypomethylated_samples\n")
     line = f.readline()
     fields = line.split("\t")
     num_samples = int((len(fields) - fields_offset - 2)/5)
