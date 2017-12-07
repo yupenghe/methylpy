@@ -85,14 +85,15 @@ install methylpy and run
 
 If you would like to install methylpy in path of your choice, run
 ``python setup.py install --prefix=/USER/PATH/``. Then, try ``methylpy``
-and if it gives no error, the setup is likely successful. See `Test
+and if no error pops out, the setup is likely successful. See `Test
 methylpy <#test-methylpy>`__ for more rigorious test. Last, processing
-large dataset will require space for storing temporary files. However,
-the default directory is unlikely to fit the need. You may want to set
-the ``TMPDIR`` environmental variable to the absolute path of a
-directory on hard drive with sufficient space (e.g. ``/YOUR/TMP/DIR/``).
-This can be done by adding the below command to ~/.bashrc file:
-``export TMPDIR=/YOUR/TMP/DIR/``.
+large dataset will require large spare space for temporary files.
+Usually, the default directory for temporary files will not meet the
+need. You may want to set the ``TMPDIR`` environmental variable to the
+(absolute) path of a directory on hard drive with sufficient space (e.g.
+``/YOUR/TMP/DIR/``). This can be done by adding the below command to
+``~/.bashrc file``: ``export TMPDIR=/YOUR/TMP/DIR/`` and run
+``source ~/.bashrc``.
 
 Step 2 - Install dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -158,8 +159,20 @@ correctly, run
 
 ::
 
-    cd methylpy/test
+    wget http://neomorph.salk.edu/yupeng/share/methylpy_test.tar.gz
+    tar -xf methylpy_test.tar.gz
+    cd methylpy_test/
     python run_test.py
+
+The test should take around 3 minutes, and progress will be printed on
+screen. After the test is started, two files ``test_output_msg.txt`` and
+``test_error_msg.txt`` will be generated. The former contains more
+details about each test and the later stores error message (if any) as
+well as additional information.
+
+If test fails, please check ``test_error_msg.txt`` for the error
+message. If you decide to submit an issue regarding test failure to
+methylpy github page, please include the error message in this file.
 
 Process data
 ============
