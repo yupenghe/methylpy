@@ -10,12 +10,7 @@ and [PyPI](https://pypi.python.org/pypi/methylpy/).
 
 # Note
 * methylpy was initiated by and built on the work of [Mattew D. Schultz](https://github.com/schultzmattd)
-* [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) is being written
-* In new version, allc files for one sample are no longer split and the current allc format does not support header. Command `cat allc_SAMPLENAME_*.tsv |grep chr -v > allc_SAMPLENAME.tsv` can be used to change the older version of allc to the new version.
-* Current version methylpy has major difference compared to previous version.
-Please checkout this document and [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md)
-for details.
-
+* beta version of [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial/tutorial.md) is released!
 
 # What can methylpy do?
 #### Processing bisulfite sequencing data and NOMe-seq data
@@ -118,7 +113,7 @@ If test fails, please check `test_error_msg.txt` for the error message. If you d
 regarding test failure to methylpy github page, please include the error message in this file.
 
 # Process data
-Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md)
+Please see [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial/tutorial.md).
 for more details.
 
 #### Step 1 - Build converted genome reference
@@ -206,7 +201,7 @@ methylpy DMRfind \
 	--num-procs 8 \
 	--output-prefix DMR_HT_IT
 ```
-Please see [methylpy tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md) for details.
+Please see [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial/tutorial.md) for details.
 
 # Additional functions for data processing
 #### Extract cytosine methylation state from BAM file

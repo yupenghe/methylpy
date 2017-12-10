@@ -17,16 +17,9 @@ Note
 
 -  methylpy was initiated by and built on the work of `Mattew D.
    Schultz <https://github.com/schultzmattd>`__
--  `tutorial <https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md>`__
-   is being written
--  In new version, allc files for one sample are no longer split and the
-   current allc format does not support header. Command
-   ``cat allc_SAMPLENAME_*.tsv |grep chr -v > allc_SAMPLENAME.tsv`` can
-   be used to change the older version of allc to the new version.
--  Current version methylpy has major difference compared to previous
-   version. Please checkout this document and
-   `tutorial <https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md>`__
-   for details.
+-  beta version of
+   `tutorial <https://github.com/yupenghe/methylpy/blob/methylpy/tutorial/tutorial.md>`__
+   is released!
 
 What can methylpy do?
 =====================
@@ -177,8 +170,8 @@ methylpy github page, please include the error message in this file.
 Process data
 ============
 
-Please see `methylpy
-tutorial <https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md>`__
+Please see
+`tutorial <https://github.com/yupenghe/methylpy/blob/methylpy/tutorial/tutorial.md>`__.
 for more details.
 
 Step 1 - Build converted genome reference
@@ -337,8 +330,8 @@ using 8 processors.
         --num-procs 8 \
         --output-prefix DMR_HT_IT
 
-Please see `methylpy
-tutorial <https://github.com/yupenghe/methylpy/blob/methylpy/tutorial.md>`__
+Please see
+`tutorial <https://github.com/yupenghe/methylpy/blob/methylpy/tutorial/tutorial.md>`__
 for details.
 
 Additional functions for data processing
