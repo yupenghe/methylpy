@@ -120,11 +120,8 @@ def convert_allc_to_bigwig(input_allc_file,
     g = open(output_file+".chrom_size",'w')
     for line in f:
         fields = line.split("\t")
-        if add_chr_prefix:
-            if not fields[0].startswith("chr"):
-                fields[0] = "chr"+fields[0]
-        elif remove_chr_prefix and fields[0].startswith("chr"):
-            fields[0] = fields[0][3:]
+        if not fields[0].startswith("chr"):
+            fields[0] = "chr"+fields[0]
         chrom_end[fields[0]] = int(fields[1])
         g.write(fields[0]+"\t"+fields[1]+"\n")
     g.close()
@@ -153,7 +150,11 @@ def convert_allc_to_bigwig(input_allc_file,
                                            str(bin_start),
                                            str(bin_end),
                                            mc_level])+"\n")
-                if pos >= chrom_end[fields[0]]:
+                if fields[0].startswith("chr"):
+                    cur_chrom_end = chrom_end[fields[0]]
+                else:
+                    cur_chrom_end = chrom_end["chr"+fields[0]]
+                if pos >= cur_chrom_end:
                     print_warning("Skip site beyond chromosome boundary: "+line)
                     cur_chrom = fields[0]
                     bin_mc, bin_h, bin_site = 0, 0, 0
@@ -163,8 +164,8 @@ def convert_allc_to_bigwig(input_allc_file,
                 bin_mc, bin_h, bin_site = 0, 0, 0
                 bin_end = int(float(pos)/float(bin_size)+1) * bin_size
                 bin_start = bin_end - bin_size
-                if bin_end > chrom_end[fields[0]]:
-                    bin_end = chrom_end[fields[0]]
+                if bin_end > cur_chrom_end:
+                    bin_end = cur_chrom_end
             # update mc, h and site
             bin_mc += int(fields[4])
             bin_h += int(fields[5])

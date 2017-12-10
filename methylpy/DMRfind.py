@@ -742,6 +742,35 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
                 g.write("\t".join(map(str,block))+"\n")
                 block_count+=1
     g.close()
+
+
+    # Generate BED file for DMSs
+    f = gzip.open(inputf,'rt')
+    g_dms = open(output+".DMS.bed",'w')
+    # skip header
+    f.readline()
+    for line in f:
+        fields = line.split("\t")
+        if fields[column].find("<")!= -1 or float(fields[column]) <= sig_cutoff:
+            if not fields[0].startswith("chr"):
+                fields[0] = "chr"+fields[0]
+            g_dms.write("\t".join([fields[0],str(int(fields[1])-1),fields[1],
+                                  fields[3]+";"+fields[2],fields[column]])+"\n")
+    g_dms.close()
+    f.close()
+    # Generate BED file for DMRs
+    f = open(output,'r')
+    g_dmr = open(output+".DMR.bed",'w')
+    # skip header
+    f.readline()
+    for line in f:
+        fields = line.split("\t")
+        if not fields[0].startswith("chr"):
+            fields[0] = "chr"+fields[0]
+        fields[1] = str(int(fields[1])-1)
+        g_dmr.write("\t".join(fields[:4])+"\n")
+    f.close()
+    g_dmr.close()
     return block_count
 
 
