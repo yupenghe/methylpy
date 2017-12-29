@@ -676,10 +676,11 @@ def expand_nucleotide_code(mc_type):
     elif "CG" in mc_type:
         mc_class.extend(["CGN"])
 
-    for motif in mc_type:
-        mc_class.extend(["".join(i) for i in
+    mc_class_final = []
+    for motif in mc_class:
+        mc_class_final.extend(["".join(i) for i in
                          itertools.product(*[iub_dict[nuc] for nuc in motif])])
-    return(set(mc_class))
+    return(set(mc_class_final))
 
 def split_fastq_file(num_chunks, input_files, output_prefix):
     """
