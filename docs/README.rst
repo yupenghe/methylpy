@@ -144,6 +144,16 @@ In Ubuntu (>=16.04), please try the below commands first.
     cd methylpy/methylpy/
     g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
 
+Lastly, the compiled file ``run_rms_tests.out`` needs to be copied to
+the directory where methylpy is installed. You can get the directory by
+running the blow commands in python console (``python`` to open a python
+console):
+
+::
+
+    import methylpy
+    print(methylpy.__file__[:methylpy.__file__.rfind("/")]+"/")
+
 Test methylpy
 =============
 

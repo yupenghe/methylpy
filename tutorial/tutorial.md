@@ -221,6 +221,14 @@ cd /YOUR/PATH/methylpy/
 g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
 ```
 
+Lastly, the compiled file `run_rms_tests.out` needs to be copied to the
+directory where methylpy is installed. You can get the directory by running
+the blow commands in python console (`python` to open a python console):
+```
+import methylpy
+print(methylpy.__file__[:methylpy.__file__.rfind("/")]+"/")
+```
+
 #### Setting up directory for temporary files
 Processing large dataset will require large spare space for temporary files.
 Usually, the default directory for temporary files will not meet the need.
