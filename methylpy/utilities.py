@@ -432,6 +432,7 @@ def merge_allc_files_minibatch(allc_files,
         return 0
     except:
         print("Failed to merge all allc files at once. Do minibatch merging")
+
     # init
     remaining_allc_files = list(allc_files[mini_batch:])
     output_tmp_file = output_file + ".tmp"
@@ -470,17 +471,18 @@ def merge_allc_files_worker(allc_files,
     fhandles = []
     chrom_pointer = []
     chroms = set([])
-    #try:
-    if True:
+    try:
         for index,allc_file in enumerate(allc_files):
             fhandles.append(open_allc_file(allc_file))
             chrom_pointer.append(read_allc_index(allc_file))
             for chrom in chrom_pointer[index].keys():
                 chroms.add(chrom)
-   # except:
-   #     for f in fhandles:
-   #         f.close()
-   #     exit() # exit due to failure of openning all allc files at once
+    except:
+        for f in fhandles:
+            f.close()
+        raise 
+        #exit() # exit due to failure of openning all allc files at once
+    print(len(fhandles))
     if query_chroms is not None:
         if isinstance(query_chroms,list):
             chroms = query_chroms
@@ -636,11 +638,8 @@ def index_allc_file(allc_file,no_reindex=False):
 
 def read_allc_index(allc_file):
     index_file = get_index_file_name(allc_file)
-    try:
-        f = open(index_file,'r')
-    except:
-        index_allc_file(allc_file)
-        f = open(index_file,'r')
+    index_allc_file(allc_file,no_reindex=True)
+    f = open(index_file,'r')
     chrom_pointer = {}
     for line in f:
         fields = line.rstrip().split("\t")

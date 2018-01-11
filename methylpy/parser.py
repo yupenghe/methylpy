@@ -1,9 +1,16 @@
 import sys
 import argparse
+import methylpy
 
 def parse_args():
      # create the top-level parser
-     parser = argparse.ArgumentParser()
+     parser = argparse.ArgumentParser(
+          description = "You are using methylpy "
+          + methylpy.__version__
+          + " version (" 
+          + methylpy.__file__[:methylpy.__file__.rfind("/")]+"/"
+          + ")"
+     )
      subparsers = parser.add_subparsers(
           title="functions",
           dest="command",metavar="")
