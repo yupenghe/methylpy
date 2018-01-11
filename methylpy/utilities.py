@@ -18,6 +18,7 @@ import glob
 def get_executable_version(exec_name):
     try:
         out = subprocess.check_output(shlex.split(exec_name+" --version"))
+        out = out.decode("utf-8")
     except:
         print_error("Failed to run %s\n" %(exec_name))
     first_line = out.split("\n")[0]
