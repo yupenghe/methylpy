@@ -27,8 +27,13 @@ def parse_args():
      add_merge_allc_subparser(subparsers)
      add_index_allc_subparser(subparsers)
      add_filter_allc_subparser(subparsers)
-     
+
      if len(sys.argv) > 1:
+          ## print out version
+          if (sys.argv[1] == '--version' or sys.argv[1] == '-v'):
+               print(methylpy.__version__)
+               exit()
+          ## all functions
           args = parser.parse_args()
      else:
           args = parser.parse_args(["-h"])
@@ -227,15 +232,30 @@ def parse_args():
                                      min_base_quality=args.min_base_quality)
 
      elif args.command == "add-methylation-level":
-          from methylpy.DMRfind import get_methylation_levels_DMRfind
-          get_methylation_levels_DMRfind(input_tsv_file=args.input_tsv_file,
-                                         output=args.output_file,
-                                         input_allc_files=args.allc_files,
-                                         samples=args.samples,
-                                         mc_type=args.mc_type,
-                                         num_procs=args.num_procs,
-                                         buffer_line_number=args.buffer_line_number,
-                                         input_no_header=args.input_no_header)
+          if args.extra_info:
+               from methylpy.DMRfind import get_c_info_DMRfind
+               get_c_info_DMRfind(input_tsv_file=args.input_tsv_file,
+                                  output=args.output_file,
+                                  input_allc_files=args.allc_files,
+                                  samples=args.samples,
+                                  mc_type=args.mc_type,
+                                  num_procs=args.num_procs,
+                                  min_cov=args.min_cov,
+                                  max_cov=args.max_cov,
+                                  buffer_line_number=args.buffer_line_number,
+                                  input_no_header=args.input_no_header)
+          else:
+               from methylpy.DMRfind import get_methylation_levels_DMRfind
+               get_methylation_levels_DMRfind(input_tsv_file=args.input_tsv_file,
+                                              output=args.output_file,
+                                              input_allc_files=args.allc_files,
+                                              samples=args.samples,
+                                              mc_type=args.mc_type,
+                                              num_procs=args.num_procs,
+                                              min_cov=args.min_cov,
+                                              max_cov=args.max_cov,
+                                              buffer_line_number=args.buffer_line_number,
+                                              input_no_header=args.input_no_header)
 
      elif args.command == "merge-allc":
           from methylpy.utilities import merge_allc_files
@@ -251,6 +271,7 @@ def parse_args():
           index_allc_file_batch(allc_files=args.allc_files,
                                 num_procs=args.num_procs,
                                 no_reindex=args.no_reindex)
+
      elif args.command == "filter-allc":
           from methylpy.utilities import filter_allc_files
           filter_allc_files(allc_files=args.allc_files,
@@ -261,7 +282,8 @@ def parse_args():
                             compress_output=args.compress_output,
                             max_mismatch=args.max_mismatch,
                             max_mismatch_frac=args.max_mismatch_frac,
-                            min_cov=args.min_cov)
+                            min_cov=args.min_cov,
+                            max_cov=args.max_cov)
 
      elif args.command == "allc-to-bigwig":
           from methylpy.utilities import convert_allc_to_bigwig
@@ -272,8 +294,10 @@ def parse_args():
                                  bin_size=args.bin_size,
                                  path_to_wigToBigWig=args.path_to_wigToBigWig,
                                  path_to_samtools=args.path_to_samtools,
-                                 min_sites=args.min_sites,
-                                 min_cov=args.min_cov,
+                                 min_bin_sites=args.min_bin_sites,
+                                 min_bin_cov=args.min_bin_cov,
+                                 min_site_cov=args.min_site_cov,
+                                 max_site_cov=args.max_site_cov,
                                  remove_chr_prefix=args.remove_chr_prefix,
                                  add_chr_prefix=args.add_chr_prefix)
 
@@ -1334,10 +1358,26 @@ def add_get_methylation_level_subparser(subparsers):
                              + "may use the wildcards H (indicating anything but a G) and "
                              + "N (indicating any nucleotide).")
 
+     add_mc_opt.add_argument("--extra-info",
+                             type=str2bool,
+                             default=False,
+                             help="Boolean to indicate whether to generate two output extra files with "
+                             +"the total basecalls and covered sites in each of the regions.")
+
      add_mc_opt.add_argument("--num-procs",
                              type=int,
                              default=1,
                              help="Number of processors you wish to use to parallelize this function")
+     
+     add_mc_opt.add_argument("--min-cov",
+                             type=int,
+                             default=0,
+                             help="Minimum coverage for a site to be included")
+     
+     add_mc_opt.add_argument("--max-cov",
+                             type=int,
+                             default=None,
+                             help="Maximum coverage for a site to be included. By default this cutoff is not applied.")
      
      add_mc_opt.add_argument("--buffer-line-number",
                              type=int,
@@ -1386,17 +1426,27 @@ def add_allc2bw_subparser(subparsers):
                               default=100,
                               help="Genomic bin size for calculating methylation level")
 
-     allc2bw_opt.add_argument("--min-sites",
+     allc2bw_opt.add_argument("--min-bin-sites",
                               type=int,
                               default=0,
-                              help="Minimum sites in a bin for methylation level to be calculated.")
+                              help="Minimum sites in a bin for it to be included.")
      
-     allc2bw_opt.add_argument("--min-cov",
+     allc2bw_opt.add_argument("--min-bin-cov",
                               type=int,
                               default=0,
                               help="Minimum total coverage of all sites in a bin for methylation level "
                               +"to be calculated.")
 
+     allc2bw_opt.add_argument("--min-site-cov",
+                              type=int,
+                              default=0,
+                              help="Minimum total coverage of a site for it to be included.")
+
+     allc2bw_opt.add_argument("--max-site-cov",
+                              type=int,
+                              default=0,
+                              help="Maximum total coverage of a site for it to be included.")
+     
      allc2bw_opt.add_argument("--path-to-wigToBigWig",
                               type=str,
                               default="",
@@ -1522,7 +1572,13 @@ def add_filter_allc_subparser(subparsers):
                                   type=int,
                                   default=0,
                                   help="Minimum number of reads that must cover a site for it to be "
-                                  + "included in output file.")
+                                  + "included in the output file.")
+
+     filter_allc_opt.add_argument("--max-cov",
+                                  type=int,
+                                  default=None,
+                                  help="Maximum number of reads that must cover a site for it to be "
+                                  + "included in the output file. By default this cutoff is not applied.")
 
      filter_allc_opt.add_argument("--max-mismatch",
                                   type=int,

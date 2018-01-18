@@ -9,7 +9,6 @@ import time
 import operator
 import itertools
 import multiprocessing
-import bz2
 import gzip
 import collections
 from pkg_resources import parse_version
@@ -87,8 +86,10 @@ def convert_allc_to_bigwig(input_allc_file,
                            bin_size = 100,
                            path_to_wigToBigWig="",
                            path_to_samtools="",
-                           min_sites = 0,
-                           min_cov = 0,
+                           min_bin_sites=0,
+                           min_bin_cov=0,
+                           max_site_cov=None,
+                           min_site_cov=0,
                            remove_chr_prefix=True,
                            add_chr_prefix=False
                            ):
@@ -139,7 +140,7 @@ def convert_allc_to_bigwig(input_allc_file,
                 continue
             pos = int(fields[1]) - 1
             if cur_chrom != fields[0] or pos >= bin_end:
-                if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
+                if bin_h > 0 and bin_site >= min_bin_sites and bin_h >= min_bin_cov:
                     mc_level = str(float(bin_mc)/float(bin_h))
                     if add_chr_prefix and not cur_chrom.startswith("chr"):
                         g.write("\t".join(["chr"+cur_chrom,
@@ -168,10 +169,13 @@ def convert_allc_to_bigwig(input_allc_file,
                 if bin_end > cur_chrom_end:
                     bin_end = cur_chrom_end
             # update mc, h and site
-            bin_mc += int(fields[4])
-            bin_h += int(fields[5])
-            bin_site += 1
-    if bin_h > 0 and bin_site >= min_sites and bin_h >= min_cov:
+            h_site = int(fields[5])
+            if h_site >= min_site_cov \
+               and (max_site_cov is None or h_site <= max_site_cov):
+                bin_mc += int(fields[4])
+                bin_h += h_site
+                bin_site += 1
+    if bin_h > 0 and bin_site >= min_bin_sites and bin_h >= min_bin_cov:
         mc_level = str(float(bin_mc)/float(bin_h))
         if add_chr_prefix and not cur_chrom.startswith("chr"):
             g.write("\t".join(["chr"+cur_chrom,
@@ -200,6 +204,7 @@ def filter_allc_files(allc_files,
                       chroms = None,
                       compress_output=False,
                       min_cov=0,
+                      max_cov=None,
                       max_mismatch=None,
                       max_mismatch_frac=None,
                       buffer_line_number=100000):
@@ -226,6 +231,7 @@ def filter_allc_files(allc_files,
                               "chroms":chroms,
                               "compress_output":compress_output,
                               "min_cov":min_cov,
+                              "max_cov":max_cov,
                               "max_mismatch":max_mismatch,
                               "max_mismatch_frac":max_mismatch_frac
                              })
@@ -240,6 +246,7 @@ def filter_allc_files(allc_files,
                                     chroms=chroms,
                                     compress_output=compress_output,
                                     min_cov=min_cov,
+                                    max_cov=max_cov,
                                     max_mismatch=max_mismatch,
                                     max_mismatch_frac=max_mismatch_frac)
     
@@ -249,6 +256,7 @@ def filter_allc_file_worker(allc_file,
                             chroms = None,
                             compress_output=False,
                             min_cov=0,
+                            max_cov=None,
                             max_mismatch=None,
                             max_mismatch_frac=None,
                             buffer_line_number=100000):
@@ -270,7 +278,8 @@ def filter_allc_file_worker(allc_file,
         fields = line.split("\t")
         if (chroms is None or fields[0] in chroms) \
            and (mc_type is None or fields[3] in mc_class) \
-           and int(fields[5]) >= min_cov:
+           and int(fields[5]) >= min_cov \
+           and (max_cov is None or int(fields[5]) <= max_cov):
             pass
         else:
             continue
@@ -699,8 +708,6 @@ def split_fastq_file(num_chunks, input_files, output_prefix):
     for inputf in input_files:
         if inputf[-3:] == ".gz":
             f = gzip.open(inputf,'rt')
-        elif inputf[-4:] == ".bz2":
-            f = bz2.BZ2File(inputf,'r')
         else:
             f = open(inputf,'r')
 
@@ -752,8 +759,6 @@ def split_fastq_file_pbat(num_chunks, input_files, output_prefix):
     for inputf in input_files:
         if inputf[-3:] == ".gz":
             f = gzip.open(inputf,'rt')
-        elif inputf[-4:] == ".bz2":
-            f = bz2.BZ2File(inputf,'r')
         else:
             f = open(inputf,'r')
                 
@@ -801,11 +806,7 @@ def split_mpileup_file(num_chunks,inputf,output_prefix):
         f = gzip.open(inputf,'rt')
         f.readline()
     except:
-        try:
-            f = bz2.BZ2File(inputf,'r')
-            f.readline()
-        except:
-            f = open(inputf,'r')
+        f = open(inputf,'r')
     finally:
         f.seek(0)
     g = open(output_prefix+str(chunk_num),'w')
@@ -1051,8 +1052,6 @@ def parallel_split_files_by_position(filen,cutoffs,
 def open_allc_file(allc_file):
     if allc_file[-3:] == ".gz":
         f = gzip.open(allc_file,'rt')
-    elif allc_file[-4:] == ".bz2":
-        f = bz2.BZ2File(allc_file,'rt')
     else:
         f = open(allc_file,'r')
     return(f)
