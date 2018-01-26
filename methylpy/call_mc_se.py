@@ -631,7 +631,7 @@ def build_ref(input_files,
         subprocess.check_call(shlex.split(base_cmd + output + "_r.fasta " + output+ "_r"))
     return 0
     
-def convert_reads(inputf,output):
+def convert_reads(inputf,output,buffer_line_number=100000):
     """
     This function takes a fastq file as input and converts all the cytosines in reads to thymines for
     mapping to bisulfite converted genomes. This function also stores an encoding of where the cytosines
@@ -649,20 +649,34 @@ def convert_reads(inputf,output):
     header2 = f.readline()
     qual = f.readline()
     encoding = encode_c_positions(seq)
-    
+
+    line_counts = 0
+    out = ""
     while header:
-        g.write(header+"!"+encoding+"\n")
+        out += header+"!"+encoding+"\n"
         converted_seq = seq.replace("C","T")
-        g.write(converted_seq)
-        g.write(header2)
-        g.write(qual)
-        
+        out += converted_seq
+        out += header2
+        out += qual
+        line_counts += 4
+        # output
+        if line_counts > buffer_line_number:
+            g.write(out)
+            line_counts = 0
+            out = ""
+        # update
         header = f.readline().rstrip()
         header = header.replace(" ","!")
         seq = f.readline()
         header2 = f.readline()
         qual = f.readline()
         encoding = encode_c_positions(seq)
+    # output
+    if line_counts > 0:
+        g.write(out)
+        line_counts = 0
+        out = ""
+
     f.close()
     g.close()
     
@@ -852,6 +866,7 @@ def run_alignment(current_library,library_read_files,
             for library_read_file in library_read_files[1:]:
                 with open(library_read_file,'r') as f:
                     g.write(f.read())
+                subprocess.check_call(["rm",library_read_file])
 
     if aligner != "minimap2":
         if " ".join(options).find(" -p ") == -1:
@@ -2364,11 +2379,11 @@ def filter_files_by_pvalue_combined(input_files,output_file,
 def bam_quality_mch_filter(inputf,
                            outputf,
                            reference_fasta,
-                           min_mapq = 30,
-                           min_ch = 3,
-                           max_mch_level = 0.7,
-                           buffer_line_number = 100000,
-                           path_to_samtools = ""):
+                           min_mapq=30,
+                           min_ch=3,
+                           max_mch_level=0.7,
+                           buffer_line_number=100000,
+                           path_to_samtools=""):
     """
     
     """

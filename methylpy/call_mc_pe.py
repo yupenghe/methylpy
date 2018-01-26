@@ -665,11 +665,15 @@ def run_alignment_pe(current_library,library_read1_files,library_read2_files,
             for library_read1_file in library_read1_files[1:]:
                 with open(library_read1_file,'r') as f:
                     g.write(f.read())
+                subprocess.check_call(["rm",library_read1_file])
     if len(library_read2_files) > 1:
         with open(input_read2_file,'a') as g:
             for library_read2_file in library_read2_files[1:]:
                 with open(library_read2_file,'r') as f:
                     g.write(f.read())
+                subprocess.check_call(["rm",library_read2_file])
+
+                    
     ## Forward
     if aligner.lower() == "minimap2":
         args = [path_to_aligner+"minimap2"]
@@ -1025,7 +1029,7 @@ def merge_sorted_multimap_pe_max_mapq(current_library,files,prefix,reference_fas
     subprocess.check_call(shlex.split("rm "+output_sam_file))
     return total_unique
 
-def convert_reads_pe(inputf,output,is_read2=False):
+def convert_reads_pe(inputf,output,is_read2=False,buffer_line_number=100000):
     """
     This function takes a fastq file as input and converts all the cytosines in reads to thymines for
     mapping to bisulfite converted genomes. This function also stores an encoding of where the cytosines
@@ -1044,13 +1048,22 @@ def convert_reads_pe(inputf,output,is_read2=False):
     qual = f.readline()
     encoding = encode_c_positions(seq,is_read2=is_read2)
     
+    line_counts = 0
+    out = ""
     if is_read2 == False:
         while header:
-            g.write(header+"!"+encoding+"\n")
+            out += header+"!"+encoding+"\n"
             converted_seq = seq.replace("C","T")
-            g.write(converted_seq)
-            g.write(header2)
-            g.write(qual)            
+            out += converted_seq
+            out += header2
+            out += qual
+            line_counts += 4
+            # output
+            if line_counts > buffer_line_number:
+                g.write(out)
+                line_counts = 0
+                out = ""
+            # update
             header = f.readline().rstrip()
             header = header.replace(" ","!")
             seq = f.readline()
@@ -1059,17 +1072,30 @@ def convert_reads_pe(inputf,output,is_read2=False):
             encoding = encode_c_positions(seq,is_read2=is_read2)
     else:
         while header:
-            g.write(header+"!"+encoding+"\n")
+            out += header+"!"+encoding+"\n"
             converted_seq = seq.replace("G","A")
-            g.write(converted_seq)
-            g.write(header2)
-            g.write(qual)                    
+            out += converted_seq
+            out += header2
+            out += qual
+            line_counts += 4
+            # output
+            if line_counts > buffer_line_number:
+                g.write(out)
+                line_counts = 0
+                out = ""
+            # update
             header = f.readline().rstrip()
             header = header.replace(" ","!")
             seq = f.readline()
             header2 = f.readline()
             qual = f.readline()
             encoding = encode_c_positions(seq,is_read2=is_read2)
+
+    # output
+    if line_counts > 0:
+        g.write(out)
+        line_counts = 0
+        out = ""
     f.close()
     g.close()
 
@@ -1271,7 +1297,7 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                              bgzip=False,
                              path_to_bgzip="",
                              path_to_tabix="",
-                             buffer_line_number = 100000,
+                             buffer_line_number=100000,
                              min_mapq=30,
                              min_cov=1,binom_test=True,
                              path_to_samtools="",
