@@ -670,9 +670,19 @@ def index_allc_file_batch(allc_files,num_procs=1,no_reindex=False):
 
 def index_allc_file(allc_file,no_reindex=False):
     index_file = get_index_file_name(allc_file)
-    # do not reindex if the index file is available
+    # do not reindex if the index file is available and is complete
     if no_reindex and os.path.exists(index_file):
-        return 0
+        # check index file completeness
+        eof_count = 0
+        with open(index_file,'r') as f:        
+            for line in f:
+                if line == '#eof':
+                    eof_count += 1
+        # need reindex
+        if eof_count > 1 or line != '#eof':
+            pass
+        else:
+            return 0
     g = open(index_file,'w')
     f = open_allc_file(allc_file)
     cur_chrom = ""
@@ -698,6 +708,7 @@ def index_allc_file(allc_file,no_reindex=False):
             g.write(fields[0]+"\t"+str(cur_pointer)+"\n")
             cur_chrom = fields[0]
         cur_pointer = f.tell()
+    g.write("#eof\n")
     f.close()
     g.close()
     return 0
@@ -708,8 +719,9 @@ def read_allc_index(allc_file):
     f = open(index_file,'r')
     chrom_pointer = {}
     for line in f:
-        fields = line.rstrip().split("\t")
-        chrom_pointer[fields[0]] = int(fields[1])
+        if line[0] != '#':
+            fields = line.rstrip().split("\t")
+            chrom_pointer[fields[0]] = int(fields[1])
     f.close()
     return(chrom_pointer)
 
