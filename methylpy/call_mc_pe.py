@@ -25,10 +25,15 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                 num_upstr_bases=0,
                                 num_downstr_bases=2,
                                 generate_allc_file=True,
-                                generate_mpileup_file=True,compress_output=True,
+                                generate_mpileup_file=True,
+                                compress_output=True,
+                                bgzip=False,
+                                path_to_bgzip="",
+                                path_to_tabix="",
                                 binom_test=True, min_cov=2,
                                 trim_reads=True, path_to_cutadapt="",
-                                bowtie2=True, path_to_aligner="", aligner_options=None,
+                                aligner="bowtie2",
+                                path_to_aligner="", aligner_options=None,
                                 merge_by_max_mapq=False,min_mapq=30,
                                 pbat=False,check_dependency=True,
                                 remove_clonal=False, keep_clonal_stats=True,
@@ -104,8 +109,6 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
     path_to_cutadapt is the path to the cutadapt execuatable. Otherwise this is assumed to be in
         your path.
 
-    bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie. Default: True
-
     path_to_aligner is a string indicating the path to the folder in which aligner resides. Aligner
         is assumed to be in your path if this option isn't used
 
@@ -164,7 +167,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
         check_call_mc_dependencies(path_to_samtools,
                                    trim_reads,
                                    path_to_cutadapt,
-                                   bowtie2,
+                                   aligner,
                                    path_to_aligner,
                                    remove_clonal,
                                    path_to_picard)
@@ -184,14 +187,17 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
 
     #Default bowtie option
     if aligner_options is None:
-        if bowtie2:
-            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
-        else:
+        if aligner.lower() == "minimap2":
+            aligner_options = ["-ax","sr","--secondary=no"]
+        elif aligner.lower() == "bowtie":
             aligner_options = ["-X 1000", "-S", "-k 1", "-m 1", "--best", "--strata",
                                "--chunkmbs 3072", "-n 1", "-e 100"]
+            aligner_options.append("--phred33-quals")
+        else: # bowtie2
+            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
+            aligner_options.append("--phred33-quals")
 
     # CASAVA >= 1.8
-    aligner_options.append("--phred33-quals")
     quality_base = 33
 
     #just to avoid any paths missing a slash. It's ok to add an extra slash if
@@ -238,6 +244,7 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
             forward_reference, reverse_reference, reference_fasta,
             path_to_output=path_to_output,
             path_to_samtools=path_to_samtools, path_to_aligner=path_to_aligner,
+            aligner=aligner,
             aligner_options=aligner_options,
             merge_by_max_mapq=merge_by_max_mapq,
             min_mapq=min_mapq,
@@ -248,7 +255,6 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
             zero_cap=zero_cap, quality_base=quality_base, error_rate=error_rate,
             min_qual_score=min_qual_score, min_read_len=min_read_len,
             keep_temp_files=keep_temp_files,
-            bowtie2=bowtie2,
             sort_mem=sort_mem)
 
         total_input += lib_input
@@ -323,6 +329,9 @@ def run_methylation_pipeline_pe(read1_files, read2_files, sample,
                                  num_downstr_bases=num_downstr_bases,
                                  generate_mpileup_file=generate_mpileup_file,
                                  compress_output=compress_output,
+                                 bgzip=bgzip,
+                                 path_to_bgzip=path_to_bgzip,
+                                 path_to_tabix=path_to_tabix,
                                  min_cov=min_cov,
                                  binom_test=binom_test,
                                  remove_chr_prefix=remove_chr_prefix,
@@ -337,6 +346,7 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
                    sample, forward_reference, reverse_reference, reference_fasta,
                    path_to_output="",
                    path_to_samtools="", path_to_aligner="",
+                   aligner="bowtie2",
                    aligner_options=None,
                    merge_by_max_mapq=False,
                    min_mapq=30,
@@ -346,7 +356,7 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
                    max_adapter_removal=None, overlap_length=None, zero_cap=None,
                    quality_base=None, error_rate=None, min_qual_score=10,
                    min_read_len=30, keep_temp_files=False,
-                   bowtie2=True, sort_mem="500M"):
+                   sort_mem="500M"):
     """
     This function runs the mapping portion of the methylation calling pipeline.
     For Paired-end data processing.
@@ -424,21 +434,23 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
     keep_temp_files is a boolean indicating that you'd like to keep the intermediate files generated
         by this function. This can be useful for debugging, but in general should be left False.
         
-    bowtie2 specifies whether to use the bowtie2 aligner instead of bowtie
-    
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
 
-    #Default bowtie option
+    #Default option
     if aligner_options is None:
-        if bowtie2:
-            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
-        else:
+        if aligner.lower() == "minimap2":
+            aligner_options = ["-ax","sr","--secondary=no"]
+        elif aligner.lower() == "bowtie":
             aligner_options = ["-X 1000", "-S", "-k 1", "-m 1", "--best", "--strata",
                                "--chunkmbs 3072", "-n 1", "-e 100"]
+            aligner_options.append("--phred33-quals")
+        else: # bowtie2
+            aligner_options = []
+            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
+            aligner_options.append("--phred33-quals")
 
     # CASAVA >= 1.8
-    aligner_options.append("--phred33-quals")
     quality_base = 33
 
     if len(path_to_output) !=0:
@@ -540,34 +552,38 @@ def run_mapping_pe(current_library, library_read1_files, library_read2_files,
         input_fastq_read2 = [prefix+"_read2_split_converted_"+str(i) for i in range(0,num_procs)]
                     
     #Run bowtie
-    if bowtie2:
-        print_checkpoint("Begin Running Bowtie2 for "+current_library)
-    else:
+    if aligner.lower() == "minimap2":
+        print_checkpoint("Begin Running minimap2 for "+current_library)
+    elif aligner.lower() == "Bowtie":
         print_checkpoint("Begin Running Bowtie for "+current_library)
-    total_unique = run_bowtie_pe(current_library,
-                                 input_fastq_read1,
-                                 input_fastq_read2,
-                                 sample,
-                                 forward_reference,reverse_reference,reference_fasta,
-                                 path_to_output=path_to_output,
-                                 path_to_samtools=path_to_samtools,
-                                 aligner_options=aligner_options,
-                                 merge_by_max_mapq=merge_by_max_mapq,
-                                 min_mapq=min_mapq,
-                                 path_to_aligner=path_to_aligner,num_procs=num_procs,
-                                 keep_temp_files=keep_temp_files,
-                                 bowtie2=bowtie2, sort_mem=sort_mem)
+    else:
+        print_checkpoint("Begin Running Bowtie2 for "+current_library)
+    total_unique = run_alignment_pe(current_library,
+                                    input_fastq_read1,
+                                    input_fastq_read2,
+                                    sample,
+                                    forward_reference,reverse_reference,reference_fasta,
+                                    path_to_output=path_to_output,
+                                    path_to_samtools=path_to_samtools,
+                                    aligner=aligner,
+                                    aligner_options=aligner_options,
+                                    merge_by_max_mapq=merge_by_max_mapq,
+                                    min_mapq=min_mapq,
+                                    path_to_aligner=path_to_aligner,num_procs=num_procs,
+                                    keep_temp_files=keep_temp_files,
+                                    sort_mem=sort_mem)
     
     return total_input,total_unique
 
-def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
-                  sample,
-                  forward_reference,reverse_reference,reference_fasta,
-                  path_to_output="",                  
-                  path_to_samtools="",
-                  aligner_options=None,path_to_aligner="",
-                  merge_by_max_mapq=False,min_mapq=30,
-                  num_procs=1,keep_temp_files=False, bowtie2=True, sort_mem="500M"):
+def run_alignment_pe(current_library,library_read1_files,library_read2_files,
+                     sample,
+                     forward_reference,reverse_reference,reference_fasta,
+                     path_to_output="",                  
+                     path_to_samtools="",
+                     aligner="bowtie2",
+                     aligner_options=None,path_to_aligner="",
+                     merge_by_max_mapq=False,min_mapq=30,
+                     num_procs=1,keep_temp_files=False,sort_mem="500M"):
     """
     This function runs bowtie on the forward and reverse converted bisulfite references 
     (generated by build_ref). The function is for processing paired-end data. It removes 
@@ -603,22 +619,6 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
 
-    #Default bowtie option
-    if aligner_options is None:
-        if bowtie2:
-            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
-        else:
-            aligner_options = ["-X 1000", "-S", "-k 1", "-m 1", "--best", "--strata",
-                               "--chunkmbs 3072", "-n 1", "-e 100"]
-
-    # CASAVA >= 1.8
-    aligner_options.append("--phred33-quals")
-    quality_base = 33
-
-    options = aligner_options
-    if " ".join(options).find(" -p ") == -1:
-        options.append("-p "+str(num_procs))
-
     if not sort_mem:
         sort_option = ""
     else:
@@ -626,61 +626,117 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
 
     if len(path_to_output) !=0:
         path_to_output+="/"
-        
-    prefix = path_to_output+sample+"_"+str(current_library)
-        
-    ## Forward
-    if bowtie2:
-        args = [path_to_aligner+"bowtie2"]
-        args.extend(options)
-        args.append("--norc")
-        args.append("-x "+forward_reference)
-        args.append("-1 "+",".join(library_read1_files))
-        args.append("-2 "+",".join(library_read2_files))
-        args.append("-S "+prefix+"_forward_strand_hits.sam")
+
+    #Default bowtie option
+    if aligner_options is None:
+        if aligner.lower() == "minimap2":
+            aligner_options = ["-ax","sr","--secondary=no"]
+        elif aligner.lower() == "bowtie":
+            aligner_options = ["-X 1000", "-S", "-k 1", "-m 1", "--best", "--strata",
+                               "--chunkmbs 3072", "-n 1", "-e 100"]
+            aligner_options.append("--phred33-quals")
+        else: # bowtie2
+            aligner_options = ["-X 1000", "--no-discordant", "--no-mixed"]
+            aligner_options.append("--phred33-quals")
+
+    # CASAVA >= 1.8
+    quality_base = 33
+
+    options = aligner_options
+    
+    if aligner != "minimap2":
+        if " ".join(options).find(" -p ") == -1:
+            options.append("-p "+str(num_procs))
     else:
+        if " ".join(options).find(" -t ") == -1:
+            options.append("-t "+str(num_procs))
+
+    prefix = path_to_output+sample+"_"+str(current_library)
+
+
+    input_read1_file = ",".join(library_read1_files)
+    input_read2_file = ",".join(library_read2_files)
+    input_read1_file = prefix+"_converted_read1s.fastq"
+    input_read2_file = prefix+"_converted_read2s.fastq"
+    subprocess.check_call(["mv",library_read1_files[0],input_read1_file])
+    subprocess.check_call(["mv",library_read2_files[0],input_read2_file])
+    if len(library_read1_files) > 1:
+        with open(input_read1_file,'a') as g:
+            for library_read1_file in library_read1_files[1:]:
+                with open(library_read1_file,'r') as f:
+                    g.write(f.read())
+    if len(library_read2_files) > 1:
+        with open(input_read2_file,'a') as g:
+            for library_read2_file in library_read2_files[1:]:
+                with open(library_read2_file,'r') as f:
+                    g.write(f.read())
+    ## Forward
+    if aligner.lower() == "minimap2":
+        args = [path_to_aligner+"minimap2"]
+        args.extend(options)
+        args.append("--for-only")
+        args.append(forward_reference)
+        args.append(input_read1_file)
+        args.append(input_read2_file)
+    elif aligner.lower() == "bowtie":
         args = [path_to_aligner+"bowtie"]
         args.extend(options)
         args.append("--norc")
         args.append(forward_reference)
-        args.append("-1 "+",".join(library_read1_files))
-        args.append("-2 "+",".join(library_read2_files))
-        args.append(prefix+"_forward_strand_hits.sam")
-    subprocess.check_call(shlex.split(" ".join(args)))
-    print_checkpoint("Processing forward strand hits")
-    find_multi_mappers_pe(prefix+"_forward_strand_hits.sam",prefix,
-                          num_procs=num_procs,
-                          min_mapq=min_mapq,
-                          keep_temp_files=keep_temp_files,
-                          append=False)
-
-    ## Reverse    
-    if bowtie2:
+        args.append("-1 "+input_read1_file)
+        args.append("-2 "+input_read2_file)
+    else: # bowtie2
         args = [path_to_aligner+"bowtie2"]
         args.extend(options)
-        args.append("--nofw")
-        args.append("-x "+reverse_reference)
-        args.append("-1 "+",".join(library_read1_files))
-        args.append("-2 "+",".join(library_read2_files))
-        args.append("-S "+prefix+"_reverse_strand_hits.sam")
-    else:
+        args.append("--norc")
+        args.append("-x "+forward_reference)
+        args.append("-1 "+input_read1_file)
+        args.append("-2 "+input_read2_file)
+    ## run
+    with open(prefix+"_forward_strand_hits.sam","w") as f:
+        subprocess.check_call(shlex.split(" ".join(args)),stdout=f)
+    print_checkpoint("Processing forward strand hits")
+    find_multi_mappers_pe(prefix+"_forward_strand_hits.sam",
+                          prefix,
+                          num_procs=num_procs,
+                          min_mapq=min_mapq,
+                          append=False,
+                          keep_temp_files=keep_temp_files)
+    
+    ## Reverse    
+    if aligner.lower() == "minimap2":
+        args = [path_to_aligner+"minimap2"]
+        args.extend(options)
+        args.append("--rev-only")
+        args.append(reverse_reference)
+        args.append(input_read1_file)
+        args.append(input_read2_file)
+    elif aligner.lower() == "bowtie":
         args = [path_to_aligner+"bowtie"]
         args.extend(options)
         args.append("--nofw")
         args.append(reverse_reference)
-        args.append("-1 "+",".join(library_read1_files))
-        args.append("-2 "+",".join(library_read2_files))
-        args.append(prefix+"_reverse_strand_hits.sam")
-    subprocess.check_call(shlex.split(" ".join(args)))
+        args.append("-1 "+input_read1_file)
+        args.append("-2 "+input_read2_file)
+    else: # bowtie2
+        args = [path_to_aligner+"bowtie2"]
+        args.extend(options)
+        args.append("--nofw")
+        args.append("-x "+reverse_reference)
+        args.append("-1 "+input_read1_file)
+        args.append("-2 "+input_read2_file)
+    ## run
+    with open(prefix+"_reverse_strand_hits.sam","w") as f:
+        subprocess.check_call(shlex.split(" ".join(args)),stdout=f)
+    subprocess.check_call(["rm",input_read1_file,input_read2_file])
     print_checkpoint("Processing reverse strand hits")
-    find_multi_mappers_pe(prefix+"_reverse_strand_hits.sam",prefix,
+    find_multi_mappers_pe(prefix+"_reverse_strand_hits.sam",
+                          prefix,
                           num_procs=num_procs,
                           min_mapq=min_mapq,
-                          append=True,keep_temp_files=keep_temp_files)
-    
-    ## Clear temporary files
-    if keep_temp_files==False:
-        subprocess.check_call(shlex.split("rm "+" ".join(library_read1_files+library_read2_files)))
+                          append=True,
+                          keep_temp_files=keep_temp_files)
+
     if num_procs > 1:
         pool = multiprocessing.Pool(num_procs)
         for file_num in range(0,num_procs):
@@ -734,7 +790,6 @@ def run_bowtie_pe(current_library,library_read1_files,library_read2_files,
                                           output_bam_file ))
     return total_unique
 
-
 def find_multi_mappers_pe(inputf,output,num_procs=1,
                           min_mapq=30,
                           keep_temp_files=False,append=False):
@@ -774,15 +829,16 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,
         fields = line.split("\t")
 
         ## Check if it is proper pair
-        if int(fields[1]) & 2 == 0 or int(fields[4]) < min_mapq:
+        flag = int(fields[1])
+        if (flag & 2) == 0 or int(fields[4]) < min_mapq or (flag & 2048) == 2048:
             continue;
         
         header = fields[0].split("!")
-        if (int(fields[1]) & 16) == 16:
+        if (flag & 16) == 16:
             strand = "-"
         else:
             strand = "+"
-        if (int(fields[1]) & 128) == 128:
+        if (flag & 128) == 128:
             is_read2 = True
         else:
             is_read2 = False
@@ -1210,7 +1266,11 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                              unmethylated_control = None,
                              sig_cutoff=.01,num_procs = 1,
                              num_upstr_bases=0,num_downstr_bases=2,
-                             generate_mpileup_file=True,compress_output=True,
+                             generate_mpileup_file=True,
+                             compress_output=True,
+                             bgzip=False,
+                             path_to_bgzip="",
+                             path_to_tabix="",
                              buffer_line_number = 100000,
                              min_mapq=30,
                              min_cov=1,binom_test=True,
@@ -1268,6 +1328,9 @@ def call_methylated_sites_pe(inputf, sample, reference_fasta,
                           num_downstr_bases=num_downstr_bases,
                           generate_mpileup_file=generate_mpileup_file,
                           compress_output=compress_output,
+                          bgzip=bgzip,
+                          path_to_bgzip=path_to_bgzip,
+                          path_to_tabix=path_to_tabix,
                           buffer_line_number = buffer_line_number,
                           min_mapq=min_mapq,
                           min_cov = min_cov,

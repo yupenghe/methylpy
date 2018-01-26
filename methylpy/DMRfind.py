@@ -9,13 +9,15 @@ from methylpy.utilities import print_checkpoint,expand_nucleotide_code
 from methylpy.utilities import open_allc_file,split_files_by_position
 from methylpy.utilities import filter_allc_files,index_allc_file_batch
 from methylpy.utilities import read_allc_index,remove_allc_index
+from methylpy.utilities import infer_samples
 from scipy.stats import scoreatpercentile
 import subprocess
 import shlex
 import gzip
 
-def DMRfind(allc_files, samples,
+def DMRfind(allc_files, 
             output_prefix,
+            samples=None,
             mc_type="CGN",
             chroms=None,
             num_procs=1, 
@@ -81,12 +83,18 @@ def DMRfind(allc_files, samples,
     #User input checks
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
+    elif len(allc_files) < 2:
+        exit("Needs more than one allc file as input")
 
     if not isinstance(mc_type, list):
         if isinstance(mc_type, str):
             mc_type = [mc_type]
         else:
             exit("mc_type must be a list of string(s)")
+
+    if samples is None:
+        samples = infer_samples(allc_files)
+
     if not isinstance(samples, list):
         exit("samples must be a list of string(s)")
     try:
@@ -777,7 +785,7 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
 def get_methylation_levels_DMRfind(input_tsv_file,
                                    output,
                                    input_allc_files,
-                                   samples,
+                                   samples=None,
                                    mc_type="CGN",
                                    num_procs=1,
                                    min_cov=0,
@@ -799,6 +807,9 @@ def get_methylation_levels_DMRfind(input_tsv_file,
     # 2. check whether samples are stored in a list
     # 4. whether samples and allc files have the same length
     
+    if samples is None:
+        samples = infer_samples(allc_files)
+
     if not isinstance(mc_type, list):
         if isinstance(mc_type, str):
             mc_type = [mc_type]

@@ -24,10 +24,62 @@ def get_executable_version(exec_name):
     fields = first_line.split(" ")
     return(fields[-1])
 
+def infer_samples(allc_files):
+    if isinstance(allc_files,str):
+        allc_file_basename = allc_files[(allc_files.rfind("/")+1):]
+        # remove prefix allc_ and suffix .tsv[.gz]
+        sample = allc_file_basename[5:allc_file_basename.find('.tsv')]
+        sample = sample
+        return(sample)
+    elif isinstance(allc_files,list):
+        samples = []
+        for allc_file in allc_files:
+            samples.append(infer_samples(allc_file))
+        return(samples)
+    else:
+        print_error("Failed to infer sample names\n")
+
+def bgzip_allc_file(allc_file,
+                    path_to_bgzip="",
+                    path_to_tabix="",
+                    buffer_line_number=100000):
+
+    if allc_file[-3:] == ".gz":
+        output_file = allc_file[:-3]+".bgz"
+        g = open(output_file,'w')
+        output_pipe = subprocess.Popen(
+            [path_to_bgzip+"bgzip"],
+            stdin=subprocess.PIPE,
+            stdout=g)
+        # output
+        f = open_allc_file(allc_file)
+        out = ""
+        line_counts = 0
+        for line in f:
+            out += line
+            line_counts += 1
+            if line_counts > buffer_line_number:
+                output_pipe.stdin.write(out)
+                line_counts = 0
+                out = ""
+        if line_counts > 0:
+            output_pipe.stdin.write(out)
+            out = ""
+        # finish
+        f.close()
+        g.close()
+        output_pipe.stdin.close()
+    else:
+        output_file = allc_file+".bgz"
+        with open(output_file,"w") as g:
+            subprocess.check_call([path_to_bgzip+"bgzip", "-c",allc_file],stdout=g)
+    # tabix indexing
+    subprocess.check_call(shlex.split(path_to_tabix+"tabix -s 1 -b 2 -e 2 "+output_file))
+    
 def check_call_mc_dependencies(path_to_samtools="",
                                trim_reads=True,
                                path_to_cutadapt="",
-                               bowtie2=True,
+                               aligner="bowtie2",
                                path_to_aligner="",
                                remove_clonal=True,
                                path_to_picard=""):
@@ -44,10 +96,14 @@ def check_call_mc_dependencies(path_to_samtools="",
     # check bowtie/bowtie2
     if len(path_to_aligner) != 0:
         path_to_aligner += "/"
-    if bowtie2:
+    if aligner.lower() == "bowtie2":
         aligner_version = get_executable_version(path_to_aligner+"bowtie2")
-    else:
+    elif aligner.lower() == "bowtie":
         aligner_version = get_executable_version(path_to_aligner+"bowtie")
+    elif aligner.lower() == "minimap2":
+        aligner_version = get_executable_version(path_to_aligner+"minimap2")
+    else:
+        print_error("Unrecognize aligner: "+path_to_aligner+aligner.lower())
 
     # check cutadapt
     if trim_reads:

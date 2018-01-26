@@ -8,7 +8,7 @@ from methylpy.utilities import print_checkpoint, print_error, print_warning
 from methylpy.utilities import split_fastq_file
 from methylpy.utilities import split_fastq_file_pbat
 from methylpy.utilities import open_allc_file,index_allc_file
-from methylpy.utilities import read_allc_index
+from methylpy.utilities import read_allc_index,bgzip_allc_file
 from methylpy.utilities import check_call_mc_dependencies
 import pdb
 import shlex
@@ -28,11 +28,16 @@ def run_methylation_pipeline(read_files, sample,
                              num_procs=1, sort_mem="500M",
                              num_upstr_bases=0, num_downstr_bases=2,
                              generate_allc_file=True,
-                             generate_mpileup_file=True, compress_output=True,
+                             generate_mpileup_file=True,
+                             compress_output=True,
+                             bgzip=False,
+                             path_to_bgzip="",
+                             path_to_tabix="",
                              binom_test=False, min_cov=2,
                              trim_reads=True, path_to_cutadapt="",
                              pbat=False,check_dependency=True,
-                             bowtie2=True, path_to_aligner="", aligner_options=None,
+                             path_to_aligner="",
+                             aligner="bowtie2",aligner_options=None,
                              merge_by_max_mapq=False,min_mapq=30,
                              remove_clonal=False,keep_clonal_stats=True,
                              path_to_picard="",java_options="-Xmx20g",
@@ -147,7 +152,6 @@ def run_methylation_pipeline(read_files, sample,
         check_call_mc_dependencies(path_to_samtools,
                                    trim_reads,
                                    path_to_cutadapt,
-                                   bowtie2,
                                    path_to_aligner,
                                    remove_clonal,
                                    path_to_picard)
@@ -167,15 +171,18 @@ def run_methylation_pipeline(read_files, sample,
 
     #Default bowtie option
     if aligner_options is None:
-        if bowtie2:
-            aligner_options = []            
-        else:
+        if aligner.lower() == "minimap2":
+            aligner_options = ["-ax","sr","--secondary=no"]
+        elif aligner.lower() == "bowtie":
             aligner_options = ["-S", "-k 1", "-m 1", "--chunkmbs 3072",
                                "--best", "--strata", "-o 4", "-e 80",
                                "-l 20", "-n 0"]
+            aligner_options.append("--phred33-quals")
+        else: # bowtie2
+            aligner_options = []
+            aligner_options.append("--phred33-quals")
 
     # CASAVA >= 1.8
-    aligner_options.append("--phred33-quals")
     quality_base = 33
 
     if len(path_to_samtools) != 0:
@@ -216,6 +223,7 @@ def run_methylation_pipeline(read_files, sample,
                                             path_to_output=path_to_output,
                                             path_to_samtools=path_to_samtools,
                                             path_to_aligner=path_to_aligner,
+                                            aligner=aligner,
                                             aligner_options=aligner_options,
                                             merge_by_max_mapq=merge_by_max_mapq,
                                             pbat=pbat,
@@ -231,7 +239,7 @@ def run_methylation_pipeline(read_files, sample,
                                             min_qual_score=min_qual_score,
                                             min_read_len=min_read_len,
                                             keep_temp_files=keep_temp_files,
-                                            bowtie2=bowtie2, sort_mem=sort_mem)
+                                            sort_mem=sort_mem)
         total_input += lib_input
         total_unique += lib_unique
 
@@ -300,6 +308,9 @@ def run_methylation_pipeline(read_files, sample,
                               num_downstr_bases=num_downstr_bases,
                               generate_mpileup_file=generate_mpileup_file,
                               compress_output=compress_output,
+                              bgzip=bgzip,
+                              path_to_bgzip=path_to_bgzip,
+                              path_to_tabix=path_to_tabix,
                               min_mapq=min_mapq,
                               min_cov=min_cov,
                               binom_test=binom_test,
@@ -316,6 +327,7 @@ def run_mapping(current_library, library_files, sample,
                 forward_reference, reverse_reference, reference_fasta,
                 path_to_output="",
                 path_to_samtools="", path_to_aligner="",
+                aligner="bowtie2",
                 aligner_options=None,merge_by_max_mapq=False,
                 min_mapq=30,pbat=False,
                 num_procs=1, trim_reads=True, path_to_cutadapt="",
@@ -323,7 +335,7 @@ def run_mapping(current_library, library_files, sample,
                 max_adapter_removal=None, overlap_length=None, zero_cap=None,
                 quality_base=None, error_rate=None,
                 min_qual_score=10, min_read_len=30,
-                keep_temp_files=False, bowtie2=False,
+                keep_temp_files=False,
                 sort_mem="500M"):
     """
     This function runs the mapping portion of the methylation calling pipeline.
@@ -400,15 +412,18 @@ def run_mapping(current_library, library_files, sample,
 
     #Default bowtie option
     if aligner_options is None:
-        if bowtie2:
-            aligner_options = []            
-        else:
+        if aligner.lower() == "minimap2":
+            aligner_options = ["-ax", "sr","--secondary=no"]
+        elif aligner.lower() == "bowtie":
             aligner_options = ["-S", "-k 1", "-m 1", "--chunkmbs 3072",
                                "--best", "--strata", "-o 4", "-e 80",
                                "-l 20", "-n 0"]
+            aligner_options.append("--phred33-quals")
+        else: # bowtie2
+            aligner_options = []          
+            aligner_options.append("--phred33-quals")
 
     # CASAVA >= 1.8
-    aligner_options.append("--phred33-quals")
     quality_base = 33
 
     if len(path_to_output) != 0:
@@ -482,23 +497,26 @@ def run_mapping(current_library, library_files, sample,
         input_fastq = [file_path+"_split_converted_"+str(i) for i in range(0, num_procs)]
 
     #Run bowtie
-    if bowtie2:
-        print_checkpoint("Begin Running Bowtie2 for "+current_library)
-    else:
+    if aligner.lower() == "minimap2":
+        print_checkpoint("Begin Running minimap2 for "+current_library)
+    elif aligner.lower() == "Bowtie":
         print_checkpoint("Begin Running Bowtie for "+current_library)
-    total_unique = run_bowtie(current_library,
-                              input_fastq,
-                              sample,
-                              forward_reference, reverse_reference, reference_fasta,
-                              path_to_output=path_to_output,
-                              aligner_options=aligner_options,
-                              merge_by_max_mapq=merge_by_max_mapq,
-                              min_mapq=min_mapq,
-                              path_to_aligner=path_to_aligner, num_procs=num_procs,
-                              keep_temp_files=keep_temp_files,
-                              bowtie2=bowtie2, sort_mem=sort_mem)
+    else:
+        print_checkpoint("Begin Running Bowtie2 for "+current_library)
+    total_unique = run_alignment(current_library,
+                                 input_fastq,
+                                 sample,
+                                 forward_reference, reverse_reference, reference_fasta,
+                                 path_to_output=path_to_output,
+                                 aligner=aligner,
+                                 aligner_options=aligner_options,
+                                 merge_by_max_mapq=merge_by_max_mapq,
+                                 min_mapq=min_mapq,
+                                 path_to_aligner=path_to_aligner, num_procs=num_procs,
+                                 keep_temp_files=keep_temp_files,
+                                 sort_mem=sort_mem)
 
-    subprocess.check_call(shlex.split("rm " + " ".join(input_fastq)))
+    #subprocess.check_call(shlex.split("rm " + " ".join(input_fastq)))
 
     return total_input, total_unique
 
@@ -525,9 +543,12 @@ def merge_bam_files(input_files,output,path_to_samtools=""):
     subprocess.check_call(shlex.split(path_to_samtools+"samtools merge -r -h header.sam "+ output +" "+" ".join(input_files)))
     subprocess.check_call(["rm", "header.sam"])
 
-def build_ref(input_files, output, buffsize=100,
-              bowtie2=False, path_to_aligner = "",
-              offrate=False, parallel=False):
+def build_ref(input_files,
+              output,
+              buffsize=100,
+              aligner="bowtie2",
+              path_to_aligner="",
+              num_procs=1):
     """
     Creates 2 reference files: one with all C's converted to T's, and one with all G's converted to A's
     
@@ -535,9 +556,7 @@ def build_ref(input_files, output, buffsize=100,
     
     output is the prefix of the two output reference files that will be created
     
-    buffsize is the number of bytes that will be read in from the reference at once
-    
-    offrate refers to the Bowtie parameter, reference the bowtie manual to see more detail
+    buffsize is the number of bytes that will be read in from the reference at once    
     """
     if len(path_to_aligner) !=0:
         path_to_aligner+="/"
@@ -582,14 +601,26 @@ def build_ref(input_files, output, buffsize=100,
                             outr.write(base)
                 line = f.read(buffsize)
             f.close()
-    if bowtie2:
-        base_cmd = path_to_aligner+"bowtie2-build -f "
-    else:
+
+    # minimap2
+    if aligner.lower() == "minimap2":
+        subprocess.check_call([path_to_aligner+"minimap2",
+                               "-t",str(num_procs),
+                               "-d",output+"_f.mmi",
+                               output + "_f.fasta"])
+        subprocess.check_call([path_to_aligner+"minimap2",
+                               "-t",str(num_procs),
+                               "-d",output+"_r.mmi",
+                               output + "_r.fasta"])
+        return 0
+        
+    # bowtie2
+    base_cmd = path_to_aligner+"bowtie2-build -f "
+    # bowtie
+    if aligner.lower() == "bowtie":
         base_cmd = path_to_aligner+"bowtie-build -f "
-    if offrate:
-        base_cmd += "-o " + str(offrate) + " "
-    
-    if parallel == True:
+
+    if num_procs > 1:
         pool = multiprocessing.Pool(2)
         pool.apply_async(subprocess.check_call,(shlex.split(base_cmd + output + "_f.fasta " + output +"_f"),))
         pool.apply_async(subprocess.check_call,(shlex.split(base_cmd + output + "_r.fasta " + output+ "_r"),))
@@ -598,6 +629,7 @@ def build_ref(input_files, output, buffsize=100,
     else:
         subprocess.check_call(shlex.split(base_cmd + output + "_f.fasta " + output +"_f"))
         subprocess.check_call(shlex.split(base_cmd + output + "_r.fasta " + output+ "_r"))
+    return 0
     
 def convert_reads(inputf,output):
     """
@@ -745,14 +777,15 @@ def decode_c_positions(seq,indexes,strand,is_read2=False):
         new_seq = new_seq[::-1]
     return new_seq
 
-def run_bowtie(current_library,library_read_files,
-               sample,
-               forward_reference,reverse_reference,reference_fasta,
-               path_to_output="",
-               path_to_samtools="",
-               path_to_aligner="",aligner_options="",
-               merge_by_max_mapq=False,min_mapq=30,
-               num_procs=1,keep_temp_files=False, bowtie2=False, sort_mem="500M"):
+def run_alignment(current_library,library_read_files,
+                  sample,
+                  forward_reference,reverse_reference,reference_fasta,
+                  path_to_output="",
+                  path_to_samtools="",
+                  aligner="bowtie2",
+                  path_to_aligner="",aligner_options=None,
+                  merge_by_max_mapq=False,min_mapq=30,
+                  num_procs=1,keep_temp_files=False,sort_mem="500M"):
     """
     This function runs bowtie on the forward and reverse converted bisulfite references 
     (generated by build_ref). It removes any read that maps to both the forward and reverse
@@ -784,11 +817,11 @@ def run_bowtie(current_library,library_read_files,
     
     sort_mem is the parameter to pass to unix sort with -S/--buffer-size command
     """
-    if len(aligner_options) == 0:
-        if not bowtie2:
-            aligner_options=["-S","-k 1","-m 1","--chunkmbs 3072",
-                             "--best","--strata","-o 4","-e 80","-l 20","-n 0"]
-    options = aligner_options
+
+    if not sort_mem:
+        sort_option = ""
+    else:
+        sort_option = " -S "+sort_mem
 
     if len(path_to_aligner) !=0:
         path_to_aligner+="/"
@@ -798,29 +831,56 @@ def run_bowtie(current_library,library_read_files,
 
     prefix = path_to_output+sample+"_"+str(current_library)
 
-    if not sort_mem:
-        sort_option = ""
-    else:
-        sort_option = " -S "+sort_mem
+    #Default bowtie option
+    if aligner_options is None:
+        if aligner.lower() == "minimap2":
+            aligner_options = ["-ax", "sr","--secondary=no"]
+        elif aligner.lower() == "bowtie":
+            aligner_options = ["-S", "-k 1", "-m 1", "--chunkmbs 3072",
+                               "--best", "--strata", "-o 4", "-e 80",
+                               "-l 20", "-n 0"]
+        else: #bowtie 2
+            aligner_options = []
 
-    if " ".join(options).find(" -p ") == -1:
-        options.append("-p "+str(num_procs))
-    
-    if bowtie2:
-        args = [path_to_aligner+"bowtie2"]
-        args.extend(options)
-        args.append("--norc")
-        args.append("-x "+forward_reference)
-        args.append("-U "+",".join(library_read_files))
-        args.append("-S "+prefix+"_forward_strand_hits.sam")
+    options = aligner_options
+
+    input_read_file = ",".join(library_read_files)
+    input_read_file = prefix+"_converted_reads.fastq"
+    subprocess.check_call(["mv",library_read_files[0],input_read_file])
+    if len(library_read_files) > 1:
+        with open(input_read_file,'a') as g:
+            for library_read_file in library_read_files[1:]:
+                with open(library_read_file,'r') as f:
+                    g.write(f.read())
+
+    if aligner != "minimap2":
+        if " ".join(options).find(" -p ") == -1:
+            options.append("-p "+str(num_procs))
     else:
+        if " ".join(options).find(" -t ") == -1:
+            options.append("-t "+str(num_procs))
+
+    if aligner.lower() == "minimap2":
+        args = [path_to_aligner+"minimap2"]
+        args.extend(options)
+        args.append("--for-only")
+        args.append(forward_reference)
+        args.append(input_read_file)
+    elif aligner.lower() == "bowtie":
         args = [path_to_aligner+"bowtie"]
         args.extend(options)
         args.append("--norc")
         args.append(forward_reference)
-        args.append(",".join(library_read_files))
-        args.append(prefix+"_forward_strand_hits.sam")
-    subprocess.check_call(shlex.split(" ".join(args)))
+        args.append(input_read_file)
+    else: # bowtie2
+        args = [path_to_aligner+"bowtie2"]
+        args.extend(options)
+        args.append("--norc")
+        args.append("-x "+forward_reference)
+        args.append("-U "+input_read_file)
+    ## run
+    with open(prefix+"_forward_strand_hits.sam","w") as f:
+        subprocess.check_call(shlex.split(" ".join(args)),stdout=f)
     print_checkpoint("Processing forward strand hits")
     find_multi_mappers(prefix+"_forward_strand_hits.sam",
                        prefix,
@@ -829,21 +889,28 @@ def run_bowtie(current_library,library_read_files,
                        append=False,
                        keep_temp_files=keep_temp_files)
 
-    if bowtie2:
-        args = [path_to_aligner+"bowtie2"]
+    if aligner.lower() == "minimap2":
+        args = [path_to_aligner+"minimap2"]
         args.extend(options)
-        args.append("--nofw")
-        args.append("-x "+reverse_reference)
-        args.append("-U "+",".join(library_read_files))
-        args.append("-S "+prefix+"_reverse_strand_hits.sam")
-    else:
+        args.append("--rev-only")
+        args.append(reverse_reference)
+        args.append(input_read_file)
+    elif aligner.lower() == "bowtie":
         args = [path_to_aligner+"bowtie"]
         args.extend(options)
         args.append("--nofw")
         args.append(reverse_reference)
-        args.append(",".join(library_read_files))
-        args.append(prefix+"_reverse_strand_hits.sam")
-    subprocess.check_call(shlex.split(" ".join(args)))    
+        args.append(input_read_file)
+    else:
+        args = [path_to_aligner+"bowtie2"]
+        args.extend(options)
+        args.append("--nofw")
+        args.append("-x "+reverse_reference)
+        args.append("-U "+input_read_file)
+    ## run
+    with open(prefix+"_reverse_strand_hits.sam","w") as f:
+        subprocess.check_call(shlex.split(" ".join(args)),stdout=f)
+    subprocess.check_call(["rm",input_read_file])        
     print_checkpoint("Processing reverse strand hits")
     sam_header = find_multi_mappers(prefix+"_reverse_strand_hits.sam",
                                     prefix,
@@ -943,14 +1010,15 @@ def find_multi_mappers(inputf,output,num_procs=1,min_mapq=30,
             continue
 
         fields = line.split("\t")
+        flag = int(fields[1])
         # minimum QC
-        if fields[2] == "*" or int(fields[4]) < min_mapq:
+        if fields[2] == "*" or int(fields[4]) < min_mapq or (flag & 2048 == 2048):
             continue
         header = fields[0].split("!")
         #BIG ASSUMPTION!! NO TABS IN FASTQ HEADER LINES EXCEPT THE ONES I ADD!
-        if (int(fields[1]) & 16) == 16:
+        if (flag & 16) == 16:
             strand = "-"
-        elif (int(fields[1]) & 16) == 0:
+        elif (flag & 16) == 0:
             strand = "+"
         try:
             seq = decode_c_positions(fields[9],header[-1],strand)
@@ -1313,6 +1381,9 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                           num_upstr_bases=0,num_downstr_bases=2,
                           generate_mpileup_file=True,
                           compress_output=True,
+                          bgzip=False,
+                          path_to_bgzip="",
+                          path_to_tabix="",
                           buffer_line_number = 100000,
                           min_mapq=30,
                           min_cov=1,binom_test=True,
@@ -1553,6 +1624,8 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                                                        chrom_pointer=None,
                                                        remove_chr_prefix=remove_chr_prefix)
     index_allc_file(output_file,no_reindex=False)
+    if bgzip:
+        bgzip_allc_file(output_file,path_to_bgzip,path_to_tabix,buffer_line_number)
     return(0)
 
 
@@ -1634,7 +1707,10 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
                                         num_upstr_bases=0,num_downstr_bases=2,
                                         generate_mpileup_file=True,
                                         compress_output=True,
-                                        buffer_line_number = 100000,
+                                        bgzip=False,
+                                        path_to_bgzip="",
+                                        path_to_tabix="",
+                                        buffer_line_number=100000,
                                         min_mapq=30,
                                         min_cov=1,binom_test=True,
                                         path_to_samtools="",
@@ -1861,6 +1937,8 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
                                                        chrom_pointer=None,
                                                        remove_chr_prefix=remove_chr_prefix)
     index_allc_file(output_file,no_reindex=False)
+    if bgzip:
+        bgzip_allc_file(output_file,path_to_bgzip,path_to_tabix,buffer_line_number)
     return 0
 
 def do_split_allc_file(allc_file,

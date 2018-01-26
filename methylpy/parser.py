@@ -43,11 +43,10 @@ def parse_args():
           from methylpy.call_mc_se import build_ref
           build_ref(input_files=args.input_files,
                     output=args.output_prefix,
-                    bowtie2=args.bowtie2,
+                    aligner=args.aligner,
                     path_to_aligner=args.path_to_aligner,
-                    buffsize=args.buffsize,
-                    parallel=args.parallel,
-                    offrate=args.offrate)
+                    num_procs=args.num_procs,
+                    buffsize=args.buffsize)
 
      elif args.command == "DMRfind":
           from methylpy.DMRfind import DMRfind
@@ -102,10 +101,13 @@ def parse_args():
                                    generate_allc_file=args.generate_allc_file,
                                    generate_mpileup_file=args.generate_mpileup_file,
                                    compress_output=args.compress_output,
+                                   bgzip=args.bgzip,
+                                   path_to_bgzip=args.path_to_bgzip,
+                                   path_to_tabix=args.path_to_tabix,
                                    trim_reads=args.trim_reads,
                                    path_to_cutadapt=args.path_to_cutadapt,
-                                   bowtie2=args.bowtie2,
                                    path_to_aligner=args.path_to_aligner,
+                                   aligner=args.aligner,
                                    aligner_options=args.aligner_options,
                                    merge_by_max_mapq=args.merge_by_max_mapq,
                                    min_mapq=args.min_mapq,
@@ -149,10 +151,13 @@ def parse_args():
                                       generate_allc_file=args.generate_allc_file,
                                       generate_mpileup_file=args.generate_mpileup_file,
                                       compress_output=args.compress_output,
+                                      bgzip=args.bgzip,
+                                      path_to_bgzip=args.path_to_bgzip,
+                                      path_to_tabix=args.path_to_tabix,
                                       trim_reads=args.trim_reads,
                                       path_to_cutadapt=args.path_to_cutadapt,
-                                      bowtie2=args.bowtie2,
                                       path_to_aligner=args.path_to_aligner,
+                                      aligner=args.aligner,
                                       aligner_options=args.aligner_options,
                                       merge_by_max_mapq=args.merge_by_max_mapq,
                                       min_mapq=args.min_mapq,
@@ -202,6 +207,9 @@ def parse_args():
                                         num_downstr_bases=args.num_downstream_bases,
                                         generate_mpileup_file=args.generate_mpileup_file,
                                         compress_output=args.compress_output,
+                                        bgzip=args.bgzip,
+                                        path_to_bgzip=args.path_to_bgzip,
+                                        path_to_tabix=args.path_to_tabix,
                                         min_mapq=args.min_mapq,
                                         min_cov=args.min_cov,
                                         binom_test=args.binom_test,
@@ -222,6 +230,9 @@ def parse_args():
                                      num_downstr_bases=args.num_downstream_bases,
                                      generate_mpileup_file=args.generate_mpileup_file,
                                      compress_output=args.compress_output,
+                                     bgzip=args.bgzip,
+                                     path_to_bgzip=args.path_to_bgzip,
+                                     path_to_tabix=args.path_to_tabix,
                                      min_mapq=args.min_mapq,
                                      min_cov=args.min_cov,
                                      binom_test=args.binom_test,
@@ -316,12 +327,6 @@ def add_DMRfind_subparser(subparsers):
                                      required=True,
                                      help="List of allc files.")
 
-     parser_dmrfind_req.add_argument("--samples",
-                                     type=str,
-                                     nargs="+",
-                                     required=True,
-                                     help="List of space separated samples matching allc files")
-     
      parser_dmrfind_req.add_argument("--output-prefix",
                                      type=str,
                                      required=True,
@@ -329,6 +334,13 @@ def add_DMRfind_subparser(subparsers):
      
      parser_dmrfind_opt = parser_dmrfind.add_argument_group("optional inputs")
 
+     parser_dmrfind_opt.add_argument("--samples",
+                                     type=str,
+                                     nargs="+",
+                                     default=None,
+                                     help="List of space separated samples matching allc files. By default "
+                                     +"sample names will be inferred from allc filenames")
+     
      parser_dmrfind_opt.add_argument("--chroms",
                                      type=str,
                                      nargs="+",
@@ -624,6 +636,21 @@ def add_se_pipeline_subparser(subparsers):
                                 help="Boolean indicating whether to compress (by gzip) the final output "
                                 + "(allc file(s)).")     
 
+     parser_se_opt.add_argument("--bgzip",
+                                type=str2bool,
+                                default=False,
+                                help="Boolean indicating whether to bgzip compressed allc files and tabix index.")
+     
+     parser_se_opt.add_argument("--path-to-bgzip",
+                                type=str,
+                                default="",
+                                help="Path to bgzip installation")
+
+     parser_se_opt.add_argument("--path-to-tabix",
+                                type=str,
+                                default="",
+                                help="Path to tabix installation")
+
      parser_se_opt.add_argument("--trim-reads",
                                 type=str2bool,
                                 default=True,
@@ -634,16 +661,16 @@ def add_se_pipeline_subparser(subparsers):
                                 default="",
                                 help="Path to cutadapt installation")
      
-     parser_se_opt.add_argument("--bowtie2",
-                                type=str2bool,
-                                default=True,
-                                help="Specifies whether to use the bowtie2 aligner instead of bowtie")
-
      parser_se_opt.add_argument("--path-to-aligner",
                                 type=str,
                                 default="",
                                 help="Path to bowtie/bowtie2 installation")
      
+     parser_se_opt.add_argument("--aligner",
+                                type=str,
+                                default="bowtie2",
+                                help="Aligner to use. Currently, methylpy supports bowtie, bowtie2 and minimap2. ")
+
      parser_se_opt.add_argument("--aligner-options",
                                 type=str,
                                 nargs="+",
@@ -908,6 +935,21 @@ def add_pe_pipeline_subparser(subparsers):
                                 help="Boolean indicating whether to compress (by gzip) the final output "
                                 + "(allc file(s)).")     
 
+     parser_pe_opt.add_argument("--bgzip",
+                                type=str2bool,
+                                default=False,
+                                help="Boolean indicating whether to bgzip compressed allc files and tabix index.")
+     
+     parser_pe_opt.add_argument("--path-to-bgzip",
+                                type=str,
+                                default="",
+                                help="Path to bgzip installation")
+
+     parser_pe_opt.add_argument("--path-to-tabix",
+                                type=str,
+                                default="",
+                                help="Path to tabix installation")
+
      parser_pe_opt.add_argument("--trim-reads",
                                 type=str2bool,
                                 default=True,
@@ -918,15 +960,15 @@ def add_pe_pipeline_subparser(subparsers):
                                 default="",
                                 help="Path to cutadapt installation")
      
-     parser_pe_opt.add_argument("--bowtie2",
-                                type=str2bool,
-                                default=True,
-                                help="Specifies whether to use the bowtie2 aligner instead of bowtie")
-
      parser_pe_opt.add_argument("--path-to-aligner",
                                 type=str,
                                 default="",
                                 help="Path to bowtie/bowtie2 installation")
+     
+     parser_pe_opt.add_argument("--aligner",
+                                type=str,
+                                default="bowtie2",
+                                help="Aligner to use. Currently, methylpy supports bowtie, bowtie2 and minimap2. ")
      
      parser_pe_opt.add_argument("--aligner-options",
                                 type=str,
@@ -1100,11 +1142,15 @@ def add_build_ref_subparser(subparsers):
                                    help="the prefix of the two output reference files that will be created.")
      
      parser_build_opt = parser_build.add_argument_group("optional inputs")
-     parser_build_opt.add_argument("--bowtie2",
-                                   type=str2bool,
-                                   default=True,
-                                   help="Boolean indicating whether to create reference for bowtie2 instead "
-                                   +"of for bowtie.")
+     parser_build_opt.add_argument("--num-procs",
+                                   type=int,
+                                   default=1,
+                                   help="Number of processors you wish to use to parallelize this function")
+
+     parser_build_opt.add_argument("--aligner",
+                                   type=str,
+                                   default="bowtie2",
+                                   help="Aligner to use. Currently, methylpy supports bowtie, bowtie2 and minimap2. ")
 
      parser_build_opt.add_argument("--path-to-aligner",
                                    type=str,
@@ -1116,16 +1162,6 @@ def add_build_ref_subparser(subparsers):
                                    default=100,
                                    help="The number of bytes that will be read in from the reference at once.")
 
-     parser_build_opt.add_argument("--parallel",
-                                   type=str2bool,
-                                   default=False,
-                                   help="Boolean indicating whether to use 2 cores for processing.")
-
-     parser_build_opt.add_argument("--offrate",
-                                   type=str2bool,
-                                   default=False,
-                                   help="offrate refers to the Bowtie parameter, reference the bowtie "
-                                   +"manual to see more detail.")
 
 def add_bam_filter_subparser(subparsers):
      parser_filter = subparsers.add_parser(
@@ -1251,7 +1287,22 @@ def add_call_mc_subparser(subparsers):
                               type=str2bool,
                               default=True,
                               help="Boolean indicating whether to compress (by gzip) the final output "
-                              + "(allc file(s)).")     
+                              + "(allc file(s)).")
+     
+     call_mc_opt.add_argument("--bgzip",
+                              type=str2bool,
+                              default=False,
+                              help="Boolean indicating whether to bgzip compressed allc files and tabix index.")
+     
+     call_mc_opt.add_argument("--path-to-bgzip",
+                              type=str,
+                              default="",
+                              help="Path to bgzip installation")
+
+     call_mc_opt.add_argument("--path-to-tabix",
+                              type=str,
+                              default="",
+                              help="Path to tabix installation")
 
      call_mc_opt.add_argument("--path-to-samtools",
                               type=str,
@@ -1342,13 +1393,14 @@ def add_get_methylation_level_subparser(subparsers):
                              required=True,
                              help="List of allc files.")
 
-     add_mc_req.add_argument("--samples",
+     add_mc_opt = add_mc.add_argument_group("optional inputs")
+     add_mc_opt.add_argument("--samples",
                              type=str,
                              nargs="+",
-                             required=True,
-                             help="List of space separated samples")
+                             default=None,
+                             help="List of space separated samples matching allc files. By default "
+                             +"sample names will be inferred from allc filenames")
 
-     add_mc_opt = add_mc.add_argument_group("optional inputs")
      add_mc_opt.add_argument("--mc-type",
                              type=str,
                              nargs="+",
@@ -1444,7 +1496,7 @@ def add_allc2bw_subparser(subparsers):
 
      allc2bw_opt.add_argument("--max-site-cov",
                               type=int,
-                              default=0,
+                              default=None,
                               help="Maximum total coverage of a site for it to be included.")
      
      allc2bw_opt.add_argument("--path-to-wigToBigWig",
