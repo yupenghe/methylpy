@@ -281,7 +281,7 @@ def parse_args():
           from methylpy.utilities import index_allc_file_batch
           index_allc_file_batch(allc_files=args.allc_files,
                                 num_procs=args.num_procs,
-                                no_reindex=args.no_reindex)
+                                reindex=args.reindex)
 
      elif args.command == "filter-allc":
           from methylpy.utilities import filter_allc_files
@@ -1580,11 +1580,11 @@ def add_index_allc_subparser(subparsers):
                                  default=1,
                                  help="Number of processors to use")
 
-     index_allc_opt.add_argument("--no-reindex",
+     index_allc_opt.add_argument("--reindex",
                                  type=str2bool,
-                                 default=False,
-                                 help="Boolean indicating whether to skip indexing "
-                                 +"for files whose index files already exist.")
+                                 default=True,
+                                 help="Boolean indicating whether to index allc files whose "
+                                 +"index files already exist.")
 
 def add_filter_allc_subparser(subparsers):
      filter_allc = subparsers.add_parser("filter-allc",

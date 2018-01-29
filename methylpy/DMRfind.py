@@ -817,7 +817,7 @@ def get_methylation_levels_DMRfind(input_tsv_file,
             exit("mc_type must be a list of string(s)")
 
     # make sure all allc files are indexed
-    index_allc_file_batch(input_allc_files,num_procs,no_reindex=True)
+    index_allc_file_batch(input_allc_files,num_procs,reindex=False)
 
     mc_class = expand_nucleotide_code(mc_type)
     
@@ -1004,7 +1004,7 @@ def get_c_info_DMRfind(input_tsv_file,
             exit("mc_type must be a list of string(s)")
 
     # make sure all allc files are indexed
-    index_allc_file_batch(input_allc_files,num_procs,no_reindex=True)
+    index_allc_file_batch(input_allc_files,num_procs,reindex=False)
 
     mc_class = expand_nucleotide_code(mc_type)
 

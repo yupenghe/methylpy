@@ -400,7 +400,7 @@ def merge_allc_files(allc_files,
     # check index
     index_allc_file_batch(allc_files,
                           num_procs=num_procs,
-                          no_reindex=True)
+                          reindex=True)
     print_checkpoint("Start merging")
     if not(num_procs > 1):
         merge_allc_files_minibatch(allc_files,
@@ -656,22 +656,22 @@ def get_index_file_name(allc_file):
         index_file = allc_file+".idx"
     return index_file
 
-def index_allc_file_batch(allc_files,num_procs=1,no_reindex=False):
+def index_allc_file_batch(allc_files,num_procs=1,reindex=True):
     if num_procs == 1:
         for allc_file in allc_files:
-            index_allc_file(allc_file,no_reindex)
+            index_allc_file(allc_file,reindex)
     else:
         pool = multiprocessing.Pool(min(num_procs,len(allc_files),100))
         for allc_file in allc_files:
-            pool.apply_async(index_allc_file,(allc_file,no_reindex))
+            pool.apply_async(index_allc_file,(allc_file,reindex))
         pool.close()
         pool.join()
     return 0
 
-def index_allc_file(allc_file,no_reindex=False):
+def index_allc_file(allc_file,reindex=True):
     index_file = get_index_file_name(allc_file)
     # do not reindex if the index file is available and is complete
-    if no_reindex and os.path.exists(index_file):
+    if (not reindex) and os.path.exists(index_file):
         # check index file completeness
         eof_count = 0
         with open(index_file,'r') as f:        
@@ -715,7 +715,7 @@ def index_allc_file(allc_file,no_reindex=False):
 
 def read_allc_index(allc_file):
     index_file = get_index_file_name(allc_file)
-    index_allc_file(allc_file,no_reindex=True)
+    index_allc_file(allc_file,reindex=False)
     f = open(index_file,'r')
     chrom_pointer = {}
     for line in f:

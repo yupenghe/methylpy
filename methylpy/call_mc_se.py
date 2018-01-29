@@ -1638,7 +1638,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
                                                        output_file,
                                                        chrom_pointer=None,
                                                        remove_chr_prefix=remove_chr_prefix)
-    index_allc_file(output_file,no_reindex=False)
+    index_allc_file(output_file)
     if bgzip:
         bgzip_allc_file(output_file,path_to_bgzip,path_to_tabix,buffer_line_number)
     return(0)
@@ -1951,7 +1951,7 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
                                                        output_file,
                                                        chrom_pointer=None,
                                                        remove_chr_prefix=remove_chr_prefix)
-    index_allc_file(output_file,no_reindex=False)
+    index_allc_file(output_file)
     if bgzip:
         bgzip_allc_file(output_file,path_to_bgzip,path_to_tabix,buffer_line_number)
     return 0
