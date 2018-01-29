@@ -394,7 +394,7 @@ def merge_allc_files(allc_files,
     if not isinstance(allc_files, list):
         exit("allc_files must be a list of string(s)")
     # add .gz suffix
-    if compress_output and  output_file[-3:] != ".gz":
+    if compress_output and output_file[-3:] != ".gz":
         output_file += ".gz"
 
     # check index
@@ -676,10 +676,10 @@ def index_allc_file(allc_file,no_reindex=False):
         eof_count = 0
         with open(index_file,'r') as f:        
             for line in f:
-                if line == '#eof':
+                if line == '#eof\n':
                     eof_count += 1
         # need reindex
-        if eof_count > 1 or line != '#eof':
+        if eof_count > 1 or line != '#eof\n':
             pass
         else:
             return 0
@@ -759,7 +759,10 @@ def expand_nucleotide_code(mc_type):
                          itertools.product(*[iub_dict[nuc] for nuc in motif])])
     return(set(mc_class_final))
 
-def split_fastq_file(num_chunks, input_files, output_prefix):
+def split_fastq_file(num_chunks,
+                     input_files,
+                     output_prefix,
+                     buffer_line_number=100000):
     """
     This function mimics the unix split utility.
     """
