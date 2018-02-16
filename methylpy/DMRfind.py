@@ -579,7 +579,7 @@ def collapse_dmr_windows(inputf, output, column=4, max_dist=100, resid_cutoff=Fa
     if collapse_samples and sample_category:
         category_dict = dict(list(zip(collapse_samples, sample_category)))
     elif sample_category:
-        exit("In order to use sample_category, you must specify a corresponding list of samples in collapse_samples!")
+        exit("In order to use sample_category, you must specify a corresponding list of samples in --collapse-samples!")
     
     #this is where sample specific fields begin. Since the number of fields before these fields is fixed
     #I created a variable in case I add a fixed field later.
@@ -806,9 +806,8 @@ def get_methylation_levels_DMRfind(input_tsv_file,
     # 1. check whether allc files are stored in a list
     # 2. check whether samples are stored in a list
     # 4. whether samples and allc files have the same length
-    
     if samples is None:
-        samples = infer_samples(allc_files)
+        samples = infer_samples(input_allc_files)
 
     if not isinstance(mc_type, list):
         if isinstance(mc_type, str):
@@ -997,6 +996,9 @@ def get_c_info_DMRfind(input_tsv_file,
     # 2. check whether samples are stored in a list
     # 4. whether samples and allc files have the same length
     
+    if samples is None:
+        samples = infer_samples(input_allc_files)
+
     if not isinstance(mc_type, list):
         if isinstance(mc_type, str):
             mc_type = [mc_type]
@@ -1136,7 +1138,7 @@ def get_c_info_DMRfind_worker(input_tsv_file,
             dmr_chr=fields[0]
             dmr_start = int(fields[1])
             dmr_end = int(fields[2])
-            
+
             # get to new chromosome and redirect pointer to related lines in allc file
             if prev_chrom != fields[0]:
                 allc_file.seek(chrom_pointer[dmr_chr])

@@ -399,8 +399,7 @@ def merge_allc_files(allc_files,
 
     # check index
     index_allc_file_batch(allc_files,
-                          num_procs=num_procs,
-                          reindex=True)
+                          num_procs=num_procs)
     print_checkpoint("Start merging")
     if not(num_procs > 1):
         merge_allc_files_minibatch(allc_files,
@@ -656,7 +655,7 @@ def get_index_file_name(allc_file):
         index_file = allc_file+".idx"
     return index_file
 
-def index_allc_file_batch(allc_files,num_procs=1,reindex=True):
+def index_allc_file_batch(allc_files,num_procs=1,reindex=False):
     if num_procs == 1:
         for allc_file in allc_files:
             index_allc_file(allc_file,reindex)
@@ -668,7 +667,7 @@ def index_allc_file_batch(allc_files,num_procs=1,reindex=True):
         pool.join()
     return 0
 
-def index_allc_file(allc_file,reindex=True):
+def index_allc_file(allc_file,reindex=False):
     index_file = get_index_file_name(allc_file)
     # do not reindex if the index file is available and is complete
     if (not reindex) and os.path.exists(index_file):

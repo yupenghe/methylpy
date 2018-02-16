@@ -15,6 +15,14 @@ methylpy is available at
 Note
 ====
 
+-  Version 1.3 has major changes on options related to mapping. A new
+   aligner, minimap2, is supported starting in this version. To
+   accommodate this new features, ``--bowtie2`` option is replaced with
+   ``--aligner``, which specifies the aligner to use. The parameters of
+   ``--build-reference`` function are modified as well.
+-  Another new feature in methylpy 1.3 is that sample names can now be
+   inferred from allc filenames. When you run ``add-methylation-level``
+   and ``DMRfind``, ``--samples`` is no longer a required option.
 -  methylpy was initiated by and built on the work of `Mattew D.
    Schultz <https://github.com/schultzmattd>`__
 -  beta version of
@@ -106,7 +114,8 @@ of methylpy functions). \*
 `bowtie <http://bowtie-bio.sourceforge.net/index.shtml>`__ and/or
 `bowtie2 <http://bowtie-bio.sourceforge.net/bowtie2/index.shtml>`__ for
 alignment \* `samtools <https://github.com/samtools/samtools>`__ (>=1.3)
-for alignment result manipulation \*
+for alignment result manipulation. Samtools can also be installed using
+conda ``conda install -c bioconda samtools`` \*
 `Picard <https://broadinstitute.github.io/picard/index.html>`__
 (>=2.10.8) for PCR duplicate removal \* java for running Picard (its
 path needs to be included in ``PATH`` environment variable) . \*

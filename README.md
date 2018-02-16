@@ -9,6 +9,10 @@ methylpy is available at [github](https://github.com/yupenghe/methylpy)
 and [PyPI](https://pypi.python.org/pypi/methylpy/).
 
 # Note
+* Version 1.3 has major changes on options related to mapping. A new aligner, minimap2, is supported starting
+in this version. To accommodate this new features, `--bowtie2` option is replaced with `--aligner`, which specifies
+the aligner to use. The parameters of `--build-reference` function are modified as well.
+* Another new feature in methylpy 1.3 is that sample names can now be inferred from allc filenames. When you run `add-methylation-level` and `DMRfind`, `--samples` is no longer a required option.
 * methylpy was initiated by and built on the work of [Mattew D. Schultz](https://github.com/schultzmattd)
 * beta version of [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial/tutorial.md) is released!
 
@@ -69,7 +73,7 @@ if you only use a subset of methylpy functions).
 * [cutadapt](http://cutadapt.readthedocs.io/en/stable/installation.html) (>=1.9) for raw read trimming
 * [bowtie](http://bowtie-bio.sourceforge.net/index.shtml) and/or 
 [bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) for alignment
-* [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment result manipulation
+* [samtools](https://github.com/samtools/samtools) (>=1.3) for alignment result manipulation. Samtools can also be installed using conda `conda install -c bioconda samtools`
 * [Picard](https://broadinstitute.github.io/picard/index.html) (>=2.10.8) for  PCR duplicate removal
 * java for running Picard (its path needs to be included in `PATH` environment variable) .
 * [wigToBigWig](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig) for converting methylpy output 
