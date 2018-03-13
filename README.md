@@ -12,7 +12,7 @@ and [PyPI](https://pypi.python.org/pypi/methylpy/).
 * Version 1.3 has major changes on options related to mapping. A new aligner, minimap2, is supported starting
 in this version. To accommodate this new features, `--bowtie2` option is replaced with `--aligner`, which specifies
 the aligner to use. The parameters of `--build-reference` function are modified as well.
-* Another new feature in methylpy 1.3 is that sample names can now be inferred from allc filenames. When you run `add-methylation-level` and `DMRfind`, `--samples` is no longer a required option.
+* methylpy only considers cytosines that are in uppercase in the genome fasta file (i.e. not masked)
 * methylpy was initiated by and built on the work of [Mattew D. Schultz](https://github.com/schultzmattd)
 * beta version of [tutorial](https://github.com/yupenghe/methylpy/blob/methylpy/tutorial/tutorial.md) is released!
 

@@ -675,7 +675,7 @@ def add_se_pipeline_subparser(subparsers):
                                 type=str,
                                 nargs="+",
                                 help="list of strings indicating options you would like passed "
-                                + "to bowtie (e.g., [\"-k 1\",\"-l 2\"])")
+                                + "to bowtie (e.g., \"-k 1 -l 2\")")
 
      parser_se_opt.add_argument("--merge-by-max-mapq",
                                 type=str2bool,
@@ -974,7 +974,7 @@ def add_pe_pipeline_subparser(subparsers):
                                 type=str,
                                 nargs="+",
                                 help="list of strings indicating options you would like passed "
-                                + "to bowtie (e.g., [\"-k 1\",\"-l 2\"])")
+                                + "to bowtie (e.g., \"-k 1 -l 2\")")
 
      parser_pe_opt.add_argument("--merge-by-max-mapq",
                                 type=str2bool,
