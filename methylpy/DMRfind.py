@@ -876,7 +876,8 @@ def get_methylation_levels_DMRfind(input_tsv_file,
             temp_files[sample]=open(output.replace(".tsv","")+"_"+sample+"_temp_methylation_levels.tsv",'r')
 
         f.seek(0)
-        line = f.readline()
+        if not input_no_header:
+            line = f.readline()
         for line in f:
             g.write(line.rstrip("\n"))
             for sample in samples:
