@@ -547,7 +547,6 @@ def merge_allc_files_worker(allc_files,
             f.close()
         raise 
         #exit() # exit due to failure of openning all allc files at once
-    print(len(fhandles))
     if query_chroms is not None:
         if isinstance(query_chroms,list):
             chroms = query_chroms

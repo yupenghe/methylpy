@@ -27,6 +27,7 @@ def parse_args():
      add_merge_allc_subparser(subparsers)
      add_index_allc_subparser(subparsers)
      add_filter_allc_subparser(subparsers)
+     add_test_allc_subparser(subparsers)
 
      if len(sys.argv) > 1:
           ## print out version
@@ -295,6 +296,19 @@ def parse_args():
                             max_mismatch_frac=args.max_mismatch_frac,
                             min_cov=args.min_cov,
                             max_cov=args.max_cov)
+
+     elif args.command == "test-allc":
+          from methylpy.call_mc_se import perform_binomial_test
+          perform_binomial_test(allc_file=args.allc_file,
+                                sample=args.sample,
+                                path_to_output=args.path_to_output,
+                                unmethylated_control=args.unmethylated_control,
+                                min_cov=args.min_cov,
+                                sig_cutoff=args.sig_cutoff,
+                                num_procs=args.num_procs,
+                                sort_mem=args.sort_mem,
+                                compress_output=args.compress_output,
+                                remove_chr_prefix=args.remove_chr_prefix)
 
      elif args.command == "allc-to-bigwig":
           from methylpy.utilities import convert_allc_to_bigwig
@@ -1604,12 +1618,12 @@ def add_filter_allc_subparser(subparsers):
                                   nargs="+",
                                   help="Name of output files. Each output file matches each allc file.")
 
-     filter_allc_req.add_argument("--num-procs",
+     filter_allc_opt = filter_allc.add_argument_group("optional inputs")
+
+     filter_allc_opt.add_argument("--num-procs",
                                   type=int,
                                   default=1,
                                   help="Number of processors you wish to use to parallelize this function")
-
-     filter_allc_opt = filter_allc.add_argument_group("optional inputs")
 
      filter_allc_opt.add_argument("--mc-type",
                                   type=str,
@@ -1665,6 +1679,72 @@ def add_filter_allc_subparser(subparsers):
                                   default=None,
                                   help="Space separated listing of chromosomes to be included in the output. "
                                   +"By default, data of all chromosomes in input allc file will be included.")
+
+def add_test_allc_subparser(subparsers):
+     test_allc = subparsers.add_parser("test-allc",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     help="Binomial test on allc file")
+
+     test_allc_req = test_allc.add_argument_group("required inputs")
+     test_allc_req.add_argument("--allc-file",
+                                  type=str,
+                                  required=True,
+                                  help="allc file to be tested.")
+
+     test_allc_req.add_argument("--sample",
+                                  type=str,
+                                  required=True,
+                                  help="sample name")
+
+     test_allc_req.add_argument("--unmethylated-control",
+                                type=str,
+                                help="name of the chromosome/region that you want to use to estimate "
+                                + "the non-conversion rate of your sample, or the non-conversion rate "
+                                + "you would like to use. Consequently, control is either a string, or "
+                                + "a decimal. If control is a string then it should be in the following "
+                                + "format: \"chrom:start-end\". If you would like to specify an entire "
+                                + "chromosome simply use \"chrom:\"")
+
+     test_allc_opt = test_allc.add_argument_group("optional inputs")
+
+     test_allc_opt.add_argument("--path-to-output",
+                                type=str,
+                                default="",
+                                help="Path to a directory where you would like the output to be stored. "
+                                + "The default is the same directory as the input fastqs.")
+
+     test_allc_opt.add_argument("--num-procs",
+                                  type=int,
+                                  default=1,
+                                  help="Number of processors you wish to use to parallelize this function")
+
+     test_allc_opt.add_argument("--min-cov",
+                                  type=int,
+                                  default=2,
+                                  help="Minimum number of reads that must cover a site for it to be "
+                                  + "tested.")
+
+     test_allc_opt.add_argument("--compress-output",
+                                  type=str2bool,
+                                  default=True,
+                                  help="Boolean indicating whether to compress (by gzip) the final output")
+
+     test_allc_opt.add_argument("--sig-cutoff",
+                                type=float,
+                                default=.01,
+                                help="Float indicating at what FDR you want to consider a result "
+                                + "significant.")
+
+     test_allc_opt.add_argument("--sort-mem",
+                                type=str,
+                                default="500M",
+                                help="Parameter to pass to unix sort with -S/--buffer-size command")
+
+     test_allc_opt.add_argument("--remove-chr-prefix",
+                                type=str2bool,
+                                default=True,
+                                help="Boolean indicates whether to remove in the final output the \"chr\" prefix "
+                                +"in the chromosome name")
 
 def str2bool(v):
      ## adapted from the answer by Maxim at
