@@ -1128,9 +1128,7 @@ def parallel_split_files_by_position(filen,cutoffs,
 
 def open_allc_file(allc_file):
     if allc_file.endswith('gz'):  # so it works for .gz and .bgz
-        f = subprocess.Popen(['zcat', allc_file],
-                             stdout=subprocess.PIPE,
-                             encoding='utf8').stdout
+        f = gzip.open(allc_file,'rt')
     else:
         f = open(allc_file,'r')
     return(f)
