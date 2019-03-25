@@ -1,6 +1,6 @@
 from setuptools import setup
 
-methylpy_version = '1.3.4'
+methylpy_version = '1.3.5'
 
 setup(
     name='methylpy',
@@ -8,7 +8,6 @@ setup(
     author='Yupeng He',
     author_email='yupeng.he.bioinfo@gmail.com',
     packages=['methylpy'], 
-    #url='http=//pypi.python.org/pypi/methylpy/',
     license='LICENSE.txt',
     description='Bisulfite sequencing data processing and differential methylation analysis',
     long_description=open('docs/README.rst').read(),
