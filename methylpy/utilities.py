@@ -673,7 +673,7 @@ def index_allc_file(allc_file,reindex=False):
         # check index file completeness
         eof_count = 0
         line = False
-        with open(index_file,'r') as f:
+        with open(index_file,'r') as f:        
             for line in f:
                 if line == '#eof\n':
                     eof_count += 1

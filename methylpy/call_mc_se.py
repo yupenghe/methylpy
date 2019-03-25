@@ -629,6 +629,7 @@ def build_ref(input_files,
     else:
         subprocess.check_call(shlex.split(base_cmd + output + "_f.fasta " + output +"_f"))
         subprocess.check_call(shlex.split(base_cmd + output + "_r.fasta " + output+ "_r"))
+    subprocess.check_call(["rm",output + "_f.fasta",output + "_r.fasta"])
     return 0
     
 def convert_reads(inputf,output,buffer_line_number=100000):
