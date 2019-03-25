@@ -672,6 +672,7 @@ def index_allc_file(allc_file,reindex=False):
     if (not reindex) and os.path.exists(index_file):
         # check index file completeness
         eof_count = 0
+        line = False
         with open(index_file,'r') as f:
             for line in f:
                 if line == '#eof\n':
