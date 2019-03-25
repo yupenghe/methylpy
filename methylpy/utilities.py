@@ -682,34 +682,41 @@ def index_allc_file(allc_file,reindex=False):
             pass
         else:
             return 0
-    g = open(index_file,'w')
+
     f = open_allc_file(allc_file)
-    cur_chrom = ""
+
+    index_lines = []
+    cur_chrom = "TOTALLY_NOT_A_CHROM"
+    cur_start = cur_chrom + '\t'
+    cur_pointer = 0
     # check header
-    line = f.readline()
-    try:
-        fields = line.split("\t")
-        int(fields[1])
-        int(fields[4])
-        int(fields[5])
-        # no header, continue to start from the beginning of allc file
-        f.seek(0)
-        cur_pointer = 0
-    except:
-        # find header, skip it
-        cur_pointer = f.tell()
-    # find chrom pointer
-    while True:
-        line = f.readline()
-        if not line: break
-        fields = line.split("\t")
-        if fields[0] != cur_chrom:
-            g.write(fields[0]+"\t"+str(cur_pointer)+"\n")
+    first_line = True
+    for line in f:
+        if first_line:
+            # all new allc files don't have header,
+            # some old files' first line is header
+            fields = line.split("\t")
+            first_line = False
+            try:
+                int(fields[1])
+                int(fields[4])
+                int(fields[5])
+                # no header, continue to start from the beginning of allc file
+            except ValueError:
+                # find header, skip it
+                cur_pointer += len(line)
+                continue
+        if not line.startswith(cur_start):
+            fields = line.split("\t")
+            index_lines.append(fields[0] + "\t" + str(cur_pointer) + "\n")
             cur_chrom = fields[0]
-        cur_pointer = f.tell()
-    g.write("#eof\n")
+            cur_start = cur_chrom + '\t'
+        cur_pointer += len(line)
+    # backward compatibility
+    index_lines.append("#eof\n")
     f.close()
-    g.close()
+    with open(index_file, 'w') as idx:
+        idx.writelines(index_lines)
     return 0
 
 def read_allc_index(allc_file):
@@ -1120,8 +1127,10 @@ def parallel_split_files_by_position(filen,cutoffs,
     f.close()
 
 def open_allc_file(allc_file):
-    if allc_file[-3:] == ".gz":
-        f = gzip.open(allc_file,'rt')
+    if allc_file.endswith('gz'):  # so it works for .gz and .bgz
+        f = subprocess.Popen(['zcat', allc_file],
+                             stdout=subprocess.PIPE,
+                             encoding='utf8').stdout
     else:
         f = open(allc_file,'r')
     return(f)
