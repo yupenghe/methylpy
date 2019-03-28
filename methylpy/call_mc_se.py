@@ -1495,7 +1495,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
     ## Input
     if not generate_mpileup_file:
         cmd = path_to_samtools+"samtools mpileup -Q "+str(min_base_quality)+\
-              +" -q "+str(min_mapq)+" -B -f "+reference_fasta+" "+inputf
+              " -q "+str(min_mapq)+" -B -f "+reference_fasta+" "+inputf
         pipes = subprocess.Popen(shlex.split(cmd),
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE,
