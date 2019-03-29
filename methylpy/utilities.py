@@ -178,7 +178,7 @@ def convert_allc_to_bigwig(input_allc_file,
     g = open(output_file+".chrom_size",'w')
     for line in f:
         fields = line.split("\t")
-        if not fields[0].startswith("chr"):
+        if add_chr_prefix and (not fields[0].startswith("chr")):
             fields[0] = "chr"+fields[0]
         chrom_end[fields[0]] = int(fields[1])
         g.write(fields[0]+"\t"+fields[1]+"\n")
