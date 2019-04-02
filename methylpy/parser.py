@@ -1531,7 +1531,7 @@ def add_allc2bw_subparser(subparsers):
 
      allc2bw_opt.add_argument("--add-chr-prefix",
                               type=str2bool,
-                              default=True,
+                              default=False,
                               help="Boolean indicates whether to add \"chr\" in the chromosome names in "
                               +"input allc file to match chromosome names in genome sequence file. This option "
                               +"overrides --remove-chr-prefix.")

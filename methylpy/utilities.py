@@ -208,10 +208,10 @@ def convert_allc_to_bigwig(input_allc_file,
                                            str(bin_start),
                                            str(bin_end),
                                            mc_level])+"\n")
-                if fields[0].startswith("chr"):
-                    cur_chrom_end = chrom_end[fields[0]]
-                else:
+                if add_chr_prefix and (not fields[0].startswith("chr")):
                     cur_chrom_end = chrom_end["chr"+fields[0]]
+                else:
+                    cur_chrom_end = chrom_end[fields[0]]
                 if pos >= cur_chrom_end:
                     print_warning("Skip site beyond chromosome boundary: "+line)
                     cur_chrom = fields[0]
