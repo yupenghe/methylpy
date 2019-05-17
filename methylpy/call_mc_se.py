@@ -149,12 +149,13 @@ def run_methylation_pipeline(read_files, sample,
     """
 
     if check_dependency:
-        check_call_mc_dependencies(path_to_samtools,
-                                   trim_reads,
-                                   path_to_cutadapt,
-                                   path_to_aligner,
-                                   remove_clonal,
-                                   path_to_picard)
+        check_call_mc_dependencies(path_to_samtools=path_to_samtools,
+                                   trim_reads=trim_reads,
+                                   path_to_cutadapt=path_to_cutadapt,
+                                   aligner=aligner,
+                                   path_to_aligner=path_to_aligner,
+                                   remove_clonal=remove_clonal,
+                                   path_to_picard=path_to_picard)
 
     if libraries is None:
         libraries = ["libA"]
