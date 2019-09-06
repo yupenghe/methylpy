@@ -1046,10 +1046,13 @@ def find_multi_mappers(inputf,output,num_procs=1,min_mapq=30,
             print_warning(header[-1]+"\n")
     f.close()
 
-    subprocess.check_call(shlex.split("rm "+inputf))
+    if not keep_temp_files:
+        subprocess.check_call(shlex.split("rm "+inputf))
+
     for file_num in range(0,num_procs):
         file_handles[file_num].close()
-    
+
+
 def merge_sorted_multimap(current_library,files,prefix,reference_fasta,path_to_samtools=""):
     """
     This function takes the files from find_multi_mappers and outputs the uniquely mapping reads.

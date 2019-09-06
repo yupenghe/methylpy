@@ -854,11 +854,14 @@ def find_multi_mappers_pe(inputf,output,num_procs=1,
             print_warning("  Failed to recover unconverted sequence for:\n"+line+"\n")
             print_warning(header[-1]+"\n")
     f.close()
-    if keep_temp_files == False:
+    
+    if not keep_temp_files:
         subprocess.check_call(shlex.split("rm "+inputf))
-        pass
+
+
     for file_num in range(0,num_procs):
         file_handles[file_num].close()
+
 
 def merge_sorted_multimap_pe(current_library,files,prefix,reference_fasta,path_to_samtools=""):
     """
