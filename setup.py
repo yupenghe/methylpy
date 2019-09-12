@@ -1,6 +1,6 @@
 from setuptools import setup
 
-methylpy_version = '1.3.8'
+methylpy_version = '1.4.0'
 
 setup(
     name='methylpy',
@@ -14,6 +14,7 @@ setup(
     install_requires=[
         "numpy >= 1.6.1",
 	"scipy >= 0.10.0",
+        "pysam >= 0.5.3"
     ],
     package_data = {
         'methylpy.test':['test/*'],

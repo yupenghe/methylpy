@@ -192,8 +192,7 @@ def parse_args():
                                  min_mapq=args.min_mapq,
                                  min_ch=args.min_num_ch,
                                  max_mch_level=args.max_mch_level,
-                                 buffer_line_number=args.buffer_line_number,
-                                 path_to_samtools=args.path_to_samtools)
+                                 buffer_line_number=args.buffer_line_number)
 
      elif args.command == "call-methylation-state":
           if args.paired_end:
@@ -1217,11 +1216,6 @@ def add_bam_filter_subparser(subparsers):
                                     default=0.7,
                                     help="Maximum mCH level for reads to be included.")
 
-     parser_filter_opt.add_argument("--path-to-samtools",
-                                type=str,
-                                default="",
-                                help="Path to samtools installation")
-     
      parser_filter_opt.add_argument("--buffer-line-number",
                                 type=int,
                                 default=100000,

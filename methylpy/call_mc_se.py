@@ -10,6 +10,7 @@ from methylpy.utilities import split_fastq_file_pbat
 from methylpy.utilities import open_allc_file,index_allc_file
 from methylpy.utilities import read_allc_index,bgzip_allc_file
 from methylpy.utilities import check_call_mc_dependencies
+import pysam
 import pdb
 import shlex
 import itertools
@@ -2387,117 +2388,97 @@ def bam_quality_mch_filter(inputf,
                            min_mapq=30,
                            min_ch=3,
                            max_mch_level=0.7,
-                           buffer_line_number=100000,
-                           path_to_samtools=""):
-    """
+                           buffer_line_number=100000):
+    """"""
     
-    """
-
-    ## Check fasta index
-    try:
-        f = open(reference_fasta+".fai",'r')
-    except:
-        print("Reference fasta not indexed. Indexing.")
-        try:
-            subprocess.check_call(shlex.split(path_to_samtools+"samtools faidx "+reference_fasta))
-            f = open(reference_fasta+".fai",'r')
-        except:
-            sys.exit("Reference fasta wasn't indexed, and couldn't be indexed. "
-                     +"Please try indexing it manually and running methylpy again.")
-
     min_ch = int(min_ch)
     max_mch_level = float(max_mch_level)
-    
+
     # quality filter
-    cmd = path_to_samtools+"samtools view -q"+str(min_mapq)+" "+inputf
-    pipes = subprocess.Popen(shlex.split(cmd),
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             universal_newlines=True)
-    fhandle = pipes.stdout
+    fhandle = pysam.AlignmentFile(inputf, "rb")
 
     # open up output file
-    out_handle = open(outputf+".sam",'w')
-    # print header
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -H "+inputf),
-                          stdout=out_handle)
+    out_handle = pysam.AlignmentFile("{}.bam".format(outputf),
+                                     "wb",
+                                     template=fhandle)
 
-    line_counts = 0
-    out = ""
-    cur_chrom = ""
+    ref_genome = pysam.FastaFile(reference_fasta)
+
+    out = []
     for line in fhandle:
-        fields = line.split("\t")
-        if fields[2] != cur_chrom:
-            cur_chrom = fields[2]
-            seq = get_chromosome_sequence(reference_fasta,cur_chrom)
-            if seq != None:
-                seq = seq.upper()
-
-        if seq == None:
-            continue
-
-        # get mc state
-        read_pos = int(fields[3]) - 1
         uch = 0
         mch = 0
         num_ch = 0
-        if int(fields[1]) & 16 == 0: # + strand
-            for ind,base in enumerate(fields[9]):
-                pos = ind + read_pos
-                try:
-                    if seq[pos] != "C":
-                        continue
-                    if base == "C":
-                        if seq[pos+1] == "G":
-                            continue
-                        else:
-                            mch += 1
-                    elif base == "T":
-                        if seq[pos+1] == "G":
-                            continue
-                        else:
-                            uch += 1
-                except: # pos + 1 exceed reference boundary
-                    pass
-        else: # - strand
-            for ind,base in enumerate(fields[9]):
-                pos = ind + read_pos
-                try:
-                    if seq[pos] != "G":
-                        continue
-                    if base == "G":
-                        if seq[pos-1] == "C":
-                            continue
-                        else:
-                            mch += 1
-                    elif base == "A":
-                        if seq[pos-1] == "C":
-                            continue
-                        else:
-                            uch += 1
-                except: # pos - 1 exceed reference boundary
-                    pass
+
+        # reference
+        ref_seq = "".join([
+            ref_genome.fetch(line.reference_name, start, end)
+            for start, end in line.get_blocks()
+        ])
+
+        # read sequence
+        seq = ""
+        pos = 0
+        for block_code, block_len in line.cigar:
+            if (block_code == 0) or (block_code == 2):
+                seq += line.seq[pos:(block_len + pos)]
+            pos += block_len
+
+        if not line.is_reverse:
+            pos = ref_seq.find("C")
+            while (pos > 0) & (pos < (len(ref_seq)-1)):
+                if ref_seq[pos + 1] != "G":
+                    if seq[pos] == "C":
+                        mch += 1
+                    elif seq[pos] == "T":
+                        uch += 1
+                pos = ref_seq.find("C", pos + 1)
+            if pos == len(ref_seq):
+                context_ref_pos = line.get_reference_positions()[-1] + 1
+                context_base = ref_genome.fetch(line.reference_name,
+                                                context_ref_pos,
+                                                context_ref_pos + 1)
+                if context_base != "G":
+                    if seq[pos] == "C":
+                        mch += 1
+                    elif seq[pos] == "T":
+                        uch += 1
+        else:
+            if ref_seq[0] == "G":
+                context_ref_pos = line.get_reference_positions()[0] - 1
+                if context_ref_pos < 0: continue
+                context_base = ref_genome.fetch(line.reference_name,
+                                                context_ref_pos,
+                                                context_ref_pos + 1)
+                if context_base != "C":
+                    if seq[0] == "G":
+                        mch += 1
+                    elif seq[0] == "A":
+                        uch += 1
+            
+            pos = ref_seq.find("G", 1)
+            while (pos > 0):
+                if ref_seq[pos - 1] != "C":
+                    if seq[pos] == "G":
+                        mch += 1
+                    elif seq[pos] == "A":
+                        uch += 1
+                pos = ref_seq.find("G", pos + 1)
+
         # apply filter
-        tot_ch = float(mch+uch)
-        if tot_ch >= min_ch and float(mch)/float(tot_ch) > max_mch_level:
-            continue
-        
-        line_counts += 1
-        out += line
-        if line_counts > buffer_line_number:
-            out_handle.write(out)
-            out = ""
-            line_counts = 0
-        
-    if line_counts > 0:
-        out_handle.write(out)
-        out = ""
+        tot_ch = float(mch + uch)
+        if tot_ch > 0:
+            if (tot_ch >= min_ch) & (float(mch) / float(tot_ch) >= max_mch_level):
+                continue
+
+        out.append(line)
+        if len(out) > buffer_line_number:
+            for line in out:
+                out_handle.write(line)
+            out = []
+
+    if len(out) > 0:
+        for line in out:
+            out_handle.write(line)
+        out = []
     out_handle.close()
-    
-    # sam to bam
-    f = open(outputf,'w')
-    subprocess.check_call(shlex.split(path_to_samtools+"samtools view -Sb "+outputf+".sam"),stdout=f)
-    f.close()
-    
-    # remove sam
-    subprocess.check_call(shlex.split("rm " +outputf+".sam"))
