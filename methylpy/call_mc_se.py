@@ -2382,6 +2382,7 @@ def filter_files_by_pvalue_combined(input_files,output_file,
         f.close()
     g.close()
 
+
 def bam_quality_mch_filter(inputf,
                            outputf,
                            reference_fasta,
@@ -2389,8 +2390,6 @@ def bam_quality_mch_filter(inputf,
                            min_ch=3,
                            max_mch_level=0.7,
                            buffer_line_number=100000):
-    """"""
-    
     min_ch = int(min_ch)
     max_mch_level = float(max_mch_level)
 
@@ -2425,40 +2424,47 @@ def bam_quality_mch_filter(inputf,
             pos += block_len
 
         if not line.is_reverse:
+            # first base to the last -1 base
             pos = ref_seq.find("C")
-            while (pos > 0) & (pos < (len(ref_seq)-1)):
-                if ref_seq[pos + 1] != "G":
+            while (pos >= 0) & (pos < (len(ref_seq) - 1)):
+                if (ref_seq[pos + 1] != "G") & (ref_seq[pos + 1] != "N"):
                     if seq[pos] == "C":
                         mch += 1
                     elif seq[pos] == "T":
                         uch += 1
                 pos = ref_seq.find("C", pos + 1)
-            if pos == len(ref_seq):
+
+            # last base
+            if pos == (len(ref_seq) - 1):
                 context_ref_pos = line.get_reference_positions()[-1] + 1
                 context_base = ref_genome.fetch(line.reference_name,
                                                 context_ref_pos,
                                                 context_ref_pos + 1)
-                if context_base != "G":
+                context_base = context_base.upper()
+                if (context_base != "G") & (context_base != "N"):
                     if seq[pos] == "C":
                         mch += 1
                     elif seq[pos] == "T":
                         uch += 1
         else:
+            # first base
             if ref_seq[0] == "G":
                 context_ref_pos = line.get_reference_positions()[0] - 1
                 if context_ref_pos < 0: continue
                 context_base = ref_genome.fetch(line.reference_name,
                                                 context_ref_pos,
                                                 context_ref_pos + 1)
-                if context_base != "C":
+                context_base = context_base.upper()
+                if (context_base != "C") & (context_base != "N"):
                     if seq[0] == "G":
                         mch += 1
                     elif seq[0] == "A":
                         uch += 1
-            
+
+            # starting from the second base
             pos = ref_seq.find("G", 1)
             while (pos > 0):
-                if ref_seq[pos - 1] != "C":
+                if (ref_seq[pos - 1] != "C") & (ref_seq[pos - 1] != "N"):
                     if seq[pos] == "G":
                         mch += 1
                     elif seq[pos] == "A":
@@ -2468,7 +2474,8 @@ def bam_quality_mch_filter(inputf,
         # apply filter
         tot_ch = float(mch + uch)
         if tot_ch > 0:
-            if (tot_ch >= min_ch) & (float(mch) / float(tot_ch) >= max_mch_level):
+            if (tot_ch >= min_ch) & (float(mch) / float(tot_ch) >=
+                                     max_mch_level):
                 continue
 
         out.append(line)
