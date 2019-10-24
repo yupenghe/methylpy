@@ -32,7 +32,7 @@ the aligner to use. The parameters of `--build-reference` function are modified 
 * useful feature for dealing with low-coverage data by combining data of adjacent cytosines
 
 # What you want to do
-* [Install methylpy](#install-methylpy)
+* [Use methylpy without installation](#use-methylpy-without-installation)
 * [Install methylpy](#install-methylpy)
 * [Test methylpy](#test-methylpy)
 * [Process data](#process-data)
