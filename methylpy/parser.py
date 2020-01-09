@@ -217,7 +217,8 @@ def parse_args():
                                         remove_chr_prefix=args.remove_chr_prefix,
                                         add_snp_info=args.add_snp_info,
                                         path_to_files=args.path_to_output,
-                                        min_base_quality=args.min_base_quality)
+                                        min_base_quality=args.min_base_quality,
+                                        keep_temp_files=args.keep_temp_files)
           else:
                from methylpy.call_mc_se import call_methylated_sites
                call_methylated_sites(inputf=args.input_file,
