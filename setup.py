@@ -1,6 +1,6 @@
 from setuptools import setup
 
-methylpy_version = '1.4.0'
+methylpy_version = '1.4.2'
 
 setup(
     name='methylpy',

@@ -55,6 +55,8 @@ Calling differentially methylated regions (DMRs)
 What you want to do
 ===================
 
+-  `Use methylpy without
+   installation <#use-methylpy-without-installation>`__
 -  `Install methylpy <#install-methylpy>`__
 -  `Test methylpy <#test-methylpy>`__
 -  `Process data <#process-data>`__
@@ -65,13 +67,43 @@ What you want to do
 
 run ``methylpy -h`` to get a list of functions.
 
+Use methylpy without installation
+=================================
+
+Methylpy can be used within docker container with all dependencies
+resolved. The docker image for methylpy can be built from the
+``Dockerfile`` under ``methylpy/`` directory using the below command. It
+will take ~3g space.
+
+::
+
+    git clone https://github.com/yupenghe/methylpy.git
+    cd methylpy/
+    docker build -t methylpy:latest ./
+
+Then, you can start a docker container by running
+
+::
+
+    docker run -it methylpy:latest
+
+methylpy can be run with full functionality within the container. You
+can mount your working directory to the container by adding ``-v``
+option to the docker command and store methylpy output there.
+
+::
+
+    docker run -it -v /YOUR/WORKING/PATH/:/output methylpy:latest
+
+See `here <https://docs.docker.com/storage/volumes/>`__ for details.
+
 Install methylpy
 ================
 
 Step 1 - Download methylpy
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Easiest way of installing methylpy will be through PyPI by running
+The easiest way of installing methylpy will be through PyPI by running
 ``pip install methylpy``. The command ``pip install --upgrade methylpy``
 updates methylpy to latest version. Alternatively, methylpy can be
 installed through github: enter the directory where you would like to
