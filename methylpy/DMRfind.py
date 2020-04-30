@@ -922,12 +922,23 @@ def get_methylation_level_DMRfind_worker(inputf_tsv,
             
             # get to new chromosome and redirect pointer to related lines in allc file
             if prev_chrom != fields[0]:
-                allc_file.seek(chrom_pointer[dmr_chr])
-                allc_prevbyte = chrom_pointer[dmr_chr]
-                # update allc line
-                allc_line=allc_file.readline()
-                allc_field=allc_line.split("\t")
-
+                # if chrom is not in the allc file, add NAs
+                if dmr_chr not in chrom_pointer:
+                    out += str(methylation_level)+"\n"
+                    line_counts += 1
+                    if line_counts > buffer_line_number:
+                        g.write(out)
+                        line_counts = 0
+                        out = ""
+                    prev_chrom = dmr_chr
+                    prev_end = dmr_end
+                    continue
+                else:
+                    allc_file.seek(chrom_pointer[dmr_chr])
+                    allc_prevbyte = chrom_pointer[dmr_chr]
+                    # update allc line
+                    allc_line=allc_file.readline()
+                    allc_field=allc_line.split("\t")
 
             #If this new dmr overlaps with the previous, begin where the previous start was found
             elif prev_end and dmr_start < prev_end:
