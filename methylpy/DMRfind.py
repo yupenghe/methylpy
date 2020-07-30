@@ -388,6 +388,7 @@ def histogram_correction_DMRfind(rms_results,num_sims,num_sig_tests,target_fdr =
             sorted_pvalues.append((num_sig_tests,denominator))
         last_pvalue = pvalue
     # get table
+    f.seek(0)
     f.readline()
     for line in f:
         line = line.rstrip()
