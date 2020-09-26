@@ -1483,8 +1483,7 @@ def call_methylated_sites(inputf, sample, reference_fasta,
         open(inputf+".bai",'r')
     except:
         print_checkpoint("Input not indexed. Indexing...")
-        subprocess.check_call(shlex.split(path_to_samtools+"samtools index -@ {} {}".format(num_procs, inputf))
-
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools index -@ {} {}".format(num_procs, inputf)))
     ## Check fasta index
     try:
         f = open(reference_fasta+".fai",'r')
@@ -1788,7 +1787,7 @@ def call_methylated_sites_with_SNP_info(inputf, sample, reference_fasta,
         open(inputf+".bai",'r')
     except:
         print_checkpoint("Input not indexed. Indexing...")
-        subprocess.check_call(shlex.split(path_to_samtools+"samtools index -@ {} {}".format(num_procs, inputf))
+        subprocess.check_call(shlex.split(path_to_samtools+"samtools index -@ {} {}".format(num_procs, inputf)))
 
     ## Check fasta index
     try:
