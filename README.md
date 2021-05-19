@@ -66,6 +66,15 @@ See [here](https://docs.docker.com/storage/volumes/) for details.
 #### Step 1 - Download methylpy
 The easiest way of installing methylpy will be through PyPI by running `pip install methylpy`. The
 command `pip install --upgrade methylpy` updates methylpy to latest version.
+
+Methylpy can also be installed through [anaconda](https://www.anaconda.com/download/) or 
+[miniconda] (https://docs.conda.io/en/latest/miniconda.html). 
+```
+conda env create --name methylpy_env
+conda activate methylpy_env
+conda install -y -c bioconda -c conda-forge methylpy              
+```
+
 Alternatively, methylpy can be installed through github: enter the directory where you would
 like to install methylpy and run
 ```
