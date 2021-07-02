@@ -127,7 +127,7 @@ g++ -O3 -l gsl -l gslcblas -o run_rms_tests.out rms.cpp
 In Ubuntu (>=16.04), please try the below commands first.
 ```
 cd methylpy/methylpy/
-g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags —libs`
+g++ -o run_rms_tests.out rms.cpp `gsl-config --cflags --libs`
 ```
 
 Lastly, the compiled file `run_rms_tests.out` needs to be copied to the
