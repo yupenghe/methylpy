@@ -434,7 +434,7 @@ def add_DMRfind_subparser(subparsers):
                                      + "to get more statistical power.")
      
      parser_dmrfind_opt.add_argument("--resid-cutoff",
-                                     type=int,
+                                     type=float,
                                      default=0.01,
                                      help="Results will have to show deviations in the contingency "
                                      + "table in the same direction as the rest of the window")
@@ -522,7 +522,7 @@ def add_merge_DMS_subparser(subparsers):
                                       + "reported")
 
      parser_mergedms_opt.add_argument("--resid-cutoff",
-                                      type=int,
+                                      type=float,
                                       default=0.01,
                                       help="Results will have to show deviations in the contingency "
                                       + "table in the same direction as the rest of the window")
